@@ -159,6 +159,31 @@ class YmlDreamConfig(BaseDreamConfig):
         for s_name, s_definition in self._config.services.items():
             yield s_name, s_definition
 
+    def filter_services(
+        self,
+        include_names: list = None,
+        exclude_names: list = None,
+        inplace: bool = False,
+    ):
+        include_names = include_names or self._config.services.keys()
+        exclude_names = exclude_names or []
+
+        model_dict = {
+            "version": self._config.version,
+            "services": {
+                k: v
+                for k, v in self._config.services.items()
+                if k in include_names and k not in exclude_names
+            },
+        }
+        config = self.GENERIC_MODEL.parse_obj(model_dict)
+        if inplace:
+            self._config = config
+            value = self
+        else:
+            value = self.__class__(config)
+        return value
+
     def add_service(self, name: str, definition: AnyContainer, inplace: bool = False):
         services = self._config.copy().services
         services[name] = definition
@@ -195,6 +220,97 @@ class DreamPipeline(JsonDreamConfig):
             raise KeyError(f"{service} not found in pipeline!")
 
         return host, port, endpoint
+
+    @staticmethod
+    def _filter_connectors_by_name(
+        original_dict: Dict[str, PipelineConfConnector],
+        names: list,
+        exclude_names: list,
+    ):
+        filtered_dict = {}
+        for k, v in original_dict.items():
+            if v.url:
+                host, port, endpoint = _parse_connector_url(v.url)
+                if host in names and host not in exclude_names:
+                    filtered_dict[k] = v
+        return filtered_dict
+
+    @staticmethod
+    def _filter_services_by_name(
+        original_dict: Dict[str, PipelineConfService],
+        names: list,
+        exclude_names: list,
+    ):
+        filtered_dict = {}
+        for k, v in original_dict.items():
+            try:
+                url = v.connector.url
+            except AttributeError:
+                if k.replace("_", "-") in names:
+                    filtered_dict[k] = v
+            else:
+                if url:
+                    host, port, endpoint = _parse_connector_url(url)
+                    if host in names and host not in exclude_names:
+                        filtered_dict[k] = v
+        return filtered_dict
+
+    def filter_services(
+        self,
+        include_names: list = None,
+        exclude_names: list = None,
+        inplace: bool = False,
+    ):
+        include_names = include_names or []
+        exclude_names = exclude_names or []
+
+        connectors = self._filter_connectors_by_name(
+            self._config.connectors, include_names, exclude_names
+        )
+        post_annotators = self._filter_services_by_name(
+            self._config.services.post_annotators, include_names, exclude_names
+        )
+        annotators = self._filter_services_by_name(
+            self._config.services.annotators, include_names, exclude_names
+        )
+        skill_selectors = self._filter_services_by_name(
+            self._config.services.skill_selectors, include_names, exclude_names
+        )
+        skills = self._filter_services_by_name(
+            self._config.services.skills, include_names, exclude_names
+        )
+        post_skill_selector_annotators = self._filter_services_by_name(
+            self._config.services.post_skill_selector_annotators,
+            include_names,
+            exclude_names,
+        )
+        response_selectors = self._filter_services_by_name(
+            self._config.services.response_selectors, include_names, exclude_names
+        )
+
+        services = PipelineConfServiceList(
+            last_chance_service=self._config.services.last_chance_service,
+            timeout_service=self._config.services.timeout_service,
+            bot_annotator_selector=self._config.services.bot_annotator_selector,
+            post_annotators=post_annotators,
+            annotators=annotators,
+            skill_selectors=skill_selectors,
+            skills=skills,
+            post_skill_selector_annotators=post_skill_selector_annotators,
+            response_selectors=response_selectors,
+        )
+
+        model_dict = {
+            "connectors": connectors,
+            "services": services,
+        }
+        config = self.GENERIC_MODEL.parse_obj(model_dict)
+        if inplace:
+            self._config = config
+            value = self
+        else:
+            value = self.__class__(config)
+        return value
 
 
 class DreamComposeOverride(YmlDreamConfig):
@@ -385,6 +501,33 @@ class DreamDist:
             compose_local,
         )
 
+        return cls(dist_path, name, dream_root, **cls_kwargs)
+
+    @classmethod
+    def from_template(
+        cls,
+        name: str,
+        dream_root: Union[str, Path],
+        template_dist_name: str,
+        service_names: Optional[list] = None,
+        pipeline_conf: bool = True,
+        compose_override: bool = True,
+        compose_dev: bool = True,
+        compose_proxy: bool = True,
+        compose_local: bool = True,
+    ):
+        dist_path, name, dream_root = DreamDist.resolve_all_paths(
+            name=name, dream_root=dream_root
+        )
+        cls_kwargs = cls.load_configs_with_default_filenames(
+            cls.resolve_dist_path(template_dist_name, dream_root),
+            pipeline_conf,
+            compose_override,
+            compose_dev,
+            compose_proxy,
+            compose_local,
+            service_names=service_names,
+        )
         return cls(dist_path, name, dream_root, **cls_kwargs)
 
     def iter_configs(self):
