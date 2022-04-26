@@ -1,0 +1,1 @@
+from deeppavlov_dreamtools.distconfigs.manager import DreamDist
