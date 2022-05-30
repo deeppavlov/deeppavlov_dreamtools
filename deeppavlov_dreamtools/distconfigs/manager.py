@@ -550,3 +550,45 @@ class DreamDist:
             paths.append(path)
 
         return paths
+
+    def add_dff_skill(self, name: str):
+        skill_dir = Path(self.dream_root) / "skills" / name
+        if skill_dir.exists():
+            raise FileExistsError(f"{skill_dir} already exists!")
+
+        copytree("deeppavlov_dreamtools/static/dff_template_skill", skill_dir)
+        return skill_dir
+
+    def create_local_yml(
+        self,
+        services: list,
+        drop_ports: bool = True,
+        single_replica: bool = True,
+    ):
+        services = list(services) + ["agent", "mongo"]
+
+        dev_config_part = self.compose_dev.filter_services(services, inplace=False)
+        proxy_config_part = self.compose_proxy.filter_services(
+            exclude_names=services, inplace=False
+        )
+        local_config = DreamComposeLocal(
+            ComposeLocal(services=proxy_config_part.config.services)
+        )
+        all_config_parts = {
+            **dev_config_part.config.services,
+            **proxy_config_part.config.services,
+        }
+
+        for name, s in all_config_parts.items():
+            if name in services:
+                service = ComposeLocalContainer.parse_obj(s)
+                if drop_ports:
+                    service.ports = None
+            else:
+                service = s
+
+            if single_replica:
+                service.deploy = DeploymentDefinition(mode="replicated", replicas=1)
+
+            local_config.add_service(name, service, inplace=True)
+        return local_config.to_dist(self.dist_path)
