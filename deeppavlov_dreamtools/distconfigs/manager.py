@@ -27,6 +27,17 @@ from deeppavlov_dreamtools.distconfigs.generics import (
 def _parse_connector_url(
     url: Optional[str] = None,
 ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    """
+    Deserializes a string into host, port, endpoint components.
+
+    Args:
+        url: Full url string of format http(s)://{host}:{port}/{endpoint}.
+            If empty, returns (None, None, None)
+
+    Returns:
+        tuple of (host, port, endpoint)
+
+    """
     host = port = endpoint = None
     if url:
         url_without_protocol = url.split("//")[-1]
@@ -42,6 +53,11 @@ def _parse_connector_url(
 
 
 class BaseDreamConfig:
+    """
+    Base class which wraps a generic config model.
+
+    Implements basic loaders and dumpers and defines constant class attributes.
+    """
     DEFAULT_FILE_NAME: str
     GENERIC_MODEL: AnyConfig
 
@@ -57,7 +73,7 @@ class BaseDreamConfig:
         raise NotImplementedError("Override this function")
 
     @staticmethod
-    def dump(data: Any, path: Union[Path, str], overwrite: bool = False):
+    def dump(data: Any, path: Union[Path, str], overwrite: bool = False) -> Path:
         raise NotImplementedError("Override this function")
 
     @classmethod
@@ -120,6 +136,11 @@ class BaseDreamConfig:
 
 
 class JsonDreamConfig(BaseDreamConfig):
+    """
+    Base class which wraps a JSON config model.
+
+    Implements or overrides common methods for JSON configs.
+    """
     @staticmethod
     def load(path: Union[Path, str]):
         with open(path, "r", encoding="utf-8") as json_f:
@@ -137,6 +158,11 @@ class JsonDreamConfig(BaseDreamConfig):
 
 
 class YmlDreamConfig(BaseDreamConfig):
+    """
+    Base class which wraps a YML config model.
+
+    Implements or overrides common methods for YML configs.
+    """
     @staticmethod
     def load(path: Union[Path, str]):
         with open(path, "r", encoding="utf-8") as yml_f:
@@ -202,6 +228,11 @@ class YmlDreamConfig(BaseDreamConfig):
 
 
 class DreamPipeline(JsonDreamConfig):
+    """
+    Main class which wraps a ``pipeline_conf.json`` config model.
+
+    Implements or overrides methods specific to the pipeline config.
+    """
     DEFAULT_FILE_NAME = "pipeline_conf.json"
     GENERIC_MODEL = PipelineConf
 
@@ -314,23 +345,50 @@ class DreamPipeline(JsonDreamConfig):
 
 
 class DreamComposeOverride(YmlDreamConfig):
+    """
+    Main class which wraps a ``docker-compose.override.yml`` config model.
+
+    Implements or overrides methods specific to the docker compose override config.
+    """
+
     DEFAULT_FILE_NAME = "docker-compose.override.yml"
     GENERIC_MODEL = ComposeOverride
 
 
 class DreamComposeDev(YmlDreamConfig):
+    """
+    Main class which wraps a ``dev.yml`` config model.
+
+    Implements or overrides methods specific to the dev config.
+    """
+
     DEFAULT_FILE_NAME = "dev.yml"
     GENERIC_MODEL = ComposeDev
 
 
 class DreamComposeProxy(YmlDreamConfig):
+    """
+    Main class which wraps a ``proxy.yml`` config model.
+
+    Implements or overrides methods specific to the proxy config.
+    """
+
     DEFAULT_FILE_NAME = "proxy.yml"
     GENERIC_MODEL = ComposeProxy
 
 
 class DreamComposeLocal(YmlDreamConfig):
+    """
+    Main class which wraps a ``local.yml`` config model.
+
+    Implements or overrides methods specific to the local config.
+    """
+
     DEFAULT_FILE_NAME = "local.yml"
     GENERIC_MODEL = ComposeLocal
+
+
+AnyConfigClass = Union[DreamPipeline, DreamComposeOverride, DreamComposeDev, DreamComposeProxy, DreamComposeLocal]
 
 
 class DreamDist:
@@ -345,6 +403,19 @@ class DreamDist:
         compose_proxy: DreamComposeProxy = None,
         compose_local: DreamComposeLocal = None,
     ):
+        """
+        Instantiates a new DreamDist object
+
+        Args:
+            dist_path: path to Dream distribution
+            name: name of Dream distribution
+            dream_root: path to Dream root directory
+            pipeline_conf: instance of DreamPipeline config
+            compose_override: instance of DreamComposeOverride config
+            compose_dev: instance of DreamComposeDev config
+            compose_proxy: instance of DreamComposeProxy config
+            compose_local: instance of DreamComposeLocal config
+        """
         self.dist_path = Path(dist_path)
         self.name = name
         self.dream_root = dream_root
@@ -363,7 +434,24 @@ class DreamDist:
         compose_proxy: bool,
         compose_local: bool,
         service_names: Optional[list] = None,
-    ):
+    ) -> Dict[str, AnyConfigClass]:
+        """
+        Loads config objects using their default file names located under given Dream distribution path.
+
+        Args:
+            dist_path: path to Dream distribution
+            pipeline_conf: if True, loads pipeline_conf.json
+            compose_override: if True, loads docker-compose.override.yml
+            compose_dev: if True, loads dev.yml
+            compose_proxy: if True, loads proxy.yml
+            compose_local: if True, loads local.yml
+            service_names: filter services by name.
+                If empty, no filters are applied.
+
+        Returns:
+            dict with arg_names as keys, config_objects as values
+
+        """
         kwargs = {}
 
         if pipeline_conf:
@@ -391,13 +479,20 @@ class DreamDist:
         dream_root: Union[str, Path] = None,
     ):
         """
-        Resolve path to Dream distribution, its name, and Dream root path
-        from either ``dist_path`` or ``name`` and ``dream_root``
+        Resolves path to Dream distribution, its name, and Dream root path
+        from either ``dist_path`` or ``name`` and ``dream_root``.
 
-        :param dist_path: Dream distribution path
-        :param name: Dream distribution name
-        :param dream_root: Dream root path
-        :return:
+        Args:
+            dist_path: path to Dream distribution
+            name: name of Dream distribution
+            dream_root: path to Dream root directory
+
+        Returns:
+            tuple of (distribution path, distribution name, dream root path)
+
+        Raises:
+            ValueError: not enough arguments to resolve
+            NotADirectoryError: dist_path is not a valid Dream distribution directory
         """
         if dist_path:
             name, dream_root = DreamDist.resolve_name_and_dream_root(dist_path)
@@ -414,21 +509,29 @@ class DreamDist:
     @staticmethod
     def resolve_dist_path(name: str, dream_root: Union[str, Path]):
         """
-        Resolve path to Dream distribution from name and Dream root path
+        Resolves path to Dream distribution from name and Dream root path.
 
-        :param name: Dream distribution name
-        :param dream_root: Dream root path
-        :return:
+        Args:
+            name: name of Dream distribution
+            dream_root: path to Dream root directory
+
+        Returns:
+            path to Dream distribution
+
         """
         return Path(dream_root) / "assistant_dists" / name
 
     @staticmethod
     def resolve_name_and_dream_root(path: Union[str, Path]):
         """
-        Resolve name and Dream root directory path from Dream distribution path
+        Resolves name and Dream root directory path from Dream distribution path.
 
-        :param path: Dream distribution path
-        :return:
+        Args:
+            path: path to Dream distribution
+
+        Returns:
+            tuple of (name of Dream distribution, path to Dream root directory)
+
         """
         path = Path(path)
         return path.name, path.parents[1]
@@ -445,16 +548,19 @@ class DreamDist:
         compose_local: bool = True,
     ):
         """
-        Load Dream distribution from ``name`` and ``dream_root`` path with default configs
+        Loads Dream distribution from ``name`` and ``dream_root`` path with default configs.
 
-        :param name: Dream distribution name.
-        :param dream_root: Dream root path.
-        :param pipeline_conf: load `pipeline_conf.json` inside ``path``
-        :param compose_override: load `docker-compose.override.yml` inside ``path``
-        :param compose_dev: load `dev.yml` inside ``path``
-        :param compose_proxy: load `proxy.yml` inside ``path``
-        :param compose_local: load `local.yml` inside ``path``
-        :return: instance of DreamDist
+        Args:
+            name: Dream distribution name.
+            dream_root: Dream root path.
+            pipeline_conf: load `pipeline_conf.json` inside ``path``
+            compose_override: load `docker-compose.override.yml` inside ``path``
+            compose_dev: load `dev.yml` inside ``path``
+            compose_proxy: load `proxy.yml` inside ``path``
+            compose_local: load `local.yml` inside ``path``
+
+        Returns:
+            instance of DreamDist
         """
         dist_path, name, dream_root = DreamDist.resolve_all_paths(
             name=name, dream_root=dream_root
@@ -481,15 +587,17 @@ class DreamDist:
         compose_local: bool = True,
     ):
         """
-        Load Dream distribution from ``dist_path`` with default configs
+        Loads Dream distribution from ``dist_path`` with default configs.
 
-        :param dist_path: path to Dream distribution, e.g. ``~/dream/assistant_dists/dream``.
-        :param pipeline_conf: load `pipeline_conf.json` inside ``path``
-        :param compose_override: load `docker-compose.override.yml` inside ``path``
-        :param compose_dev: load `dev.yml` inside ``path``
-        :param compose_proxy: load `proxy.yml` inside ``path``
-        :param compose_local: load `local.yml` inside ``path``
-        :return: instance of DreamDist
+        Args:
+            dist_path: path to Dream distribution, e.g. ``~/dream/assistant_dists/dream``.
+            pipeline_conf: load `pipeline_conf.json` inside ``path``
+            compose_override: load `docker-compose.override.yml` inside ``path``
+            compose_dev: load `dev.yml` inside ``path``
+            compose_proxy: load `proxy.yml` inside ``path``
+            compose_local: load `local.yml` inside ``path``
+        Returns:
+            instance of DreamDist
         """
         dist_path, name, dream_root = DreamDist.resolve_all_paths(dist_path=dist_path)
         cls_kwargs = cls.load_configs_with_default_filenames(
@@ -516,6 +624,24 @@ class DreamDist:
         compose_proxy: bool = True,
         compose_local: bool = True,
     ):
+        """
+        Creates Dream distribution inherited from another distribution.
+
+        The new distribution only has services included in ``service_names``.
+
+        Args:
+            name: name of new Dream distribution
+            dream_root: path to Dream root directory
+            template_dist_name: name of Dream distribution used as a template
+            service_names: list of services to be included in new distribution
+            pipeline_conf: load `pipeline_conf.json` inside ``path``
+            compose_override: load `docker-compose.override.yml` inside ``path``
+            compose_dev: load `dev.yml` inside ``path``
+            compose_proxy: load `proxy.yml` inside ``path``
+            compose_local: load `local.yml` inside ``path``
+        Returns:
+            instance of DreamDist
+        """
         dist_path, name, dream_root = DreamDist.resolve_all_paths(
             name=name, dream_root=dream_root
         )
@@ -531,6 +657,13 @@ class DreamDist:
         return cls(dist_path, name, dream_root, **cls_kwargs)
 
     def iter_configs(self):
+        """
+        Iterates over loaded config objects.
+
+        Yields:
+            config object
+
+        """
         for config in [
             self.pipeline_conf,
             self.compose_override,
@@ -542,6 +675,15 @@ class DreamDist:
                 yield config
 
     def save(self, overwrite: bool = False):
+        """
+        Dumps current config objects to files.
+
+        Args:
+            overwrite: if True, overwrites existing files
+
+        Returns:
+            list of paths to saved config files
+        """
         paths = []
 
         self.dist_path.mkdir(parents=True, exist_ok=overwrite)
@@ -552,6 +694,15 @@ class DreamDist:
         return paths
 
     def add_dff_skill(self, name: str):
+        """
+        Adds DFF skill to distribution.
+
+        Args:
+            name: name of new DFF skill
+
+        Returns:
+            path to new DFF skill
+        """
         skill_dir = Path(self.dream_root) / "skills" / name
         if skill_dir.exists():
             raise FileExistsError(f"{skill_dir} already exists!")
@@ -565,6 +716,22 @@ class DreamDist:
         drop_ports: bool = True,
         single_replica: bool = True,
     ):
+        """
+        Creates local config for distribution.
+
+        Picks up container definitions from dev and proxy configs,
+        replaces selected proxy services with their definitions from dev config,
+        and dumps the resulting config to ``local.yml``
+
+        Args:
+            services: list of service names which should be deployed locally
+            drop_ports: if True, removes port definitions from local services
+            single_replica: if True, adds deployment arguments to all services
+
+        Returns:
+            path to new local config
+
+        """
         services = list(services) + ["agent", "mongo"]
 
         dev_config_part = self.compose_dev.filter_services(services, inplace=False)
