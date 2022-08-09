@@ -98,7 +98,7 @@ def new_dff(ctx: click.Context, name: str, dist: str):
 )
 @click.option("--overwrite/--no-overwrite", default=False)
 @click.option("--all", "all_configs", is_flag=True, default=False)
-@click.option("--pipeline/--no-pipeline", default=False)
+@click.option("--pipeline/--no-pipeline", default=True)
 @click.option("--compose-override/--no-compose-override", default=False)
 @click.option("--compose-dev/--no-compose-dev", default=False)
 @click.option("--compose-proxy/--no-compose-proxy", default=False)

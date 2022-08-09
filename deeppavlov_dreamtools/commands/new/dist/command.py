@@ -16,10 +16,18 @@ def dist(
     mk_compose_proxy: bool = False,
     mk_compose_local: bool = False,
 ):
-    dream_dist = DreamDist.from_template(
+    dream_dist = DreamDist.from_name(
+        template_name,
+        dream_root,
+        mk_pipeline_conf,
+        mk_compose_override,
+        mk_compose_dev,
+        mk_compose_proxy,
+        mk_compose_local,
+    )
+    new_dist = dream_dist.create_dist(
         name,
         dream_root,
-        template_name,
         services,
         mk_pipeline_conf,
         mk_compose_override,
@@ -27,6 +35,6 @@ def dist(
         mk_compose_proxy,
         mk_compose_local,
     )
-    paths = dream_dist.save(overwrite)
+    paths = new_dist.save(overwrite)
 
     return paths

@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 from shutil import copytree
 from typing import Union, Any, Optional, Tuple, Literal, Callable, Dict
@@ -130,7 +131,7 @@ class BaseDreamConfig:
         return self.dump(config, path, overwrite)
 
     def filter_services(
-        self, include_names: list, exclude_names: list = None, inplace: bool = False
+        self, include_names: list, exclude_names: list = None
     ):
         raise NotImplementedError("Override this function")
 
@@ -189,7 +190,6 @@ class YmlDreamConfig(BaseDreamConfig):
         self,
         include_names: list = None,
         exclude_names: list = None,
-        inplace: bool = False,
     ):
         include_names = include_names or self._config.services.keys()
         exclude_names = exclude_names or []
@@ -203,12 +203,7 @@ class YmlDreamConfig(BaseDreamConfig):
             },
         }
         config = self.GENERIC_MODEL.parse_obj(model_dict)
-        if inplace:
-            self._config = config
-            value = self
-        else:
-            value = self.__class__(config)
-        return value
+        return include_names, self.__class__(config)
 
     def add_service(self, name: str, definition: AnyContainer, inplace: bool = False):
         services = self._config.copy().services
@@ -236,112 +231,75 @@ class DreamPipeline(JsonDreamConfig):
     DEFAULT_FILE_NAME = "pipeline_conf.json"
     GENERIC_MODEL = PipelineConf
 
-    @property
-    def container_names(self):
-        for s in self._config.services.flattened_dict.values():
-            host, _, _ = _parse_connector_url(s.connector_url)
-            if host:
-                yield host
+    # @property
+    # def container_names(self):
+    #     for s in self._config.services.flattened_dict.values():
+    #         host, _, _ = _parse_connector_url(s.connector_url)
+    #         if host:
+    #             yield host
 
-    def discover_host_port_endpoint(self, service: str):
-        try:
-            url = self._config.services.flattened_dict[service].connector_url
-            host, port, endpoint = _parse_connector_url(url)
-        except KeyError:
-            raise KeyError(f"{service} not found in pipeline!")
+    # def discover_host_port_endpoint(self, service: str):
+    #     try:
+    #         url = self._config.services.flattened_dict[service].connector_url
+    #         host, port, endpoint = _parse_connector_url(url)
+    #     except KeyError:
+    #         raise KeyError(f"{service} not found in pipeline!")
+    #
+    #     return host, port, endpoint
 
-        return host, port, endpoint
-
-    @staticmethod
-    def _filter_connectors_by_name(
-        original_dict: Dict[str, PipelineConfConnector],
-        names: list,
-        exclude_names: list,
-    ):
-        filtered_dict = {}
-        for k, v in original_dict.items():
-            if v.url:
-                host, port, endpoint = _parse_connector_url(v.url)
-                if host in names and host not in exclude_names:
-                    filtered_dict[k] = v
-        return filtered_dict
-
-    @staticmethod
     def _filter_services_by_name(
-        original_dict: Dict[str, PipelineConfService],
+        self,
         names: list,
-        exclude_names: list,
     ):
-        filtered_dict = {}
-        for k, v in original_dict.items():
-            try:
-                url = v.connector.url
-            except AttributeError:
-                if k.replace("_", "-") in names:
-                    filtered_dict[k] = v
-            else:
-                if url:
-                    host, port, endpoint = _parse_connector_url(url)
-                    if host in names and host not in exclude_names:
-                        filtered_dict[k] = v
-        return filtered_dict
+        for service_group in self.config.services.editable_groups:
+            for service_name, service in getattr(self.config.services, service_group).items():
+                if hasattr(service.connector, "url"):
+                    url = service.connector.url
+                    if url:
+                        host, port, endpoint = _parse_connector_url(url)
+                        if host in names:
+                            yield service_group, service_name, service
+                else:
+                    service_name = service_name.replace("_", "-")
+                    if service_name in names:
+                        yield service_group, service_name, service
 
     def filter_services(
         self,
         include_names: list = None,
         exclude_names: list = None,
-        inplace: bool = False,
     ):
         include_names = include_names or []
         exclude_names = exclude_names or []
 
-        connectors = self._filter_connectors_by_name(
-            self._config.connectors, include_names, exclude_names
-        )
-        post_annotators = self._filter_services_by_name(
-            self._config.services.post_annotators, include_names, exclude_names
-        )
-        annotators = self._filter_services_by_name(
-            self._config.services.annotators, include_names, exclude_names
-        )
-        skill_selectors = self._filter_services_by_name(
-            self._config.services.skill_selectors, include_names, exclude_names
-        )
-        skills = self._filter_services_by_name(
-            self._config.services.skills, include_names, exclude_names
-        )
-        post_skill_selector_annotators = self._filter_services_by_name(
-            self._config.services.post_skill_selector_annotators,
-            include_names,
-            exclude_names,
-        )
-        response_selectors = self._filter_services_by_name(
-            self._config.services.response_selectors, include_names, exclude_names
-        )
+        filtered_dict = {grp: {} for grp in self.config.services.editable_groups}
+        include_names_extended = list(include_names).copy()
 
-        services = PipelineConfServiceList(
-            last_chance_service=self._config.services.last_chance_service,
-            timeout_service=self._config.services.timeout_service,
-            bot_annotator_selector=self._config.services.bot_annotator_selector,
-            post_annotators=post_annotators,
-            annotators=annotators,
-            skill_selectors=skill_selectors,
-            skills=skills,
-            post_skill_selector_annotators=post_skill_selector_annotators,
-            response_selectors=response_selectors,
-        )
+        for group, name, service in self._filter_services_by_name(include_names):
+            filtered_dict[group][name] = service
+
+            previous_services = service.previous_services or []
+            required_previous_services = service.required_previous_services or []
+            for required_service_name in previous_services + required_previous_services:
+                required_service_parts = required_service_name.split(".", maxsplit=1)
+                if len(required_service_parts) > 1:
+                    required_group, required_name = required_service_parts
+                    required_service = getattr(self.config.services, required_group)[required_name]
+                    filtered_dict[required_group][required_name] = required_service
+                    include_names_extended.append(required_name)
+
+        filtered_dict["last_chance_service"] = self.config.services.last_chance_service
+        filtered_dict["timeout_service"] = self.config.services.timeout_service
+        filtered_dict["bot_annotator_selector"] = self.config.services.bot_annotator_selector
+        filtered_dict["skill_selectors"] = self.config.services.skill_selectors
+        services = PipelineConfServiceList(**filtered_dict)
 
         model_dict = {
-            "connectors": connectors,
+            "connectors": self.config.connectors,
             "services": services,
         }
-        config = self.GENERIC_MODEL.parse_obj(model_dict)
-        if inplace:
-            self._config = config
-            value = self
-        else:
-            value = self.__class__(config)
-        return value
+        config = self.GENERIC_MODEL(**model_dict)
+        return include_names_extended, self.__class__(config)
 
 
 class DreamComposeOverride(YmlDreamConfig):
@@ -433,7 +391,6 @@ class DreamDist:
         compose_dev: bool,
         compose_proxy: bool,
         compose_local: bool,
-        service_names: Optional[list] = None,
     ) -> Dict[str, AnyConfigClass]:
         """
         Loads config objects using their default file names located under given Dream distribution path.
@@ -445,8 +402,6 @@ class DreamDist:
             compose_dev: if True, loads dev.yml
             compose_proxy: if True, loads proxy.yml
             compose_local: if True, loads local.yml
-            service_names: filter services by name.
-                If empty, no filters are applied.
 
         Returns:
             dict with arg_names as keys, config_objects as values
@@ -465,11 +420,6 @@ class DreamDist:
         if compose_local:
             kwargs["compose_local"] = DreamComposeLocal.from_dist(dist_path)
 
-        if service_names:
-            kwargs = {
-                k: v.filter_services(service_names, inplace=True)
-                for k, v in kwargs.items()
-            }
         return kwargs
 
     @staticmethod
@@ -611,12 +561,10 @@ class DreamDist:
 
         return cls(dist_path, name, dream_root, **cls_kwargs)
 
-    @classmethod
-    def from_template(
-        cls,
+    def create_dist(
+        self,
         name: str,
         dream_root: Union[str, Path],
-        template_dist_name: str,
         service_names: Optional[list] = None,
         pipeline_conf: bool = True,
         compose_override: bool = True,
@@ -632,7 +580,6 @@ class DreamDist:
         Args:
             name: name of new Dream distribution
             dream_root: path to Dream root directory
-            template_dist_name: name of Dream distribution used as a template
             service_names: list of services to be included in new distribution
             pipeline_conf: load `pipeline_conf.json` inside ``path``
             compose_override: load `docker-compose.override.yml` inside ``path``
@@ -642,21 +589,39 @@ class DreamDist:
         Returns:
             instance of DreamDist
         """
-        dist_path, name, dream_root = DreamDist.resolve_all_paths(
-            name=name, dream_root=dream_root
-        )
-        cls_kwargs = cls.load_configs_with_default_filenames(
-            cls.resolve_dist_path(template_dist_name, dream_root),
-            pipeline_conf,
-            compose_override,
-            compose_dev,
-            compose_proxy,
-            compose_local,
-            service_names=service_names,
-        )
-        return cls(dist_path, name, dream_root, **cls_kwargs)
+        new_compose_override = new_compose_dev = new_compose_proxy = new_compose_local = None
+        all_names, new_pipeline_conf = self.pipeline_conf.filter_services(service_names)
+        all_names += ["agent", "mongo"]
+        if compose_override:
+            _, new_compose_override = self.compose_override.filter_services(all_names)
 
-    def iter_configs(self):
+            new_agent_command = re.sub(
+                f"assistant_dists/{self.name}/pipeline_conf.json",
+                f"assistant_dists/{name}/pipeline_conf.json",
+                new_compose_override.config.services["agent"].command
+            )
+            new_compose_override.config.services["agent"].command = new_agent_command
+
+            new_compose_override.config.services["agent"].environment["WAIT_HOSTS"] = ""
+        if compose_dev:
+            _, new_compose_dev = self.compose_dev.filter_services(all_names)
+        if compose_proxy:
+            _, new_compose_proxy = self.compose_proxy.filter_services(all_names)
+        if compose_local:
+            _, new_compose_local = self.compose_local.filter_services(all_names)
+
+        return DreamDist(
+            self.resolve_dist_path(name, dream_root),
+            name,
+            dream_root,
+            new_pipeline_conf,
+            new_compose_override,
+            new_compose_dev,
+            new_compose_proxy,
+            new_compose_local
+        )
+
+    def iter_loaded_configs(self):
         """
         Iterates over loaded config objects.
 
@@ -687,7 +652,7 @@ class DreamDist:
         paths = []
 
         self.dist_path.mkdir(parents=True, exist_ok=overwrite)
-        for config in self.iter_configs():
+        for config in self.iter_loaded_configs():
             path = config.to_dist(self.dist_path, overwrite)
             paths.append(path)
 

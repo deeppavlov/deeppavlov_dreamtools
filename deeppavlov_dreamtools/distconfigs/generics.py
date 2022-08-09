@@ -71,31 +71,31 @@ class PipelineConfServiceList(BaseModelNoExtra):
         return ["last_chance_service", "timeout_service", "bot_annotator_selector"]
 
     @property
-    def nested_keys(self):
+    def editable_groups(self):
         return [
             "post_annotators",
             "annotators",
-            "skill_selectors",
+            # "skill_selectors",
             "skills",
             "post_skill_selector_annotators",
             "response_selectors",
         ]
 
-    @property
-    def flattened_dict(self) -> Dict[str, PipelineConfService]:
-        flattened_service_dict = {
-            **self.post_annotators,
-            **self.annotators,
-            **self.skill_selectors,
-            **self.skills,
-            **self.post_skill_selector_annotators,
-            **self.response_selectors,
-            "last_chance_service": self.last_chance_service,
-            "timeout_service": self.timeout_service,
-            "bot_annotator_selector": self.bot_annotator_selector,
-        }
-
-        return flattened_service_dict
+    # @property
+    # def flattened_dict(self) -> Dict[str, PipelineConfService]:
+    #     flattened_service_dict = {
+    #         **self.post_annotators,
+    #         **self.annotators,
+    #         **self.skill_selectors,
+    #         **self.skills,
+    #         **self.post_skill_selector_annotators,
+    #         **self.response_selectors,
+    #         "last_chance_service": self.last_chance_service,
+    #         "timeout_service": self.timeout_service,
+    #         "bot_annotator_selector": self.bot_annotator_selector,
+    #     }
+    #
+    #     return flattened_service_dict
 
 
 class PipelineConf(BaseModelNoExtra):

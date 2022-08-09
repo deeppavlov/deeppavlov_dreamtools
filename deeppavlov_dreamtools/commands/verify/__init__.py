@@ -1,1 +1,1 @@
-from deeppavlov_dreamtools.commands.verify.dist.command import dist
+# from deeppavlov_dreamtools.commands.verify.dist.command import dist
