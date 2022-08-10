@@ -715,6 +715,7 @@ class DreamDist:
 
         Args:
             name: name of new DFF skill
+            port: port where new DFF skill should be deployed
 
         Returns:
             path to new DFF skill
@@ -726,7 +727,9 @@ class DreamDist:
         if skill_dir.exists():
             raise FileExistsError(f"{skill_dir} already exists!")
 
-        copytree("deeppavlov_dreamtools/static/dff_template_skill", skill_dir)
+        pkg_source_dir = Path(__file__).parents[1]
+        dff_template_dir = pkg_source_dir / "static" / "dff_template_skill"
+        copytree(dff_template_dir, skill_dir)
 
         if self.pipeline_conf:
             pl_service = PipelineConfService(

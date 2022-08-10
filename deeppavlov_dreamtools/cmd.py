@@ -113,7 +113,7 @@ def new_dff(
     )
     click.echo(
         f"Created new dff skill at {new_dff_path}.\n"
-        f"Don't forget to define your state formatter '{name}_skill'"
+        f"Don't forget to define your state formatter '{name}_formatter' "
         f"in 'dream/state_formatters/dp_formatters.py'"
     )
 
