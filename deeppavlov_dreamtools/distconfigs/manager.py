@@ -264,6 +264,18 @@ class DreamPipeline(JsonDreamConfig):
                     if service_name in names:
                         yield service_group, service_name, service
 
+    def _recursively_parse_requirements(self, service: PipelineConfService):
+        previous_services = service.previous_services or []
+        required_previous_services = service.required_previous_services or []
+
+        for required_service_name in previous_services + required_previous_services:
+            required_service_parts = required_service_name.split(".", maxsplit=1)
+            if len(required_service_parts) > 1:
+                required_group, required_name = required_service_parts
+                required_service = getattr(self.config.services, required_group)[required_name]
+                yield required_group, required_name, required_service
+                yield from self._recursively_parse_requirements(required_service)
+
     def filter_services(
         self,
         include_names: list = None,
@@ -278,15 +290,9 @@ class DreamPipeline(JsonDreamConfig):
         for group, name, service in self._filter_services_by_name(include_names):
             filtered_dict[group][name] = service
 
-            previous_services = service.previous_services or []
-            required_previous_services = service.required_previous_services or []
-            for required_service_name in previous_services + required_previous_services:
-                required_service_parts = required_service_name.split(".", maxsplit=1)
-                if len(required_service_parts) > 1:
-                    required_group, required_name = required_service_parts
-                    required_service = getattr(self.config.services, required_group)[required_name]
-                    filtered_dict[required_group][required_name] = required_service
-                    include_names_extended.append(required_name)
+            for required_group, required_name, required_service in self._recursively_parse_requirements(service):
+                filtered_dict[required_group][required_name] = required_service
+                include_names_extended.append(required_name)
 
         filtered_dict["last_chance_service"] = self.config.services.last_chance_service
         filtered_dict["timeout_service"] = self.config.services.timeout_service
@@ -591,7 +597,7 @@ class DreamDist:
         """
         new_compose_override = new_compose_dev = new_compose_proxy = new_compose_local = None
         all_names, new_pipeline_conf = self.pipeline_conf.filter_services(service_names)
-        all_names += ["agent", "mongo"]
+        all_names += ["agent", "mongo", "spelling-preprocessing"]
         if compose_override:
             _, new_compose_override = self.compose_override.filter_services(all_names)
 
