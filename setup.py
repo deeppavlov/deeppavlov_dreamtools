@@ -13,6 +13,7 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
+        "pydantic==1.9.0",
         "Click==8.0.3",
         "PyYAML==5.3b1",
     ],
