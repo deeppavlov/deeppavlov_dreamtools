@@ -122,23 +122,29 @@ def new_dist(
     if all_configs:
         pipeline = compose_override = compose_dev = compose_proxy = compose_local = True
 
-    new_config_paths = commands.new.dist(
-        name,
-        ctx.obj.dream_root,
-        dist,
-        services,
-        overwrite,
-        pipeline,
-        compose_override,
-        compose_dev,
-        compose_proxy,
-        compose_local,
-    )
+    try:
+        new_config_paths = commands.new.dist(
+            name,
+            ctx.obj.dream_root,
+            dist,
+            services,
+            overwrite,
+            pipeline,
+            compose_override,
+            compose_dev,
+            compose_proxy,
+            compose_local,
+        )
 
-    new_config_paths = ", ".join(str(p) for p in new_config_paths)
-    click.echo(
-        f"Created new Dream distribution {name} from {dist} with configs: {new_config_paths}"
-    )
+        new_config_paths = ", ".join(str(p) for p in new_config_paths)
+        click.echo(
+            f"Created new Dream distribution {name} from {dist} with configs: {new_config_paths}"
+        )
+    except FileExistsError:
+        raise click.ClickException(
+            f"{name} distribution already exists! "
+            "Run 'dreamtools new dist' with --overwrite flag to avoid this error message"
+        )
 
 
 @new.command("skill")

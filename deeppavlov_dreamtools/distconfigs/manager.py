@@ -151,7 +151,7 @@ class JsonDreamConfig(BaseDreamConfig):
 
     @staticmethod
     def dump(data: Any, path: Union[Path, str], overwrite: bool = False):
-        mode = "x" if overwrite else "w"
+        mode = "w" if overwrite else "x"
         with open(path, mode, encoding="utf-8") as yml_f:
             json.dump(data, yml_f, indent=4)
 
@@ -173,7 +173,7 @@ class YmlDreamConfig(BaseDreamConfig):
 
     @staticmethod
     def dump(data: Any, path: Union[Path, str], overwrite: bool = False):
-        mode = "x" if overwrite else "w"
+        mode = "w" if overwrite else "x"
         with open(path, mode, encoding="utf-8") as yml_f:
             yaml.dump(data, yml_f)
 
