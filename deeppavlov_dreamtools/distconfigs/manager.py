@@ -22,6 +22,9 @@ from deeppavlov_dreamtools.distconfigs.generics import (
     ComposeLocal,
     DeploymentDefinition,
     ComposeLocalContainer,
+    ContainerBuildDefinition,
+    DeploymentDefinitionResources,
+    DeploymentDefinitionResourcesArg,
 )
 
 
@@ -59,6 +62,7 @@ class BaseDreamConfig:
 
     Implements basic loaders and dumpers and defines constant class attributes.
     """
+
     DEFAULT_FILE_NAME: str
     GENERIC_MODEL: AnyConfig
 
@@ -130,9 +134,7 @@ class BaseDreamConfig:
         path = Path(dist_path) / self.DEFAULT_FILE_NAME
         return self.dump(config, path, overwrite)
 
-    def filter_services(
-        self, include_names: list, exclude_names: list = None
-    ):
+    def filter_services(self, include_names: list, exclude_names: list = None):
         raise NotImplementedError("Override this function")
 
 
@@ -142,6 +144,7 @@ class JsonDreamConfig(BaseDreamConfig):
 
     Implements or overrides common methods for JSON configs.
     """
+
     @staticmethod
     def load(path: Union[Path, str]):
         with open(path, "r", encoding="utf-8") as json_f:
@@ -164,6 +167,7 @@ class YmlDreamConfig(BaseDreamConfig):
 
     Implements or overrides common methods for YML configs.
     """
+
     @staticmethod
     def load(path: Union[Path, str]):
         with open(path, "r", encoding="utf-8") as yml_f:
@@ -228,6 +232,7 @@ class DreamPipeline(JsonDreamConfig):
 
     Implements or overrides methods specific to the pipeline config.
     """
+
     DEFAULT_FILE_NAME = "pipeline_conf.json"
     GENERIC_MODEL = PipelineConf
 
@@ -252,7 +257,9 @@ class DreamPipeline(JsonDreamConfig):
         names: list,
     ):
         for service_group in self.config.services.editable_groups:
-            for service_name, service in getattr(self.config.services, service_group).items():
+            for service_name, service in getattr(
+                self.config.services, service_group
+            ).items():
                 if hasattr(service.connector, "url"):
                     url = service.connector.url
                     if url:
@@ -272,7 +279,9 @@ class DreamPipeline(JsonDreamConfig):
             required_service_parts = required_service_name.split(".", maxsplit=1)
             if len(required_service_parts) > 1:
                 required_group, required_name = required_service_parts
-                required_service = getattr(self.config.services, required_group)[required_name]
+                required_service = getattr(self.config.services, required_group)[
+                    required_name
+                ]
                 yield required_group, required_name, required_service
                 yield from self._recursively_parse_requirements(required_service)
 
@@ -290,13 +299,19 @@ class DreamPipeline(JsonDreamConfig):
         for group, name, service in self._filter_services_by_name(include_names):
             filtered_dict[group][name] = service
 
-            for required_group, required_name, required_service in self._recursively_parse_requirements(service):
+            for (
+                required_group,
+                required_name,
+                required_service,
+            ) in self._recursively_parse_requirements(service):
                 filtered_dict[required_group][required_name] = required_service
                 include_names_extended.append(required_name)
 
         filtered_dict["last_chance_service"] = self.config.services.last_chance_service
         filtered_dict["timeout_service"] = self.config.services.timeout_service
-        filtered_dict["bot_annotator_selector"] = self.config.services.bot_annotator_selector
+        filtered_dict[
+            "bot_annotator_selector"
+        ] = self.config.services.bot_annotator_selector
         filtered_dict["skill_selectors"] = self.config.services.skill_selectors
         services = PipelineConfServiceList(**filtered_dict)
 
@@ -306,6 +321,28 @@ class DreamPipeline(JsonDreamConfig):
         }
         config = self.GENERIC_MODEL(**model_dict)
         return include_names_extended, self.__class__(config)
+
+    def add_service(
+        self,
+        name: str,
+        service_type: str,
+        definition: PipelineConfService,
+        inplace: bool = False,
+    ):
+        services = self._config.copy().services
+        getattr(services, service_type)[name] = definition
+
+        model_dict = {
+            "connectors": self._config.connectors,
+            "services": services,
+        }
+        config = self.GENERIC_MODEL.parse_obj(model_dict)
+        if inplace:
+            self._config = config
+            value = self
+        else:
+            value = self.__class__(config)
+        return value
 
 
 class DreamComposeOverride(YmlDreamConfig):
@@ -352,7 +389,13 @@ class DreamComposeLocal(YmlDreamConfig):
     GENERIC_MODEL = ComposeLocal
 
 
-AnyConfigClass = Union[DreamPipeline, DreamComposeOverride, DreamComposeDev, DreamComposeProxy, DreamComposeLocal]
+AnyConfigClass = Union[
+    DreamPipeline,
+    DreamComposeOverride,
+    DreamComposeDev,
+    DreamComposeProxy,
+    DreamComposeLocal,
+]
 
 
 class DreamDist:
@@ -595,7 +638,9 @@ class DreamDist:
         Returns:
             instance of DreamDist
         """
-        new_compose_override = new_compose_dev = new_compose_proxy = new_compose_local = None
+        new_compose_override = (
+            new_compose_dev
+        ) = new_compose_proxy = new_compose_local = None
         all_names, new_pipeline_conf = self.pipeline_conf.filter_services(service_names)
         all_names += ["agent", "mongo", "spelling-preprocessing"]
         if compose_override:
@@ -604,7 +649,7 @@ class DreamDist:
             new_agent_command = re.sub(
                 f"assistant_dists/{self.name}/pipeline_conf.json",
                 f"assistant_dists/{name}/pipeline_conf.json",
-                new_compose_override.config.services["agent"].command
+                new_compose_override.config.services["agent"].command,
             )
             new_compose_override.config.services["agent"].command = new_agent_command
 
@@ -624,7 +669,7 @@ class DreamDist:
             new_compose_override,
             new_compose_dev,
             new_compose_proxy,
-            new_compose_local
+            new_compose_local,
         )
 
     def iter_loaded_configs(self):
@@ -664,7 +709,7 @@ class DreamDist:
 
         return paths
 
-    def add_dff_skill(self, name: str):
+    def add_dff_skill(self, name: str, port: int):
         """
         Adds DFF skill to distribution.
 
@@ -674,11 +719,72 @@ class DreamDist:
         Returns:
             path to new DFF skill
         """
+        name_with_underscores = name.replace("-", "_")
+        name_with_dashes = name.replace("_", "-")
+
         skill_dir = Path(self.dream_root) / "skills" / name
         if skill_dir.exists():
             raise FileExistsError(f"{skill_dir} already exists!")
 
         copytree("deeppavlov_dreamtools/static/dff_template_skill", skill_dir)
+
+        if self.pipeline_conf:
+            pl_service = PipelineConfService(
+                connector=PipelineConfConnector(
+                    protocol="http",
+                    timeout=2,
+                    url=f"http://{name_with_dashes}:{port}/respond",
+                ),
+                dialog_formatter=f"state_formatters.dp_formatters:{name}_formatter",
+                response_formatter="state_formatters.dp_formatters:skill_with_attributes_formatter_service",
+                previous_services=["skill_selectors"],
+                state_manager_method="add_hypothesis",
+            )
+            self.pipeline_conf.add_service(
+                name_with_underscores, "skills", pl_service, inplace=True
+            )
+
+        if self.compose_override:
+            override_service = ComposeContainer(
+                env_file=[".env"],
+                build=ContainerBuildDefinition(
+                    args={"SERVICE_PORT": port, "SERVICE_NAME": name},
+                    context=Path("."),
+                    dockerfile=skill_dir / "Dockerfile",
+                ),
+                command=f"gunicorn --workers=1 server:app -b 0.0.0.0:{port} --reload --timeout 500",
+                deploy=DeploymentDefinition(
+                    resources=DeploymentDefinitionResources(
+                        limits=DeploymentDefinitionResourcesArg(memory="1G"),
+                        reservations=DeploymentDefinitionResourcesArg(memory="1G"),
+                    )
+                ),
+            )
+            self.compose_override.add_service(
+                name_with_dashes, override_service, inplace=True
+            )
+
+        if self.compose_dev:
+            dev_service = ComposeDevContainer(
+                volumes=[f"./skills/{name}:/src", "./common:/src/common"],
+                ports=[f"{port}:{port}"],
+            )
+            self.compose_dev.add_service(name_with_dashes, dev_service, inplace=True)
+
+        if self.compose_proxy:
+            proxy_service = ComposeContainer(
+                command=["nginx", "-g", "daemon off;"],
+                build=ContainerBuildDefinition(
+                    context=Path("dp/proxy"), dockerfile=Path("Dockerfile")
+                ),
+                environment=[f"PROXY_PASS=dream.deeppavlov.ai:{port}", f"PORT={port}"],
+            )
+            self.compose_proxy.add_service(
+                name_with_dashes, proxy_service, inplace=True
+            )
+
+        self.save(True)
+
         return skill_dir
 
     def create_local_yml(

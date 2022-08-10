@@ -78,12 +78,44 @@ def new(ctx: click.Context):
 @new.command("dff")
 @click.argument("name")
 @click.option("-d", "--dist", required=True, help="Dream distribution name")
+@click.option("-p", "--port", required=True, help="DFF skill port")
+@click.option("--all", "all_configs", is_flag=True, default=False)
+@click.option("--compose-override/--no-compose-override", default=False)
+@click.option("--compose-dev/--no-compose-dev", default=False)
+@click.option("--compose-proxy/--no-compose-proxy", default=False)
+@click.option("--compose-local/--no-compose-local", default=False)
 @click.pass_context
 @must_be_inside_dream
-def new_dff(ctx: click.Context, name: str, dist: str):
+def new_dff(
+    ctx: click.Context,
+    name: str,
+    dist: str,
+    port: int,
+    all_configs: bool,
+    compose_override: bool,
+    compose_dev: bool,
+    compose_proxy: bool,
+    compose_local: bool,
+):
     """Create new dff-based skill template in ./skills"""
-    new_dff_path = commands.new.dff(name, ctx.obj.dream_root, dist)
-    click.echo(f"Created new dff skill at {new_dff_path}")
+    if all_configs:
+        compose_override = compose_dev = compose_proxy = compose_local = True
+
+    new_dff_path = commands.new.dff(
+        name,
+        ctx.obj.dream_root,
+        dist,
+        port,
+        compose_override,
+        compose_dev,
+        compose_proxy,
+        compose_local,
+    )
+    click.echo(
+        f"Created new dff skill at {new_dff_path}.\n"
+        f"Don't forget to define your state formatter '{name}_skill'"
+        f"in 'dream/state_formatters/dp_formatters.py'"
+    )
 
 
 @new.command("dist")

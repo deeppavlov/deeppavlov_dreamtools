@@ -133,6 +133,7 @@ class DeploymentDefinitionResourcesArg(BaseModelNoExtra):
             raise ValueError(
                 "'memory' value must contain a float-like value before the unit substring, e.g. '2.5G' or '256M'"
             )
+        return v
 
 
 class DeploymentDefinitionResources(BaseModelNoExtra):
