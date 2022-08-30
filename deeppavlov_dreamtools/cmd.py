@@ -72,18 +72,40 @@ def cli(ctx: click.Context, dream: Path):
 @cli.group()
 @click.pass_context
 def new(ctx: click.Context):
-    """Create new template for distribution or skill"""
+    """Create new distribution or skill"""
 
 
 @new.command("dff")
 @click.argument("name")
 @click.option("-d", "--dist", required=True, help="Dream distribution name")
 @click.option("-p", "--port", required=True, help="DFF skill port")
-@click.option("--all", "all_configs", is_flag=True, default=False)
-@click.option("--compose-override/--no-compose-override", default=False)
-@click.option("--compose-dev/--no-compose-dev", default=False)
-@click.option("--compose-proxy/--no-compose-proxy", default=False)
-@click.option("--compose-local/--no-compose-local", default=False)
+@click.option(
+    "--all",
+    "all_configs",
+    is_flag=True,
+    default=False,
+    help="Add definition to all docker-compose configs (defaults to False). Overrides all other --compose-* flags",
+)
+@click.option(
+    "--compose-override/--no-compose-override",
+    default=False,
+    help="Add definition to docker-compose.override.yml (defaults to False)",
+)
+@click.option(
+    "--compose-dev/--no-compose-dev",
+    default=False,
+    help="Add definition to dev.yml config (defaults to False)",
+)
+@click.option(
+    "--compose-proxy/--no-compose-proxy",
+    default=False,
+    help="Add definition to proxy.yml config (defaults to False)",
+)
+@click.option(
+    "--compose-local/--no-compose-local",
+    default=False,
+    help="Add definition to local.yml config (defaults to False)",
+)
 @click.pass_context
 @must_be_inside_dream
 def new_dff(
@@ -97,7 +119,7 @@ def new_dff(
     compose_proxy: bool,
     compose_local: bool,
 ):
-    """Create new dff-based skill template in ./skills"""
+    """Creates new dff skill in ./skills"""
     if all_configs:
         compose_override = compose_dev = compose_proxy = compose_local = True
 
@@ -128,13 +150,35 @@ def new_dff(
     default=[],
     help="Dream distribution name",
 )
-@click.option("--overwrite/--no-overwrite", default=False)
-@click.option("--all", "all_configs", is_flag=True, default=False)
-@click.option("--pipeline/--no-pipeline", default=True)
-@click.option("--compose-override/--no-compose-override", default=False)
-@click.option("--compose-dev/--no-compose-dev", default=False)
-@click.option("--compose-proxy/--no-compose-proxy", default=False)
-@click.option("--compose-local/--no-compose-local", default=False)
+@click.option(
+    "--overwrite/--no-overwrite",
+    default=False,
+    help="Overwrite distribution directory if it exists",
+)
+@click.option(
+    "--all",
+    "all_configs",
+    is_flag=True,
+    default=False,
+    help="Create all configs (defaults to False). Overrides --pipeline and all other --compose-* flags",
+)
+@click.option(
+    "--pipeline/--no-pipeline", default=True, help="Create pipeline_conf.json config (defaults to True)"
+)
+@click.option(
+    "--compose-override/--no-compose-override",
+    default=False,
+    help="Create docker-compose.override.yml config (defaults to False)",
+)
+@click.option(
+    "--compose-dev/--no-compose-dev", default=False, help="Create dev.yml config (defaults to False)"
+)
+@click.option(
+    "--compose-proxy/--no-compose-proxy", default=False, help="Create proxy.yml config (defaults to False)"
+)
+@click.option(
+    "--compose-local/--no-compose-local", default=False, help="Create local.yml config (defaults to False)"
+)
 @click.pass_context
 @must_be_inside_dream
 def new_dist(
@@ -150,7 +194,7 @@ def new_dist(
     compose_proxy,
     compose_local,
 ):
-    """Create new distribution in ./assistant_dists with templates for docker-compose.override.yml, etc."""
+    """Creates new distribution in ./assistant_dists"""
     if all_configs:
         pipeline = compose_override = compose_dev = compose_proxy = compose_local = True
 

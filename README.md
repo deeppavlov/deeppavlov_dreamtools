@@ -49,7 +49,6 @@ Commands:
   dff    Create new dff-based skill template in ./skills
   dist   Create new distribution in ./assistant_dists with templates for...
   local  Create new local.yml
-  skill  Create new basic skill template in ./skills
 ```
 
 ### dreamtools new dist
@@ -58,11 +57,28 @@ Create new dream dist
 $ dreamtools new dist --help
 Usage: dreamtools new dist [OPTIONS] NAME
 
-  Create new distribution in ./assistant_dists with templates for docker-
-  compose.override.yml, etc.
+  Creates new distribution in ./assistant_dists
 
 Options:
-  --help  Show this message and exit.
+  -d, --dist TEXT                 Dream distribution name
+  -s, --services TEXT             Dream distribution name
+  --overwrite / --no-overwrite    Overwrite distribution directory if it
+                                  exists
+  --all                           Create all configs (defaults to False).
+                                  Overrides --pipeline and all other
+                                  --compose-* flags
+  --pipeline / --no-pipeline      Create pipeline_conf.json config (defaults
+                                  to True)
+  --compose-override / --no-compose-override
+                                  Create docker-compose.override.yml config
+                                  (defaults to False)
+  --compose-dev / --no-compose-dev
+                                  Create dev.yml config (defaults to False)
+  --compose-proxy / --no-compose-proxy
+                                  Create proxy.yml config (defaults to False)
+  --compose-local / --no-compose-local
+                                  Create local.yml config (defaults to False)
+  --help                          Show this message and exit.
 ```
 
 ### dreamtools new dff
@@ -71,22 +87,27 @@ Create new dff skill
 $ dreamtools new dff --help
 Usage: dreamtools new dff [OPTIONS] NAME
 
-  Create new dff-based skill template in ./skills
+  Creates new dff skill in ./skills
 
 Options:
-  --help  Show this message and exit.
-```
-
-### dreamtools new skill
-Create new skill
-```
-$ dreamtools new skill --help
-Usage: dreamtools new skill [OPTIONS] NAME
-
-  Create new basic skill template in ./skills
-
-Options:
-  --help  Show this message and exit.
+  -d, --dist TEXT                 Dream distribution name  [required]
+  -p, --port TEXT                 DFF skill port  [required]
+  --all                           Add definition to all docker-compose configs
+                                  (defaults to False). Overrides all other
+                                  --compose-* flags
+  --compose-override / --no-compose-override
+                                  Add definition to docker-
+                                  compose.override.yml (defaults to False)
+  --compose-dev / --no-compose-dev
+                                  Add definition to dev.yml config (defaults
+                                  to False)
+  --compose-proxy / --no-compose-proxy
+                                  Add definition to proxy.yml config (defaults
+                                  to False)
+  --compose-local / --no-compose-local
+                                  Add definition to local.yml config (defaults
+                                  to False)
+  --help                          Show this message and exit.
 ```
 
 ### dreamtools new local

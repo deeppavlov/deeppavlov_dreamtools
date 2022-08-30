@@ -26,6 +26,7 @@ from deeppavlov_dreamtools.distconfigs.generics import (
     DeploymentDefinitionResources,
     DeploymentDefinitionResourcesArg,
 )
+from deeppavlov_dreamtools.distconfigs import const
 
 
 def _parse_connector_url(
@@ -548,7 +549,7 @@ class DreamDist:
             path to Dream distribution
 
         """
-        return Path(dream_root) / "assistant_dists" / name
+        return Path(dream_root) / const.ASSISTANT_DISTS_DIR_NAME / name
 
     @staticmethod
     def resolve_name_and_dream_root(path: Union[str, Path]):
@@ -672,7 +673,7 @@ class DreamDist:
             new_compose_dev
         ) = new_compose_proxy = new_compose_local = None
         all_names, new_pipeline_conf = self.pipeline_conf.filter_services(service_names)
-        all_names += ["agent", "mongo", "spelling-preprocessing"]
+        all_names += const.MANDATORY_SERVICES
         if compose_override:
             _, new_compose_override = self.compose_override.filter_services(all_names)
 
@@ -744,7 +745,7 @@ class DreamDist:
         Adds DFF skill to distribution.
 
         Args:
-            name: name of new DFF skill
+            name: DFF skill name
             port: port where new DFF skill should be deployed
 
         Returns:
@@ -753,7 +754,7 @@ class DreamDist:
         name_with_underscores = name.replace("-", "_")
         name_with_dashes = name.replace("_", "-")
 
-        skill_dir = Path(self.dream_root) / "skills" / name
+        skill_dir = Path(self.dream_root) / const.SKILLS_DIR_NAME / name
         if skill_dir.exists():
             raise FileExistsError(f"{skill_dir} already exists!")
 

@@ -16,6 +16,24 @@ def dist(
     mk_compose_proxy: bool = False,
     mk_compose_local: bool = False,
 ):
+    """Creates new Dream distribution from template.
+    Throws an exception if the directory exists and overwrite=False.
+
+    Args:
+        name: new Dream distribution name
+        dream_root:
+        template_name:
+        services:
+        overwrite:
+        mk_pipeline_conf:
+        mk_compose_override:
+        mk_compose_dev:
+        mk_compose_proxy:
+        mk_compose_local:
+
+    Returns:
+
+    """
     dream_dist = DreamDist.from_name(
         template_name,
         dream_root,
