@@ -2,7 +2,7 @@ import json
 import re
 from pathlib import Path
 from shutil import copytree
-from typing import Union, Any, Optional, Tuple, Literal, Callable, Dict
+from typing import Union, Any, Optional, Tuple, Dict
 
 import yaml
 
@@ -26,6 +26,7 @@ from deeppavlov_dreamtools.distconfigs.generics import (
     DeploymentDefinitionResources,
     DeploymentDefinitionResourcesArg,
 )
+from deeppavlov_dreamtools.distconfigs import const
 
 
 def _parse_connector_url(
@@ -67,11 +68,7 @@ class BaseDreamConfig:
     GENERIC_MODEL: AnyConfig
 
     def __init__(self, config: AnyConfig):
-        self._config = config
-
-    @property
-    def config(self):
-        return self._config
+        self.config = config
 
     @staticmethod
     def load(path: Union[Path, str]):
@@ -84,57 +81,84 @@ class BaseDreamConfig:
     @classmethod
     def from_path(cls, path: Union[str, Path]):
         """
-        Load config from file path
+        Loads config from file path
 
-        :param path: path to config file
-        :return:
+        Args:
+            path: path to config file
+
+        Returns:
+            Dream config instance
+
         """
         data = cls.load(path)
         config = cls.GENERIC_MODEL.parse_obj(**data)
         return cls(config)
 
+    def to_path(self, path: Union[str, Path], overwrite: bool = False):
+        """
+        Saves config to file path
+
+        Args:
+            path: path to config file
+            overwrite: if True, overwrites existing file
+
+        Returns:
+            path to config file
+
+        """
+
+        # Until .dict() with jsonable type serialization is implemented
+        # we will have to use this workaround
+        # https://github.com/samuelcolvin/pydantic/issues/1409
+        config = json.loads(self.config.json(exclude_none=True))
+        return self.dump(config, path, overwrite)
+
     @classmethod
     def from_dist(cls, dist_path: Union[str, Path]):
         """
-        Load config with default name from Dream distribution path
+        Loads config with default name from Dream distribution path
 
-        :param dist_path: path to Dream distribution
-        :return:
+        Args:
+            dist_path: path to Dream distribution
+
+        Returns:
+            Dream config instance
+
         """
+
         data = cls.load(Path(dist_path).resolve() / cls.DEFAULT_FILE_NAME)
         config = cls.GENERIC_MODEL.parse_obj(data)
         return cls(config)
 
-    def to_path(self, path: Union[str, Path], overwrite: bool = False):
-        """
-        Save config to file path
-
-        :param path: path to config file
-        :param overwrite: if True, overwrites existing file
-        :return:
-        """
-        # Until .dict() with jsonable type serialization is implemented
-        # we will have to use this workaround
-        # https://github.com/samuelcolvin/pydantic/issues/1409
-        config = json.loads(self._config.json(exclude_none=True))
-        return self.dump(config, path, overwrite)
-
     def to_dist(self, dist_path: Union[str, Path], overwrite: bool = False):
-        """
-        Save config to file path
+        """Saves config with default name to Dream distribution path
 
-        :param dist_path: path to Dream dist
-        :param overwrite: if True, overwrites existing file
-        :return:
+        Args:
+            dist_path: path to Dream distribution
+            overwrite: if True, overwrites existing file
+
+        Returns:
+            path to config file
+
         """
+
         # Until .dict() with jsonable type serialization is implemented
         # we will have to use this workaround
         # https://github.com/samuelcolvin/pydantic/issues/1409
-        config = json.loads(self._config.json(exclude_none=True))
+        config = json.loads(self.config.json(exclude_none=True))
         path = Path(dist_path) / self.DEFAULT_FILE_NAME
         return self.dump(config, path, overwrite)
 
-    def filter_services(self, include_names: list, exclude_names: list = None):
+    def filter_services(self, include_names: list):
+        """
+        Filters services by name
+
+        Args:
+            include_names: only services with these names will be included
+
+        Returns:
+
+        """
         raise NotImplementedError("Override this function")
 
 
@@ -160,6 +184,9 @@ class JsonDreamConfig(BaseDreamConfig):
 
         return path
 
+    def filter_services(self, include_names: list):
+        raise NotImplementedError("Override this function")
+
 
 class YmlDreamConfig(BaseDreamConfig):
     """
@@ -184,42 +211,44 @@ class YmlDreamConfig(BaseDreamConfig):
         return path
 
     def __getitem__(self, item) -> AnyContainer:
-        return self._config.services[item]
+        return self.config.services[item]
 
     def iter_services(self):
-        for s_name, s_definition in self._config.services.items():
+        for s_name, s_definition in self.config.services.items():
             yield s_name, s_definition
 
-    def filter_services(
-        self,
-        include_names: list = None,
-        exclude_names: list = None,
-    ):
-        include_names = include_names or self._config.services.keys()
-        exclude_names = exclude_names or []
-
+    def filter_services(self, names: list):
         model_dict = {
-            "version": self._config.version,
+            "version": self.config.version,
             "services": {
-                k: v
-                for k, v in self._config.services.items()
-                if k in include_names and k not in exclude_names
+                k: v for k, v in self.config.services.items() if k in names
             },
         }
         config = self.GENERIC_MODEL.parse_obj(model_dict)
-        return include_names, self.__class__(config)
+        return names, self.__class__(config)
 
     def add_service(self, name: str, definition: AnyContainer, inplace: bool = False):
-        services = self._config.copy().services
+        """
+        Adds service to config
+
+        Args:
+            name: service name
+            definition: generic service object
+            inplace: if True, updates the config instance, returns a new copy of config instance otherwise
+
+        Returns:
+            config instance
+        """
+        services = self.config.copy().services
         services[name] = definition
 
         model_dict = {
-            "version": self._config.version,
+            "version": self.config.version,
             "services": services,
         }
         config = self.GENERIC_MODEL.parse_obj(model_dict)
         if inplace:
-            self._config = config
+            self.config = config
             value = self
         else:
             value = self.__class__(config)
@@ -252,10 +281,7 @@ class DreamPipeline(JsonDreamConfig):
     #
     #     return host, port, endpoint
 
-    def _filter_services_by_name(
-        self,
-        names: list,
-    ):
+    def _filter_services_by_name(self, names: list):
         for service_group in self.config.services.editable_groups:
             for service_name, service in getattr(
                 self.config.services, service_group
@@ -285,14 +311,7 @@ class DreamPipeline(JsonDreamConfig):
                 yield required_group, required_name, required_service
                 yield from self._recursively_parse_requirements(required_service)
 
-    def filter_services(
-        self,
-        include_names: list = None,
-        exclude_names: list = None,
-    ):
-        include_names = include_names or []
-        exclude_names = exclude_names or []
-
+    def filter_services(self, include_names: list):
         filtered_dict = {grp: {} for grp in self.config.services.editable_groups}
         include_names_extended = list(include_names).copy()
 
@@ -329,16 +348,28 @@ class DreamPipeline(JsonDreamConfig):
         definition: PipelineConfService,
         inplace: bool = False,
     ):
-        services = self._config.copy().services
+        """
+        Adds service to config
+
+        Args:
+            name: service name
+            service_type: service type in pipeline
+            definition: generic service object
+            inplace: if True, updates the config instance, returns a new copy of config instance otherwise
+
+        Returns:
+            config instance
+        """
+        services = self.config.copy().services
         getattr(services, service_type)[name] = definition
 
         model_dict = {
-            "connectors": self._config.connectors,
+            "connectors": self.config.connectors,
             "services": services,
         }
         config = self.GENERIC_MODEL.parse_obj(model_dict)
         if inplace:
-            self._config = config
+            self.config = config
             value = self
         else:
             value = self.__class__(config)
@@ -518,7 +549,7 @@ class DreamDist:
             path to Dream distribution
 
         """
-        return Path(dream_root) / "assistant_dists" / name
+        return Path(dream_root) / const.ASSISTANT_DISTS_DIR_NAME / name
 
     @staticmethod
     def resolve_name_and_dream_root(path: Union[str, Path]):
@@ -642,7 +673,7 @@ class DreamDist:
             new_compose_dev
         ) = new_compose_proxy = new_compose_local = None
         all_names, new_pipeline_conf = self.pipeline_conf.filter_services(service_names)
-        all_names += ["agent", "mongo", "spelling-preprocessing"]
+        all_names += const.MANDATORY_SERVICES
         if compose_override:
             _, new_compose_override = self.compose_override.filter_services(all_names)
 
@@ -714,7 +745,7 @@ class DreamDist:
         Adds DFF skill to distribution.
 
         Args:
-            name: name of new DFF skill
+            name: DFF skill name
             port: port where new DFF skill should be deployed
 
         Returns:
@@ -723,7 +754,7 @@ class DreamDist:
         name_with_underscores = name.replace("-", "_")
         name_with_dashes = name.replace("_", "-")
 
-        skill_dir = Path(self.dream_root) / "skills" / name
+        skill_dir = Path(self.dream_root) / const.SKILLS_DIR_NAME / name
         if skill_dir.exists():
             raise FileExistsError(f"{skill_dir} already exists!")
 
