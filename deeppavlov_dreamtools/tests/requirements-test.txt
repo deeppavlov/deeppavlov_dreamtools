@@ -1,2 +1,0 @@
-pytest==7.1.2
-virtualenv==20.16.4
