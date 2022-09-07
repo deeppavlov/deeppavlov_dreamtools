@@ -10,7 +10,7 @@ RUN git clone https://github.com/deeppavlovteam/deeppavlov_dreamtools.git
 # Copy ground-truth files to container
 COPY ./../static/dream_weather_dist_configs/ /usr/src/app/deeppavlov_dreamtools/deeppavlov_dreamtools/static/dream_weather_dist_configs
 
-# Setting up virtual environment:
+#   Setting up virtual environment:
 #1. For the project
 WORKDIR /usr/src/app/deeppavlov_dreamtools
 RUN pip install --no-cache-dir -r requirements.txt
