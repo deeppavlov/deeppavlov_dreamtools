@@ -1,7 +1,7 @@
 services:
   convers-evaluator-annotator:
     build:
-      context: dp/proxy
+      context: dp\proxy
       dockerfile: Dockerfile
     command:
     - nginx
@@ -12,7 +12,7 @@ services:
     - PORT=8004
   dff-intent-responder-skill:
     build:
-      context: dp/proxy
+      context: dp\proxy
       dockerfile: Dockerfile
     command:
     - nginx
@@ -23,7 +23,7 @@ services:
     - PORT=8012
   dff-weather-skill:
     build:
-      context: dp/proxy
+      context: dp\proxy
       dockerfile: Dockerfile
     command:
     - nginx
@@ -34,7 +34,7 @@ services:
     - PORT=8037
   dialogpt:
     build:
-      context: dp/proxy
+      context: dp\proxy
       dockerfile: Dockerfile
     command:
     - nginx
@@ -45,7 +45,7 @@ services:
     - PORT=8125
   entity-detection:
     build:
-      context: dp/proxy
+      context: dp\proxy
       dockerfile: Dockerfile
     command:
     - nginx
@@ -56,7 +56,7 @@ services:
     - PORT=8103
   intent-catcher:
     build:
-      context: dp/proxy
+      context: dp\proxy
       dockerfile: Dockerfile
     command:
     - nginx
@@ -67,7 +67,7 @@ services:
     - PORT=8014
   ner:
     build:
-      context: dp/proxy
+      context: dp\proxy
       dockerfile: Dockerfile
     command:
     - nginx
@@ -78,7 +78,7 @@ services:
     - PORT=8021
   sentseg:
     build:
-      context: dp/proxy
+      context: dp\proxy
       dockerfile: Dockerfile
     command:
     - nginx
@@ -89,7 +89,7 @@ services:
     - PORT=8011
   spacy-nounphrases:
     build:
-      context: dp/proxy
+      context: dp\proxy
       dockerfile: Dockerfile
     command:
     - nginx
@@ -100,7 +100,7 @@ services:
     - PORT=8006
   spelling-preprocessing:
     build:
-      context: dp/proxy
+      context: dp\proxy
       dockerfile: Dockerfile
     command:
     - nginx
