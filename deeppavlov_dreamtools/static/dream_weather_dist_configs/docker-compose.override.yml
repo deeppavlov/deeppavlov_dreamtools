@@ -11,7 +11,7 @@ services:
         DATA_URL: https://files.deeppavlov.ai/alexaprize_data/cobot_conveval2.tar.gz
         PORT: 8004
       context: .
-      dockerfile: annotators\ConversationEvaluator\Dockerfile
+      dockerfile: annotators/ConversationEvaluator/Dockerfile
     deploy:
       mode: replicated
       replicas: 1
@@ -31,7 +31,7 @@ services:
         SERVICE_NAME: dff_intent_responder_skill
         SERVICE_PORT: 8012
       context: .
-      dockerfile: skills\dff_intent_responder_skill\Dockerfile
+      dockerfile: skills/dff_intent_responder_skill/Dockerfile
     command: gunicorn --workers=1 server:app -b 0.0.0.0:8012 --reload
     deploy:
       resources:
@@ -47,7 +47,7 @@ services:
         SERVICE_NAME: dff_weather_skill
         SERVICE_PORT: 8037
       context: .
-      dockerfile: skills\dff_weather_skill\Dockerfile
+      dockerfile: skills/dff_weather_skill/Dockerfile
     command: gunicorn --workers=1 server:app -b 0.0.0.0:8037 --reload --timeout 500
     deploy:
       resources:
@@ -65,7 +65,7 @@ services:
         PRETRAINED_MODEL_NAME_OR_PATH: microsoft/DialoGPT-medium
         SERVICE_NAME: dialogpt
         SERVICE_PORT: 8125
-      context: services\dialogpt
+      context: services/dialogpt
     command: flask run -h 0.0.0.0 -p 8125
     deploy:
       resources:
@@ -89,7 +89,7 @@ services:
         SEQ_TAG_CONFIG: src/wikipedia_entity_detection_distilbert.json
         SRC_DIR: annotators/entity_detection/
       context: .
-      dockerfile: annotators\entity_detection\Dockerfile
+      dockerfile: annotators/entity_detection/Dockerfile
     command: flask run -h 0.0.0.0 -p 8103
     deploy:
       resources:
@@ -109,7 +109,7 @@ services:
         INTENT_PHRASES_PATH: intent_phrases.json
         SERVICE_PORT: 8014
       context: .
-      dockerfile: annotators\IntentCatcherTransformers\Dockerfile
+      dockerfile: annotators/IntentCatcherTransformers/Dockerfile
     command: python -m flask run -h 0.0.0.0 -p 8014
     deploy:
       resources:
@@ -130,7 +130,7 @@ services:
         PORT: 8021
         SRC_DIR: annotators/NER_deeppavlov
       context: .
-      dockerfile: annotators\NER_deeppavlov\Dockerfile
+      dockerfile: annotators/NER_deeppavlov/Dockerfile
     command: flask run -h 0.0.0.0 -p 8021
     deploy:
       resources:
@@ -146,7 +146,7 @@ services:
     tty: true
   sentseg:
     build:
-      context: annotators\SentSeg
+      context: annotators/SentSeg
     command: flask run -h 0.0.0.0 -p 8011
     deploy:
       resources:
@@ -161,7 +161,7 @@ services:
   spacy-nounphrases:
     build:
       context: .
-      dockerfile: annotators\spacy_nounphrases\Dockerfile
+      dockerfile: annotators/spacy_nounphrases/Dockerfile
     command: flask run -h 0.0.0.0 -p 8006
     deploy:
       resources:
@@ -175,7 +175,7 @@ services:
     - FLASK_APP=server
   spelling-preprocessing:
     build:
-      context: annotators\spelling_preprocessing
+      context: annotators/spelling_preprocessing
     command: flask run -h 0.0.0.0 -p 8074
     deploy:
       resources:
