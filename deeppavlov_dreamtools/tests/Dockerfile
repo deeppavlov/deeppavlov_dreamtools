@@ -1,28 +1,19 @@
 FROM python:3.10.5-slim
 
-WORKDIR /usr/src/app
+# Cloning repos
+RUN apt-get update && apt-get install -y --no-install-recommends git
+RUN git clone https://github.com/deeppavlovteam/dream.git
 
-RUN git clone https://github.com/deeppavlovteam/dream & git clone https://github.com/deeppavlovteam/deeppavlov_dreamtools
+#   Setting up virtual environment:
+#1. For the project
+COPY requirements.txt /src/requirements.txt
+RUN pip install --no-cache-dir -r /src/requirements.txt
+#2. For the test system
+COPY deeppavlov_dreamtools/tests/requirements-test.txt /src/requirements-test.txt
+RUN pip install --no-cache-dir -r /src/requirements-test.txt
 
-RUN pip install -r  --no-cache deeppavlov_dreamtools/requirements.txt
+COPY . /src/
 
-COPY ../../deeppavlov_dreamtools/tests/* ./deeppavlov_dreamtools/deeppavlov_dreamtools/tests
-
-RUN pip install -r  --no-cache /deeppavlov_dreamtools/tests/requirements-test.txt
-
-# virtualenv of dpd
-
-# inside dream:
-# dreamtools new dist dream_weather -d dream \
-  #  -s convers-evaluator-annotator \
-  #  -s spacy-nounphrases \
-  #  -s convers-evaluator-selector \
-  #  -s dff-intent-responder-skill \
-  #  -s intent-catcher \
-  #  -s ner \
-  #  -s entity-detection \
-  #  -s dff-weather-skill \
-  #  -s dialogpt \
-  #  --compose-override --compose-dev --compose-proxy
-
+WORKDIR /src/deeppavlov_dreamtools/tests
 # run tests
+CMD ["pytest", "."]
