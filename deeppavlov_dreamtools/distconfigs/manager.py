@@ -1,4 +1,3 @@
-from __future__ import annotations
 import json
 import re
 from pathlib import Path
@@ -31,7 +30,7 @@ from deeppavlov_dreamtools.distconfigs import const
 
 
 def _parse_connector_url(
-        url: Optional[str] = None,
+    url: Optional[str] = None,
 ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
     """
     Deserializes a string into host, port, endpoint components.
@@ -255,17 +254,17 @@ class YmlDreamConfig(BaseDreamConfig):
             value = self.__class__(config)
         return value
 
-    def remove_service(self, name: str, inplace: bool = False) -> YmlDreamConfig:
+    def remove_service(self, name: str, inplace: bool = False):
         """
-            Removes the service from the config.
+        Removes the service from the config.
 
-            Args:
-                name: service name
-                inplace: if True, updates the config instance, returns a new copy of config instance otherwise
+        Args:
+            name: service name
+            inplace: if True, updates the config instance, returns a new copy of config instance otherwise
 
-            Returns:
-                config instance
-            """
+        Returns:
+            config instance
+        """
         services = self.config.copy().services
         if name not in services.editable_groups:
             raise KeyError("Can't delete this service")
@@ -282,7 +281,7 @@ class YmlDreamConfig(BaseDreamConfig):
             self.config = config
             value = self
         else:
-            value = YmlDreamConfig(config)
+            value = self.__class__(config)
         return value
 
 
@@ -315,7 +314,7 @@ class DreamPipeline(JsonDreamConfig):
     def _filter_services_by_name(self, names: list):
         for service_group in self.config.services.editable_groups:
             for service_name, service in getattr(
-                    self.config.services, service_group
+                self.config.services, service_group
             ).items():
                 if hasattr(service.connector, "url"):
                     url = service.connector.url
@@ -350,9 +349,9 @@ class DreamPipeline(JsonDreamConfig):
             filtered_dict[group][name] = service
 
             for (
-                    required_group,
-                    required_name,
-                    required_service,
+                required_group,
+                required_name,
+                required_service,
             ) in self._recursively_parse_requirements(service):
                 filtered_dict[required_group][required_name] = required_service
                 include_names_extended.append(required_name)
@@ -373,11 +372,11 @@ class DreamPipeline(JsonDreamConfig):
         return include_names_extended, self.__class__(config)
 
     def add_service(
-            self,
-            name: str,
-            service_type: str,
-            definition: PipelineConfService,
-            inplace: bool = False,
+        self,
+        name: str,
+        service_type: str,
+        definition: PipelineConfService,
+        inplace: bool = False,
     ):
         """
         Adds service to config
@@ -406,7 +405,7 @@ class DreamPipeline(JsonDreamConfig):
             value = self.__class__(config)
         return value
 
-    def remove_service(self, name: str, inplace: bool = False) -> DreamPipeline:
+    def remove_service(self, name: str, inplace: bool = False):
         """
         Removes the service from the config.
 
@@ -430,7 +429,7 @@ class DreamPipeline(JsonDreamConfig):
             self.config = config
             value = self
         else:
-            value = DreamPipeline(config)
+            value = self.__class__(config)
         return value
 
 
@@ -489,15 +488,15 @@ AnyConfigClass = Union[
 
 class DreamDist:
     def __init__(
-            self,
-            dist_path: Union[str, Path],
-            name: str,
-            dream_root: Union[str, Path],
-            pipeline_conf: DreamPipeline = None,
-            compose_override: DreamComposeOverride = None,
-            compose_dev: DreamComposeDev = None,
-            compose_proxy: DreamComposeProxy = None,
-            compose_local: DreamComposeLocal = None,
+        self,
+        dist_path: Union[str, Path],
+        name: str,
+        dream_root: Union[str, Path],
+        pipeline_conf: DreamPipeline = None,
+        compose_override: DreamComposeOverride = None,
+        compose_dev: DreamComposeDev = None,
+        compose_proxy: DreamComposeProxy = None,
+        compose_local: DreamComposeLocal = None,
     ):
         """
         Instantiates a new DreamDist object
@@ -523,12 +522,12 @@ class DreamDist:
 
     @staticmethod
     def load_configs_with_default_filenames(
-            dist_path: Union[str, Path],
-            pipeline_conf: bool,
-            compose_override: bool,
-            compose_dev: bool,
-            compose_proxy: bool,
-            compose_local: bool,
+        dist_path: Union[str, Path],
+        pipeline_conf: bool,
+        compose_override: bool,
+        compose_dev: bool,
+        compose_proxy: bool,
+        compose_local: bool,
     ) -> Dict[str, AnyConfigClass]:
         """
         Loads config objects using their default file names located under given Dream distribution path.
@@ -562,9 +561,9 @@ class DreamDist:
 
     @staticmethod
     def resolve_all_paths(
-            dist_path: Union[str, Path] = None,
-            name: str = None,
-            dream_root: Union[str, Path] = None,
+        dist_path: Union[str, Path] = None,
+        name: str = None,
+        dream_root: Union[str, Path] = None,
     ):
         """
         Resolves path to Dream distribution, its name, and Dream root path
@@ -626,14 +625,14 @@ class DreamDist:
 
     @classmethod
     def from_name(
-            cls,
-            name: str,
-            dream_root: Union[str, Path],
-            pipeline_conf: bool = True,
-            compose_override: bool = True,
-            compose_dev: bool = True,
-            compose_proxy: bool = True,
-            compose_local: bool = True,
+        cls,
+        name: str,
+        dream_root: Union[str, Path],
+        pipeline_conf: bool = True,
+        compose_override: bool = True,
+        compose_dev: bool = True,
+        compose_proxy: bool = True,
+        compose_local: bool = True,
     ):
         """
         Loads Dream distribution from ``name`` and ``dream_root`` path with default configs.
@@ -666,13 +665,13 @@ class DreamDist:
 
     @classmethod
     def from_dist(
-            cls,
-            dist_path: Union[str, Path] = None,
-            pipeline_conf: bool = True,
-            compose_override: bool = True,
-            compose_dev: bool = True,
-            compose_proxy: bool = True,
-            compose_local: bool = True,
+        cls,
+        dist_path: Union[str, Path] = None,
+        pipeline_conf: bool = True,
+        compose_override: bool = True,
+        compose_dev: bool = True,
+        compose_proxy: bool = True,
+        compose_local: bool = True,
     ):
         """
         Loads Dream distribution from ``dist_path`` with default configs.
@@ -700,15 +699,15 @@ class DreamDist:
         return cls(dist_path, name, dream_root, **cls_kwargs)
 
     def create_dist(
-            self,
-            name: str,
-            dream_root: Union[str, Path],
-            service_names: Optional[list] = None,
-            pipeline_conf: bool = True,
-            compose_override: bool = True,
-            compose_dev: bool = True,
-            compose_proxy: bool = True,
-            compose_local: bool = True,
+        self,
+        name: str,
+        dream_root: Union[str, Path],
+        service_names: Optional[list] = None,
+        pipeline_conf: bool = True,
+        compose_override: bool = True,
+        compose_dev: bool = True,
+        compose_proxy: bool = True,
+        compose_local: bool = True,
     ):
         """
         Creates Dream distribution inherited from another distribution.
@@ -880,10 +879,10 @@ class DreamDist:
         return skill_dir
 
     def create_local_yml(
-            self,
-            services: list,
-            drop_ports: bool = True,
-            single_replica: bool = True,
+        self,
+        services: list,
+        drop_ports: bool = True,
+        single_replica: bool = True,
     ):
         """
         Creates local config for distribution.
