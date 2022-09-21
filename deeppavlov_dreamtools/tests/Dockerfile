@@ -2,7 +2,7 @@ FROM python:3.10.5-slim
 
 # Cloning repos
 RUN apt-get update && apt-get install -y --no-install-recommends git
-RUN git clone https://github.com/deeppavlovteam/dream.git
+RUN git clone https://github.com/deeppavlov/dream.git
 
 #   Setting up virtual environment:
 #1. For the project
