@@ -254,6 +254,34 @@ class YmlDreamConfig(BaseDreamConfig):
             value = self.__class__(config)
         return value
 
+    def remove_service(self, name: str, inplace: bool = False):
+        """
+        Removes the service from the config.
+        Args:
+            name: service name
+            inplace: if True, updates the config instance, returns a new copy of config instance otherwise
+        Returns:
+            config instance
+        """
+        services = self.config.copy().services
+        if name not in services.editable_groups:
+            raise KeyError("Can't delete this service")
+        try:
+            del services[name]
+        except KeyError:
+            raise KeyError(f"{name} is not in the services")
+        model_dict = {
+            "version": self.config.version,
+            "services": services,
+        }
+        config = self.GENERIC_MODEL.parse_obj(model_dict)
+        if inplace:
+            self.config = config
+            value = self
+        else:
+            value = self.__class__(config)
+        return value
+
 
 class DreamPipeline(JsonDreamConfig):
     """
@@ -363,6 +391,31 @@ class DreamPipeline(JsonDreamConfig):
         services = self.config.copy().services
         getattr(services, service_type)[name] = definition
 
+        model_dict = {
+            "connectors": self.config.connectors,
+            "services": services,
+        }
+        config = self.GENERIC_MODEL.parse_obj(model_dict)
+        if inplace:
+            self.config = config
+            value = self
+        else:
+            value = self.__class__(config)
+        return value
+
+    def remove_service(self, name: str, inplace: bool = False):
+        """
+        Removes the service from the config.
+        Args:
+            name: service name
+            inplace: if True, updates the config instance, returns a new copy of config instance otherwise
+        Returns:
+            config instance
+        """
+        services = self.config.copy().services
+        getattr(services, name)[name] = {name: {}}
+        if name not in services.editable_groups:
+            raise NameError(f"Cannot remove {name}")
         model_dict = {
             "connectors": self.config.connectors,
             "services": services,
