@@ -27,7 +27,6 @@ from deeppavlov_dreamtools.distconfigs.generics import (
     DeploymentDefinitionResourcesArg,
 )
 from deeppavlov_dreamtools.distconfigs import const
-from const import ASSISTANT_DISTS_DIR_NAME
 
 
 def _parse_connector_url(
@@ -876,7 +875,7 @@ class DreamDist:
 def list_dists(dream_root: Union[Path, str] = None) -> list[DreamDist]:
     if not dream_root:
         dream_root = Path(__file__).resolve().parents[3] / "dream"
-    dist_path = dream_root / ASSISTANT_DISTS_DIR_NAME
+    dist_path = dream_root / const.ASSISTANT_DISTS_DIR_NAME
     dream_dists = []
     for distributive in dist_path.iterdir():
         if distributive.is_file():
