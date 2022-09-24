@@ -27,6 +27,7 @@ from deeppavlov_dreamtools.distconfigs.generics import (
     DeploymentDefinitionResourcesArg,
 )
 from deeppavlov_dreamtools.distconfigs import const
+from const import ASSISTANT_DISTS_DIR_NAME
 
 
 def _parse_connector_url(
@@ -870,3 +871,24 @@ class DreamDist:
 
             local_config.add_service(name, service, inplace=True)
         return local_config.to_dist(self.dist_path)
+
+
+def list_dists(dream_root: Union[Path, str] = None) -> list[DreamDist]:
+    if not dream_root:
+        dream_root = Path(__file__).resolve().parents[3] / "dream"
+    dist_path = dream_root / ASSISTANT_DISTS_DIR_NAME
+    dream_dists = []
+    for distributive in dist_path.iterdir():
+        if distributive.is_file():
+            continue
+        filenames = [file.name for file in dist_path.iterdir()]
+        dream_dist = DreamDist.from_dist(
+            distributive,
+            pipeline_conf="pipeline_conf.json" in filenames,
+            compose_override="docker-compose.override.yml" in filenames,
+            compose_dev="dev.yml" in filenames,
+            compose_proxy="proxy.yml" in filenames,
+            compose_local="local.yml" in filenames,
+        )
+        dream_dists.append(dream_dist)
+    return dream_dists
