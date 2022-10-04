@@ -884,7 +884,7 @@ def list_dists(dream_root: Union[Path, str]) -> list[DreamDist]:
 
     """
 
-    dist_path = dream_root / const.ASSISTANT_DISTS_DIR_NAME
+    dist_path = Path(dream_root) / const.ASSISTANT_DISTS_DIR_NAME
     dream_dists = []
     distributions_paths = dist_path.iterdir()
 
