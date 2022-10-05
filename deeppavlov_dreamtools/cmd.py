@@ -35,9 +35,7 @@ def must_be_inside_dream(f):
                 "Make sure you run 'dreamtools' from inside the Dream directory or provide -D/--dream, e.g.:\n"
                 f"{possible_command}"
             )
-            raise click.exceptions.BadParameter(
-                exception_message, param_hint="-D/--dream"
-            )
+            raise click.exceptions.BadParameter(exception_message, param_hint="-D/--dream")
         return f(click_context, **kwargs)
 
     return must_be_inside_dream_wrapper
@@ -163,7 +161,9 @@ def new_dff(
     help="Create all configs (defaults to False). Overrides --pipeline and all other --compose-* flags",
 )
 @click.option(
-    "--pipeline/--no-pipeline", default=True, help="Create pipeline_conf.json config (defaults to True)"
+    "--pipeline/--no-pipeline",
+    default=True,
+    help="Create pipeline_conf.json config (defaults to True)",
 )
 @click.option(
     "--compose-override/--no-compose-override",
@@ -171,13 +171,19 @@ def new_dff(
     help="Create docker-compose.override.yml config (defaults to False)",
 )
 @click.option(
-    "--compose-dev/--no-compose-dev", default=False, help="Create dev.yml config (defaults to False)"
+    "--compose-dev/--no-compose-dev",
+    default=False,
+    help="Create dev.yml config (defaults to False)",
 )
 @click.option(
-    "--compose-proxy/--no-compose-proxy", default=False, help="Create proxy.yml config (defaults to False)"
+    "--compose-proxy/--no-compose-proxy",
+    default=False,
+    help="Create proxy.yml config (defaults to False)",
 )
 @click.option(
-    "--compose-local/--no-compose-local", default=False, help="Create local.yml config (defaults to False)"
+    "--compose-local/--no-compose-local",
+    default=False,
+    help="Create local.yml config (defaults to False)",
 )
 @click.pass_context
 @must_be_inside_dream
@@ -213,9 +219,7 @@ def new_dist(
         )
 
         new_config_paths = ", ".join(str(p) for p in new_config_paths)
-        click.echo(
-            f"Created new Dream distribution {name} from {dist} with configs: {new_config_paths}"
-        )
+        click.echo(f"Created new Dream distribution {name} from {dist} with configs: {new_config_paths}")
     except FileExistsError:
         raise click.ClickException(
             f"{name} distribution already exists! "

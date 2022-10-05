@@ -15,9 +15,17 @@ def dream_root_dir(pytestconfig):
 def create_weather_dist(dream_root_dir):
     template_name = "dream"
     name = "dream_weather"
-    services = ['convers-evaluator-annotator', 'spacy-nounphrases', 'convers-evaluator-selector',
-                'dff-intent-responder-skill', 'intent-catcher', 'ner', 'entity-detection', 'dff-weather-skill',
-                'dialogpt']
+    services = [
+        "convers-evaluator-annotator",
+        "spacy-nounphrases",
+        "convers-evaluator-selector",
+        "dff-intent-responder-skill",
+        "intent-catcher",
+        "ner",
+        "entity-detection",
+        "dff-weather-skill",
+        "dialogpt",
+    ]
     pipeline_conf = True
     compose_override = True
     compose_dev = True
@@ -71,12 +79,18 @@ def test_if_dream_weather_dist_exists(dream_weather_dist_dir) -> None:
     assert dream_weather_dist_dir.exists(), f"There is no directory at path: {dream_weather_dist_dir}"
 
 
-@pytest.mark.parametrize("file", ["dev.yml", "docker-compose.override.yml", "pipeline_conf.json", "proxy.yml"])
+@pytest.mark.parametrize(
+    "file",
+    ["dev.yml", "docker-compose.override.yml", "pipeline_conf.json", "proxy.yml"],
+)
 def test_dist_file_in_dream_directory(file: str, dream_weather_dist_dir, files_in_dream_weather_dist_dir) -> None:
     assert file in files_in_dream_weather_dist_dir, f"The file {file} is not in the right directory"
 
 
-@pytest.mark.parametrize("file", ["dev.yml", "docker-compose.override.yml", "pipeline_conf.json", "proxy.yml"])
+@pytest.mark.parametrize(
+    "file",
+    ["dev.yml", "docker-compose.override.yml", "pipeline_conf.json", "proxy.yml"],
+)
 def test_dream_weather_dist_corresponds_ground_truth_files(file: str, dream_weather_dist_dir) -> None:
     """
     Test if built files are equal to ground-truth files that are based in `ground_truth_path`.
@@ -102,4 +116,4 @@ def test_dream_weather_dist_corresponds_ground_truth_files(file: str, dream_weat
                     print(f"{ground_truth_text[i]} != {dist_file_text[i]}")
                     differ_lines.append(i + 1)
 
-            assert (not differ_lines), f"built-file {file} differs from the ground_truth_file at lines: {differ_lines} "
+            assert not differ_lines, f"built-file {file} differs from the ground_truth_file at lines: {differ_lines} "
