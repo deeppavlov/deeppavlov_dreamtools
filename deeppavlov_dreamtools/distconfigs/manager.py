@@ -220,9 +220,7 @@ class YmlDreamConfig(BaseDreamConfig):
     def filter_services(self, names: list):
         model_dict = {
             "version": self.config.version,
-            "services": {
-                k: v for k, v in self.config.services.items() if k in names
-            },
+            "services": {k: v for k, v in self.config.services.items() if k in names},
         }
         config = self.GENERIC_MODEL.parse_obj(model_dict)
         return names, self.__class__(config)

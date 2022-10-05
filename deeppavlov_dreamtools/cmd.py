@@ -163,7 +163,9 @@ def new_dff(
     help="Create all configs (defaults to False). Overrides --pipeline and all other --compose-* flags",
 )
 @click.option(
-    "--pipeline/--no-pipeline", default=True, help="Create pipeline_conf.json config (defaults to True)"
+    "--pipeline/--no-pipeline",
+    default=True,
+    help="Create pipeline_conf.json config (defaults to True)",
 )
 @click.option(
     "--compose-override/--no-compose-override",
@@ -171,13 +173,19 @@ def new_dff(
     help="Create docker-compose.override.yml config (defaults to False)",
 )
 @click.option(
-    "--compose-dev/--no-compose-dev", default=False, help="Create dev.yml config (defaults to False)"
+    "--compose-dev/--no-compose-dev",
+    default=False,
+    help="Create dev.yml config (defaults to False)",
 )
 @click.option(
-    "--compose-proxy/--no-compose-proxy", default=False, help="Create proxy.yml config (defaults to False)"
+    "--compose-proxy/--no-compose-proxy",
+    default=False,
+    help="Create proxy.yml config (defaults to False)",
 )
 @click.option(
-    "--compose-local/--no-compose-local", default=False, help="Create local.yml config (defaults to False)"
+    "--compose-local/--no-compose-local",
+    default=False,
+    help="Create local.yml config (defaults to False)",
 )
 @click.pass_context
 @must_be_inside_dream

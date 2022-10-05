@@ -64,9 +64,13 @@ flows = {
             },
         },
         "node1": {
-            RESPONSE: int_rsp.multi_response(replies=["Hi, how are you?", "Hi, what's up?"]),  # several hypothesis
+            RESPONSE: int_rsp.multi_response(
+                replies=["Hi, how are you?", "Hi, what's up?"]
+            ),  # several hypothesis
             PROCESSING: {
-                "save_slots_to_ctx": int_prs.save_slots_to_ctx({"topic": "science", "user_name": "Gordon Freeman"})
+                "save_slots_to_ctx": int_prs.save_slots_to_ctx(
+                    {"topic": "science", "user_name": "Gordon Freeman"}
+                )
             },
             TRANSITIONS: {"node2": cnd.regexp(r"how are you", re.IGNORECASE)},
         },
@@ -105,8 +109,12 @@ flows = {
                 replies=["bye", "goodbye"],
                 confidences=[1.0, 0.5],
                 hype_attr=[
-                    {"can_continue": common_constants.MUST_CONTINUE},  # for the first hyp
-                    {"can_continue": common_constants.CAN_CONTINUE_SCENARIO},  # for the second hyp
+                    {
+                        "can_continue": common_constants.MUST_CONTINUE
+                    },  # for the first hyp
+                    {
+                        "can_continue": common_constants.CAN_CONTINUE_SCENARIO
+                    },  # for the second hyp
                 ],
             ),
             PROCESSING: {"set_confidence": int_prs.set_confidence(0.0)},
@@ -115,4 +123,6 @@ flows = {
 }
 
 
-actor = Actor(flows, start_label=("sevice", "start"), fallback_label=("sevice", "fallback"))
+actor = Actor(
+    flows, start_label=("sevice", "start"), fallback_label=("sevice", "fallback")
+)
