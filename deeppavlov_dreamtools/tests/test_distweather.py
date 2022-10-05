@@ -76,30 +76,22 @@ def files_in_dream_weather_dist_dir(dream_weather_dist_dir):
 
 
 def test_if_dream_weather_dist_exists(dream_weather_dist_dir) -> None:
-    assert (
-        dream_weather_dist_dir.exists()
-    ), f"There is no directory at path: {dream_weather_dist_dir}"
+    assert dream_weather_dist_dir.exists(), f"There is no directory at path: {dream_weather_dist_dir}"
 
 
 @pytest.mark.parametrize(
     "file",
     ["dev.yml", "docker-compose.override.yml", "pipeline_conf.json", "proxy.yml"],
 )
-def test_dist_file_in_dream_directory(
-    file: str, dream_weather_dist_dir, files_in_dream_weather_dist_dir
-) -> None:
-    assert (
-        file in files_in_dream_weather_dist_dir
-    ), f"The file {file} is not in the right directory"
+def test_dist_file_in_dream_directory(file: str, dream_weather_dist_dir, files_in_dream_weather_dist_dir) -> None:
+    assert file in files_in_dream_weather_dist_dir, f"The file {file} is not in the right directory"
 
 
 @pytest.mark.parametrize(
     "file",
     ["dev.yml", "docker-compose.override.yml", "pipeline_conf.json", "proxy.yml"],
 )
-def test_dream_weather_dist_corresponds_ground_truth_files(
-    file: str, dream_weather_dist_dir
-) -> None:
+def test_dream_weather_dist_corresponds_ground_truth_files(file: str, dream_weather_dist_dir) -> None:
     """
     Test if built files are equal to ground-truth files that are based in `ground_truth_path`.
     If files aren't equal test shows which lines differ and prints those two different lines.
@@ -109,9 +101,7 @@ def test_dream_weather_dist_corresponds_ground_truth_files(
         dream_weather_dist_dir (Path): path to root Dream directory
     """
     config_path = dream_weather_dist_dir / file
-    ground_truth_path = (
-        Path(__file__).parents[1] / "static" / "dream_weather_dist_configs" / file
-    )
+    ground_truth_path = Path(__file__).parents[1] / "static" / "dream_weather_dist_configs" / file
 
     with open(ground_truth_path) as ground_truth_file:
         with open(config_path) as dist_file:
@@ -126,6 +116,4 @@ def test_dream_weather_dist_corresponds_ground_truth_files(
                     print(f"{ground_truth_text[i]} != {dist_file_text[i]}")
                     differ_lines.append(i + 1)
 
-            assert (
-                not differ_lines
-            ), f"built-file {file} differs from the ground_truth_file at lines: {differ_lines} "
+            assert not differ_lines, f"built-file {file} differs from the ground_truth_file at lines: {differ_lines} "

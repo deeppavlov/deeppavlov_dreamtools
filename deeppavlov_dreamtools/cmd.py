@@ -35,9 +35,7 @@ def must_be_inside_dream(f):
                 "Make sure you run 'dreamtools' from inside the Dream directory or provide -D/--dream, e.g.:\n"
                 f"{possible_command}"
             )
-            raise click.exceptions.BadParameter(
-                exception_message, param_hint="-D/--dream"
-            )
+            raise click.exceptions.BadParameter(exception_message, param_hint="-D/--dream")
         return f(click_context, **kwargs)
 
     return must_be_inside_dream_wrapper
@@ -221,9 +219,7 @@ def new_dist(
         )
 
         new_config_paths = ", ".join(str(p) for p in new_config_paths)
-        click.echo(
-            f"Created new Dream distribution {name} from {dist} with configs: {new_config_paths}"
-        )
+        click.echo(f"Created new Dream distribution {name} from {dist} with configs: {new_config_paths}")
     except FileExistsError:
         raise click.ClickException(
             f"{name} distribution already exists! "

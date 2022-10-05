@@ -256,6 +256,4 @@ class ComposeLocal(BaseComposeConfigModel):
 
 AnyContainer = Union[ComposeContainer, ComposeDevContainer, ComposeLocalContainer]
 AnyConfig = Union[PipelineConf, ComposeOverride, ComposeDev, ComposeProxy, ComposeLocal]
-AnyConfigType = Type[
-    Union[PipelineConf, ComposeOverride, ComposeDev, ComposeProxy, ComposeLocal]
-]
+AnyConfigType = Type[Union[PipelineConf, ComposeOverride, ComposeDev, ComposeProxy, ComposeLocal]]
