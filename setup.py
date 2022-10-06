@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 authors = [
     "Maxim Talimanchuk <mtalimanchuk@gmail.com>",
     "Dilyara Baymurzina <dilyara.rimovna@gmail.com>",
-    "Denis Kuznetsov <kuznetsov.den.p@gmail.com>"
+    "Denis Kuznetsov <kuznetsov.den.p@gmail.com>",
 ]
 
 setup(

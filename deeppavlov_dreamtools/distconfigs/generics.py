@@ -103,6 +103,7 @@ class PipelineConf(BaseModelNoExtra):
     """
     Implements pipeline.json config structure
     """
+
     connectors: Dict[str, PipelineConfConnector]
     services: PipelineConfServiceList
 
@@ -113,9 +114,7 @@ class ContainerBuildDefinition(BaseModelNoExtra):
     dockerfile: Optional[Path]
 
     class Config:
-        json_encoders = {
-            Path: str
-        }
+        json_encoders = {Path: str}
 
 
 class DeploymentDefinitionResourcesArg(BaseModelNoExtra):
@@ -196,7 +195,11 @@ class ComposeContainer(BaseModelNoExtra):
         for env_name, env_value in iterator:
             if env_name == "PORT":
                 ports.append(
-                    {"key": f"environment -> {env_name}", "text": env_value, "value": env_value}
+                    {
+                        "key": f"environment -> {env_name}",
+                        "text": env_value,
+                        "value": env_value,
+                    }
                 )
 
         return ports
@@ -216,6 +219,7 @@ class BaseComposeConfigModel(BaseModelNoExtra):
     Implements basic .yml config structure.
     Particular .yml configs should inherit from this one instead of BaseModel.
     """
+
     services: Dict
     version: str = "3.7"
 
@@ -224,6 +228,7 @@ class ComposeOverride(BaseComposeConfigModel):
     """
     Implements docker-compose.override.yml config structure
     """
+
     services: Dict[str, ComposeContainer]
 
 
@@ -231,6 +236,7 @@ class ComposeDev(BaseComposeConfigModel):
     """
     Implements dev.yml config structure
     """
+
     services: Dict[str, ComposeDevContainer]
 
 
@@ -238,6 +244,7 @@ class ComposeProxy(BaseComposeConfigModel):
     """
     Implements proxy.yml config structure
     """
+
     services: Dict[str, ComposeContainer]
 
 
@@ -245,6 +252,7 @@ class ComposeLocal(BaseComposeConfigModel):
     """
     Implements proxy.yml config structure
     """
+
     services: Dict[str, ComposeLocalContainer]
 
 
