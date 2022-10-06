@@ -16,7 +16,7 @@ def dream_root_dir(pytestconfig):
     yield Path(pytestconfig.getoption("dream_root"))
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def create_weather_dist(dream_root_dir):
     template_name = "dream"
     name = "dream_weather"
@@ -62,7 +62,7 @@ def create_weather_dist(dream_root_dir):
     yield paths
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def dream_weather_dist_dir(create_weather_dist, dream_root_dir):
     """
     Path to directory where should be built files
@@ -71,7 +71,7 @@ def dream_weather_dist_dir(create_weather_dist, dream_root_dir):
     yield dream_path_dist
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def files_in_dream_weather_dist_dir(dream_weather_dist_dir):
     """
     List of files in the dream_weather distribution directory
@@ -84,6 +84,10 @@ def test_if_dream_weather_dist_exists(dream_weather_dist_dir) -> None:
     assert dream_weather_dist_dir.exists(), f"There is no directory at path: {dream_weather_dist_dir}"
 
 
+@pytest.mark.parametrize(
+    "file",
+    ["dev.yml", "docker-compose.override.yml", "pipeline_conf.json", "proxy.yml"],
+)
 def test_dist_file_in_dream_directory(file: str, dream_weather_dist_dir, files_in_dream_weather_dist_dir) -> None:
     assert file in files_in_dream_weather_dist_dir, f"The file {file} is not in the right directory"
 
