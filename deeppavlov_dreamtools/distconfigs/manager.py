@@ -750,53 +750,54 @@ class DreamDist:
         dff_template_dir = pkg_source_dir / "static" / "dff_template_skill"
         copytree(dff_template_dir, skill_dir)
 
-        if self.pipeline_conf:
-            pl_service = PipelineConfService(
-                connector=PipelineConfConnector(
-                    protocol="http",
-                    timeout=2,
-                    url=f"http://{name_with_dashes}:{port}/respond",
-                ),
-                dialog_formatter=f"state_formatters.dp_formatters:{name}_formatter",
-                response_formatter="state_formatters.dp_formatters:skill_with_attributes_formatter_service",
-                previous_services=["skill_selectors"],
-                state_manager_method="add_hypothesis",
-            )
-            self.pipeline_conf.add_service(name_with_underscores, "skills", pl_service, inplace=True)
+        self._check_if_services_can_be_added_to_self_config()
 
-        if self.compose_override:
-            override_service = ComposeContainer(
-                env_file=[".env"],
-                build=ContainerBuildDefinition(
-                    args={"SERVICE_PORT": port, "SERVICE_NAME": name},
-                    context=Path("."),
-                    dockerfile=skill_dir / "Dockerfile",
-                ),
-                command=f"gunicorn --workers=1 server:app -b 0.0.0.0:{port} --reload --timeout 500",
-                deploy=DeploymentDefinition(
-                    resources=DeploymentDefinitionResources(
-                        limits=DeploymentDefinitionResourcesArg(memory="1G"),
-                        reservations=DeploymentDefinitionResourcesArg(memory="1G"),
-                    )
-                ),
-            )
-            self.compose_override.add_service(name_with_dashes, override_service, inplace=True)
+        pl_service = PipelineConfService(
+            connector=PipelineConfConnector(
+                protocol="http",
+                timeout=2,
+                url=f"http://{name_with_dashes}:{port}/respond",
+            ),
+            dialog_formatter=f"state_formatters.dp_formatters:{name}_formatter",
+            response_formatter="state_formatters.dp_formatters:skill_with_attributes_formatter_service",
+            previous_services=["skill_selectors"],
+            state_manager_method="add_hypothesis",
+        )
 
-        if self.compose_dev:
-            dev_service = ComposeDevContainer(
-                volumes=[f"./skills/{name}:/src", "./common:/src/common"],
-                ports=[f"{port}:{port}"],
-            )
-            self.compose_dev.add_service(name_with_dashes, dev_service, inplace=True)
+        override_service = ComposeContainer(
+            env_file=[".env"],
+            build=ContainerBuildDefinition(
+                args={"SERVICE_PORT": port, "SERVICE_NAME": name},
+                context=Path("."),
+                dockerfile=skill_dir / "Dockerfile",
+            ),
+            command=f"gunicorn --workers=1 server:app -b 0.0.0.0:{port} --reload --timeout 500",
+            deploy=DeploymentDefinition(
+                resources=DeploymentDefinitionResources(
+                    limits=DeploymentDefinitionResourcesArg(memory="1G"),
+                    reservations=DeploymentDefinitionResourcesArg(memory="1G"),
+                )
+            ),
+        )
 
-        if self.compose_proxy:
-            proxy_service = ComposeContainer(
-                command=["nginx", "-g", "daemon off;"],
-                build=ContainerBuildDefinition(context=Path("dp/proxy"), dockerfile=Path("Dockerfile")),
-                environment=[f"PROXY_PASS=dream.deeppavlov.ai:{port}", f"PORT={port}"],
-            )
-            self.compose_proxy.add_service(name_with_dashes, proxy_service, inplace=True)
+        dev_service = ComposeDevContainer(
+            volumes=[f"./skills/{name}:/src", "./common:/src/common"],
+            ports=[f"{port}:{port}"],
+        )
 
+        proxy_service = ComposeContainer(
+            command=["nginx", "-g", "daemon off;"],
+            build=ContainerBuildDefinition(context=Path("dp/proxy"), dockerfile=Path("Dockerfile")),
+            environment=[f"PROXY_PASS=dream.deeppavlov.ai:{port}", f"PORT={port}"],
+        )
+
+        self.add_services(
+            pl_service=pl_service,
+            override_service=override_service,
+            dev_service=dev_service,
+            proxy_service=proxy_service,
+            name=name,
+        )
         self.save(True)
 
         return skill_dir
@@ -846,6 +847,39 @@ class DreamDist:
 
             local_config.add_service(name, service, inplace=True)
         return local_config.to_dist(self.dist_path)
+
+    def _check_if_services_can_be_added_to_self_config(self) -> None:
+        missing_configs = []
+
+        if not self.pipeline_conf:
+            missing_configs.append("pipeline_conf")
+        if not self.compose_override:
+            missing_configs.append("compose_override")
+        if not self.compose_dev:
+            missing_configs.append("compose_dev")
+        if not self.compose_proxy:
+            missing_configs.append("compose_proxy")
+
+        if missing_configs:
+            raise FileNotFoundError(f"These configs are missing in DreamDist object: {', '.join(missing_configs)}")
+
+    def add_services(
+        self,
+        pl_service: PipelineConfService,
+        override_service: ComposeContainer,
+        dev_service: ComposeDevContainer,
+        proxy_service: ComposeContainer,
+        name: str,
+    ) -> None:
+        self._check_if_services_can_be_added_to_self_config()
+
+        name_with_underscores = name.replace("-", "_")
+        name_with_dashes = name.replace("_", "-")
+
+        self.pipeline_conf.add_service(name_with_underscores, "skills", pl_service, inplace=True)
+        self.compose_override.add_service(name_with_dashes, override_service, inplace=True)
+        self.compose_dev.add_service(name_with_dashes, dev_service, inplace=True)
+        self.compose_proxy.add_service(name_with_dashes, proxy_service, inplace=True)
 
 
 def list_dists(dream_root: Union[Path, str]) -> list[DreamDist]:
