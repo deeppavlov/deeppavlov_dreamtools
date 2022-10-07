@@ -739,7 +739,6 @@ class DreamDist:
         Returns:
             path to new DFF skill
         """
-        name_with_underscores = name.replace("-", "_")
         name_with_dashes = name.replace("_", "-")
 
         skill_dir = Path(self.dream_root) / const.SKILLS_DIR_NAME / name
