@@ -750,8 +750,6 @@ class DreamDist:
         dff_template_dir = pkg_source_dir / "static" / "dff_template_skill"
         copytree(dff_template_dir, skill_dir)
 
-        self._check_if_services_can_be_added_to_self_config()
-
         pl_service = PipelineConfService(
             connector=PipelineConfConnector(
                 protocol="http",
@@ -791,7 +789,7 @@ class DreamDist:
             environment=[f"PROXY_PASS=dream.deeppavlov.ai:{port}", f"PORT={port}"],
         )
 
-        self.add_services(
+        self.add_service(
             pl_service=pl_service,
             override_service=override_service,
             dev_service=dev_service,
@@ -848,38 +846,47 @@ class DreamDist:
             local_config.add_service(name, service, inplace=True)
         return local_config.to_dist(self.dist_path)
 
-    def _check_if_services_can_be_added_to_self_config(self) -> None:
+    def _check_if_services_can_be_added_to_self_config(
+        self,
+        pl_service: PipelineConfService = None,
+        override_service: ComposeContainer = None,
+        dev_service: ComposeDevContainer = None,
+        proxy_service: ComposeContainer = None,
+    ) -> None:
         missing_configs = []
 
-        if not self.pipeline_conf:
+        if pl_service and not self.pipeline_conf:
             missing_configs.append("pipeline_conf")
-        if not self.compose_override:
+        if override_service and not self.compose_override:
             missing_configs.append("compose_override")
-        if not self.compose_dev:
+        if dev_service and not self.compose_dev:
             missing_configs.append("compose_dev")
-        if not self.compose_proxy:
+        if proxy_service and not self.compose_proxy:
             missing_configs.append("compose_proxy")
 
         if missing_configs:
             raise FileNotFoundError(f"These configs are missing in DreamDist object: {', '.join(missing_configs)}")
 
-    def add_services(
+    def add_service(
         self,
-        pl_service: PipelineConfService,
-        override_service: ComposeContainer,
-        dev_service: ComposeDevContainer,
-        proxy_service: ComposeContainer,
         name: str,
+        pl_service: PipelineConfService = None,
+        override_service: ComposeContainer = None,
+        dev_service: ComposeDevContainer = None,
+        proxy_service: ComposeContainer = None,
     ) -> None:
-        self._check_if_services_can_be_added_to_self_config()
+        self._check_if_services_can_be_added_to_self_config(pl_service, override_service, dev_service, proxy_service)
 
         name_with_underscores = name.replace("-", "_")
         name_with_dashes = name.replace("_", "-")
-
-        self.pipeline_conf.add_service(name_with_underscores, "skills", pl_service, inplace=True)
-        self.compose_override.add_service(name_with_dashes, override_service, inplace=True)
-        self.compose_dev.add_service(name_with_dashes, dev_service, inplace=True)
-        self.compose_proxy.add_service(name_with_dashes, proxy_service, inplace=True)
+        if self.pipeline_conf:
+            self.pipeline_conf.add_service(name_with_underscores, "skills", pl_service, inplace=True)
+        if self.compose_override:
+            self.compose_override.add_service(name_with_dashes, override_service, inplace=True)
+        if self.compose_dev:
+            self.compose_dev.add_service(name_with_dashes, dev_service, inplace=True)
+        if self.compose_proxy:
+            self.compose_proxy.add_service(name_with_dashes, proxy_service, inplace=True)
 
 
 def list_dists(dream_root: Union[Path, str]) -> list[DreamDist]:
