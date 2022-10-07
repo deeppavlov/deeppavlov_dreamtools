@@ -58,13 +58,14 @@ class PipelineConfService(BaseModelNoExtra):
 class PipelineConfServiceList(BaseModelNoExtra):
     last_chance_service: PipelineConfService
     timeout_service: PipelineConfService
-    bot_annotator_selector: PipelineConfService
-    post_annotators: Dict[str, PipelineConfService]
+    bot_annotator_selector: Optional[PipelineConfService]
+    post_annotators: Optional[Dict[str, PipelineConfService]]
     annotators: Dict[str, PipelineConfService]
-    skill_selectors: Dict[str, PipelineConfService]
+    skill_selectors: Optional[Dict[str, PipelineConfService]]
     skills: Dict[str, PipelineConfService]
-    post_skill_selector_annotators: Dict[str, PipelineConfService]
+    post_skill_selector_annotators: Optional[Dict[str, PipelineConfService]]
     response_selectors: Dict[str, PipelineConfService]
+    response_annotators: Optional[Dict[str, PipelineConfService]]
 
     @property
     def flat_keys(self):
@@ -154,6 +155,7 @@ class ComposeContainer(BaseModelNoExtra):
     environment: Optional[Union[Dict[str, Any], list]]
     deploy: Optional[DeploymentDefinition]
     tty: Optional[bool]
+    ports: Optional[List[str]]
 
     @property
     def port_definitions(self):

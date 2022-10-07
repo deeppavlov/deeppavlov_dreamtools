@@ -1,17 +1,22 @@
-import pytest
-
 from pathlib import Path
-from typing import Union
 
+import pytest
 from deeppavlov_dreamtools import DreamDist
+from deeppavlov_dreamtools.distconfigs import list_dists
+from deeppavlov_dreamtools.tests.fixtures import (
+    create_weather_dist,
+    dream_weather_dist_dir,
+    files_in_dream_weather_dist_dir,
+    list_of_dream_dist,
+)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def dream_root_dir(pytestconfig):
     yield Path(pytestconfig.getoption("dream_root"))
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def create_weather_dist(dream_root_dir):
     template_name = "dream"
     name = "dream_weather"
@@ -57,7 +62,7 @@ def create_weather_dist(dream_root_dir):
     yield paths
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def dream_weather_dist_dir(create_weather_dist, dream_root_dir):
     """
     Path to directory where should be built files
@@ -66,7 +71,7 @@ def dream_weather_dist_dir(create_weather_dist, dream_root_dir):
     yield dream_path_dist
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def files_in_dream_weather_dist_dir(dream_weather_dist_dir):
     """
     List of files in the dream_weather distribution directory
@@ -115,5 +120,4 @@ def test_dream_weather_dist_corresponds_ground_truth_files(file: str, dream_weat
                 if ground_truth_text[i] != dist_file_text[i]:
                     print(f"{ground_truth_text[i]} != {dist_file_text[i]}")
                     differ_lines.append(i + 1)
-
             assert not differ_lines, f"built-file {file} differs from the ground_truth_file at lines: {differ_lines} "

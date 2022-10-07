@@ -846,3 +846,37 @@ class DreamDist:
 
             local_config.add_service(name, service, inplace=True)
         return local_config.to_dist(self.dist_path)
+
+
+def list_dists(dream_root: Union[Path, str]) -> list[DreamDist]:
+    """
+    Serializes configs from Dream assistant distributions to list of DreamDist objects
+
+    Args:
+        dream_root: path to Dream module
+
+    Returns:
+        dream_dists: python list of DreamDist objects
+
+    """
+
+    dist_path = Path(dream_root) / const.ASSISTANT_DISTS_DIR_NAME
+    dream_dists = []
+    distributions_paths = dist_path.iterdir()
+
+    for distribution in distributions_paths:
+        if distribution.is_file():
+            continue
+        filenames = [file.name for file in distribution.iterdir()]
+
+        dream_dist = DreamDist.from_dist(
+            distribution,
+            pipeline_conf="pipeline_conf.json" in filenames,
+            compose_override="docker-compose.override.yml" in filenames,
+            compose_dev="dev.yml" in filenames,
+            compose_proxy="proxy.yml" in filenames,
+            compose_local="local.yml" in filenames,
+        )
+        dream_dists.append(dream_dist)
+
+    return dream_dists
