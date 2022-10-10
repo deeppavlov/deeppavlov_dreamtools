@@ -852,6 +852,19 @@ class DreamDist:
         dev_service: ComposeDevContainer = None,
         proxy_service: ComposeContainer = None,
     ) -> None:
+        """
+        The function checks if created service could be added to the current config of DreamDist.
+
+        The main condition is existence of corresponding config in the DreamDist object. An error is raised if
+        the condition isn't met.
+
+        Args:
+            pl_service: service of pipeline config (pipeline_conf.json)
+            override_service: service of compose config (docker-compose.override.yml)
+            dev_service: service of dev config (dev.yml)
+            proxy_service: service of proxy config (proxy.yml)
+
+        """
         missing_configs = []
 
         if pl_service and not self.pipeline_conf:
@@ -874,17 +887,29 @@ class DreamDist:
         dev_service: ComposeDevContainer = None,
         proxy_service: ComposeContainer = None,
     ) -> None:
+        """
+        Adds service to DreamDist config
+
+        Args:
+            name: name of the service
+            pl_service: service of pipeline config (pipeline_conf.json)
+            override_service: service of compose config (docker-compose.override.yml)
+            dev_service: service of dev config (dev.yml)
+            proxy_service: service of proxy config (proxy.yml)
+
+        """
         self._check_if_services_can_be_added_to_self_config(pl_service, override_service, dev_service, proxy_service)
 
         name_with_underscores = name.replace("-", "_")
         name_with_dashes = name.replace("_", "-")
-        if self.pipeline_conf:
+
+        if pl_service:
             self.pipeline_conf.add_service(name_with_underscores, "skills", pl_service, inplace=True)
-        if self.compose_override:
+        if override_service:
             self.compose_override.add_service(name_with_dashes, override_service, inplace=True)
-        if self.compose_dev:
+        if dev_service:
             self.compose_dev.add_service(name_with_dashes, dev_service, inplace=True)
-        if self.compose_proxy:
+        if proxy_service:
             self.compose_proxy.add_service(name_with_dashes, proxy_service, inplace=True)
 
 
