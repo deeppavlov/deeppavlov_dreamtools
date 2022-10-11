@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from deeppavlov_dreamtools.tests.fixtures import (
     DreamDist,
-    dream_assistant_dist_dir,
+    dream_assistant_dists_dir,
     dream_root_dir,
     list_of_dream_dist,
 )
