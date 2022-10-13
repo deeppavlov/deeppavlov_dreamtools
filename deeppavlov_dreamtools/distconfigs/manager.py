@@ -739,8 +739,6 @@ class DreamDist:
         Returns:
             path to new DFF skill
         """
-        name_with_dashes = name.replace("_", "-")
-
         skill_dir = Path(self.dream_root) / const.SKILLS_DIR_NAME / name
         if skill_dir.exists():
             raise FileExistsError(f"{skill_dir} already exists!")
@@ -749,52 +747,17 @@ class DreamDist:
         dff_template_dir = pkg_source_dir / "static" / "dff_template_skill"
         copytree(dff_template_dir, skill_dir)
 
-        pl_service = PipelineConfService(
-            connector=PipelineConfConnector(
-                protocol="http",
-                timeout=2,
-                url=f"http://{name_with_dashes}:{port}/respond",
-            ),
-            dialog_formatter=f"state_formatters.dp_formatters:{name}_formatter",
-            response_formatter="state_formatters.dp_formatters:skill_with_attributes_formatter_service",
-            previous_services=["skill_selectors"],
-            state_manager_method="add_hypothesis",
+        self._check_if_services_can_be_added_to_self_config(
+            pl_service=True,
+            override_service=True,
+            dev_service=True,
+            proxy_service=True,
         )
-
-        override_service = ComposeContainer(
-            env_file=[".env"],
-            build=ContainerBuildDefinition(
-                args={"SERVICE_PORT": port, "SERVICE_NAME": name},
-                context=Path("."),
-                dockerfile=skill_dir / "Dockerfile",
-            ),
-            command=f"gunicorn --workers=1 server:app -b 0.0.0.0:{port} --reload --timeout 500",
-            deploy=DeploymentDefinition(
-                resources=DeploymentDefinitionResources(
-                    limits=DeploymentDefinitionResourcesArg(memory="1G"),
-                    reservations=DeploymentDefinitionResourcesArg(memory="1G"),
-                )
-            ),
-        )
-
-        dev_service = ComposeDevContainer(
-            volumes=[f"./skills/{name}:/src", "./common:/src/common"],
-            ports=[f"{port}:{port}"],
-        )
-
-        proxy_service = ComposeContainer(
-            command=["nginx", "-g", "daemon off;"],
-            build=ContainerBuildDefinition(context=Path("dp/proxy"), dockerfile=Path("Dockerfile")),
-            environment=[f"PROXY_PASS=dream.deeppavlov.ai:{port}", f"PORT={port}"],
-        )
-
         self.add_service(
-            pl_service=pl_service,
-            override_service=override_service,
-            dev_service=dev_service,
-            proxy_service=proxy_service,
             name=name,
+            port=port,
         )
+
         self.save(True)
 
         return skill_dir
@@ -847,10 +810,10 @@ class DreamDist:
 
     def _check_if_services_can_be_added_to_self_config(
         self,
-        pl_service: PipelineConfService = None,
-        override_service: ComposeContainer = None,
-        dev_service: ComposeDevContainer = None,
-        proxy_service: ComposeContainer = None,
+        pl_service: bool = False,
+        override_service: bool = False,
+        dev_service: bool = False,
+        proxy_service: bool = False,
     ) -> None:
         """
         The function checks if created service could be added to the current config of DreamDist.
@@ -882,34 +845,64 @@ class DreamDist:
     def add_service(
         self,
         name: str,
-        pl_service: PipelineConfService = None,
-        override_service: ComposeContainer = None,
-        dev_service: ComposeDevContainer = None,
-        proxy_service: ComposeContainer = None,
+        port: int,
     ) -> None:
         """
-        Adds service to DreamDist config
+        Adds service to DreamDist config if config exists
 
         Args:
             name: name of the service
-            pl_service: service of pipeline config (pipeline_conf.json)
-            override_service: service of compose config (docker-compose.override.yml)
-            dev_service: service of dev config (dev.yml)
-            proxy_service: service of proxy config (proxy.yml)
-
+            port: port where service should be deployed
         """
-        self._check_if_services_can_be_added_to_self_config(pl_service, override_service, dev_service, proxy_service)
-
         name_with_underscores = name.replace("-", "_")
         name_with_dashes = name.replace("_", "-")
+        skill_dir = Path(self.dream_root) / const.SKILLS_DIR_NAME / name
 
-        if pl_service:
+        if self.pipeline_conf:
+            pl_service = PipelineConfService(
+                connector=PipelineConfConnector(
+                    protocol="http",
+                    timeout=2,
+                    url=f"http://{name_with_dashes}:{port}/respond",
+                ),
+                dialog_formatter=f"state_formatters.dp_formatters:{name}_formatter",
+                response_formatter="state_formatters.dp_formatters:skill_with_attributes_formatter_service",
+                previous_services=["skill_selectors"],
+                state_manager_method="add_hypothesis",
+            )
             self.pipeline_conf.add_service(name_with_underscores, "skills", pl_service, inplace=True)
-        if override_service:
+
+        if self.compose_override:
+            override_service = ComposeContainer(
+                env_file=[".env"],
+                build=ContainerBuildDefinition(
+                    args={"SERVICE_PORT": port, "SERVICE_NAME": name},
+                    context=Path("."),
+                    dockerfile=skill_dir / "Dockerfile",
+                ),
+                command=f"gunicorn --workers=1 server:app -b 0.0.0.0:{port} --reload --timeout 500",
+                deploy=DeploymentDefinition(
+                    resources=DeploymentDefinitionResources(
+                        limits=DeploymentDefinitionResourcesArg(memory="1G"),
+                        reservations=DeploymentDefinitionResourcesArg(memory="1G"),
+                    )
+                ),
+            )
             self.compose_override.add_service(name_with_dashes, override_service, inplace=True)
-        if dev_service:
+
+        if self.compose_dev:
+            dev_service = ComposeDevContainer(
+                volumes=[f"./skills/{name}:/src", "./common:/src/common"],
+                ports=[f"{port}:{port}"],
+            )
             self.compose_dev.add_service(name_with_dashes, dev_service, inplace=True)
-        if proxy_service:
+
+        if self.compose_proxy:
+            proxy_service = ComposeContainer(
+                command=["nginx", "-g", "daemon off;"],
+                build=ContainerBuildDefinition(context=Path("dp/proxy"), dockerfile=Path("Dockerfile")),
+                environment=[f"PROXY_PASS=dream.deeppavlov.ai:{port}", f"PORT={port}"],
+            )
             self.compose_proxy.add_service(name_with_dashes, proxy_service, inplace=True)
 
 
