@@ -14,7 +14,39 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+
     - name: Build Tests
       run: docker build . --file deeppavlov_dreamtools/tests/Dockerfile --tag testrunner:latest
+
     - name: Run Tests
       run: docker run testrunner:latest
+
+    - uses: shrink/actions-docker-extract@v1
+      id: extract
+      with:
+        image: testrunner:latest
+        path: /src/deeppavlov_dreamtools/tests/.coverage
+
+    - name: Create coverage badge
+      uses: tj-actions/coverage-badge-py@v1.8
+
+    - name: Verify coverage badge changed
+      uses: tj-actions/verify-changed-files@v9
+      id: changed_files
+      with:
+        files: coverage.svg
+
+    - name: Commit coverage badge
+      if: steps.changed_files.outputs.files_changed == 'true'
+      run: |
+        git config --local user.email "mtalimanchuk@gmail.com"
+        git config --local user.name "Maxim Talimanchuk"
+        git add coverage.svg
+        git commit -m "Updated coverage.svg"
+
+    - name: Push changes
+      if: steps.changed_files.outputs.files_changed == 'true'
+      uses: ad-m/github-push-action@master
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        branch: ${{ github.ref }}
