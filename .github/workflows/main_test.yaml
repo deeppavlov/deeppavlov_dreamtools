@@ -32,14 +32,14 @@ jobs:
           pip install -r dreamtools/deeppavlov_dreamtools/tests/requirements-test.txt
           pip install black==22.8.0
       - name: Run codestyle
-        run: black --line-length=120 --check .
+        run: black --line-length=120 --check dreamtools/.
       - name: Run unit tests
-        run: cd deeppavlov_dreamtools/tests && pytest .
+        run: cd dreamtools/deeppavlov_dreamtools/tests && pytest .
       - name: Store coverage file
         uses: actions/upload-artifact@v3
         with:
           name: coverage
-          path: deeppavlov_dreamtools/tests/coverage
+          path: dreamtools/deeppavlov_dreamtools/tests/coverage
 
   coverage:
     needs: build
