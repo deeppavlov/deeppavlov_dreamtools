@@ -56,8 +56,8 @@ class PipelineConfService(BaseModelNoExtra):
 
 
 class PipelineConfServiceList(BaseModelNoExtra):
-    last_chance_service: PipelineConfService
-    timeout_service: PipelineConfService
+    last_chance_service: Optional[PipelineConfService]
+    timeout_service: Optional[PipelineConfService]
     bot_annotator_selector: Optional[PipelineConfService]
     post_annotators: Optional[Dict[str, PipelineConfService]]
     annotators: Dict[str, PipelineConfService]
@@ -104,7 +104,7 @@ class PipelineConf(BaseModelNoExtra):
     Implements pipeline.json config structure
     """
 
-    connectors: Dict[str, PipelineConfConnector]
+    connectors: Optional[Dict[str, PipelineConfConnector]]
     services: PipelineConfServiceList
 
 
