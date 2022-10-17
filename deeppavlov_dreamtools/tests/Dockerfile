@@ -16,4 +16,4 @@ COPY . /src/
 
 WORKDIR /src/deeppavlov_dreamtools/tests
 # run tests
-CMD ["pytest", "--cov-config=.coveragerc", "--cov=deeppavlov_dreamtools", "."]
+CMD ["pytest", "."]
