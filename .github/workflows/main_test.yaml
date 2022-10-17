@@ -15,9 +15,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          path: dreamtools
       - uses: actions/checkout@v3
         with:
           repository: deeppavlov/dream
+          path: dream
       - name: Set up python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
         with:
@@ -25,8 +28,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r deeppavlov_dreamtools/tests/requirements-test.txt
+          pip install -r dreamtools/requirements.txt
+          pip install -r dreamtools/deeppavlov_dreamtools/tests/requirements-test.txt
           pip install black==22.8.0
       - name: Run codestyle
         run: black --line-length=120 --check .
