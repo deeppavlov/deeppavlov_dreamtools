@@ -39,7 +39,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: coverage
-          path: dreamtools/deeppavlov_dreamtools/tests/coverage
+          path: dreamtools/deeppavlov_dreamtools/tests/.coverage
 
   coverage:
     needs: build
