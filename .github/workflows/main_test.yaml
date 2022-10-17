@@ -29,8 +29,6 @@ jobs:
 
     - name: Create coverage badge
       uses: tj-actions/coverage-badge-py@v1.8
-      with:
-
 
     - name: Verify coverage badge changed
       uses: tj-actions/verify-changed-files@v9
