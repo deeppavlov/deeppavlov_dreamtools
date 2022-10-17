@@ -50,6 +50,10 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           name: coverage
+          path: ./.coverage
+      - name: Check coverage file
+        run: |
+          ls -a
       - name: Create coverage badge
         uses: tj-actions/coverage-badge-py@v1.8
       - name: Verify coverage badge changed
