@@ -91,7 +91,7 @@ class BaseDreamConfig:
 
         """
         data = cls.load(path)
-        config = cls.GENERIC_MODEL.parse_obj(**data)
+        config = cls.GENERIC_MODEL.parse_obj(data)
         return cls(config)
 
     def to_path(self, path: Union[str, Path], overwrite: bool = False):

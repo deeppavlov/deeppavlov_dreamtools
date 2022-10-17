@@ -1,12 +1,17 @@
 from pathlib import Path
 
 import pytest
-from deeppavlov_dreamtools.distconfigs import DreamDist, list_dists
+from deeppavlov_dreamtools.distconfigs import DreamDist, list_dists, const
 
 
 @pytest.fixture
 def dream_root_dir(pytestconfig):
     yield Path(pytestconfig.getoption("dream_root"))
+
+
+@pytest.fixture
+def dream_assistant_dists_dir(dream_root_dir):
+    yield dream_root_dir / const.ASSISTANT_DISTS_DIR_NAME
 
 
 @pytest.fixture
@@ -62,11 +67,6 @@ def dream_weather_dist_dir(create_weather_dist, dream_root_dir):
     """
     dream_path_dist = dream_root_dir / "assistant_dists" / "dream_weather"
     yield dream_path_dist
-
-
-@pytest.fixture
-def dream_assistant_dist_dir(dream_root_dir):
-    yield dream_root_dir / "assistant_dists"
 
 
 @pytest.fixture
