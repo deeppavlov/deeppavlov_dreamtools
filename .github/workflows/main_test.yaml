@@ -19,10 +19,7 @@ jobs:
       run: docker build . --file deeppavlov_dreamtools/tests/Dockerfile --tag testrunner:latest
 
     - name: Run Tests
-      run: docker run testrunner:latest
-
-    - name: Extract coverage report
-      run: docker cp testrunner:/src/deeppavlov_dreamtools/tests/.coverage .
+      run: docker run testrunner:latest cat testrunner:latest /src/deeppavlov_dreamtools/tests/.coverage > ./.coverage
 
     - name: Create coverage badge
       uses: tj-actions/coverage-badge-py@v1.8
