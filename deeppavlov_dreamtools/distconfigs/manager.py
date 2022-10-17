@@ -91,7 +91,7 @@ class BaseDreamConfig:
 
         """
         data = cls.load(path)
-        config = cls.GENERIC_MODEL.parse_obj(**data)
+        config = cls.GENERIC_MODEL.parse_obj(data)
         return cls(config)
 
     def to_path(self, path: Union[str, Path], overwrite: bool = False):
@@ -252,6 +252,35 @@ class YmlDreamConfig(BaseDreamConfig):
             value = self.__class__(config)
         return value
 
+    def remove_service(self, name: str, inplace: bool = False):
+        """
+        Removes service from config.
+
+        Args:
+            name: service name
+            inplace: if True, updates the config instance, returns a new copy of config instance otherwise
+        Returns:
+            config instance
+        """
+        services = self.config.copy().services
+
+        try:
+            del services[name]
+        except KeyError:
+            raise KeyError(f"{name} is not in the service list")
+
+        model_dict = {
+            "version": self.config.version,
+            "services": services,
+        }
+        config = self.GENERIC_MODEL.parse_obj(model_dict)
+        if inplace:
+            self.config = config
+            value = self
+        else:
+            value = self.__class__(config)
+        return value
+
 
 class DreamPipeline(JsonDreamConfig):
     """
@@ -354,6 +383,39 @@ class DreamPipeline(JsonDreamConfig):
         """
         services = self.config.copy().services
         getattr(services, service_type)[name] = definition
+
+        model_dict = {
+            "connectors": self.config.connectors,
+            "services": services,
+        }
+        config = self.GENERIC_MODEL.parse_obj(model_dict)
+        if inplace:
+            self.config = config
+            value = self
+        else:
+            value = self.__class__(config)
+        return value
+
+    def remove_service(self, service_type: str, name: str, inplace: bool = False):
+        """
+        Removes service from config.
+
+        Args:
+            service_type: service type in pipeline
+            name: service name
+            inplace: if True, updates the config instance, returns a new copy of config instance otherwise
+        Returns:
+            config instance
+        """
+        # TODO implement recursive removal of dependent services
+        services = self.config.copy().services
+
+        try:
+            del getattr(services, service_type)[name]
+        except AttributeError:
+            raise KeyError(f"{service_type} is not a valid service group")
+        except KeyError:
+            raise KeyError(f"{name} is not in the service list")
 
         model_dict = {
             "connectors": self.config.connectors,
