@@ -24,11 +24,13 @@ jobs:
     - uses: shrink/actions-docker-extract@v1
       id: extract
       with:
-        image: testrunner:latest
+        image: testrunner
         path: /src/deeppavlov_dreamtools/tests/.coverage
 
     - name: Create coverage badge
       uses: tj-actions/coverage-badge-py@v1.8
+      with:
+
 
     - name: Verify coverage badge changed
       uses: tj-actions/verify-changed-files@v9
