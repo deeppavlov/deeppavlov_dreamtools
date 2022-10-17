@@ -58,14 +58,17 @@ jobs:
           ls -a
       - name: Create coverage badge
         uses: tj-actions/coverage-badge-py@v1.8
+        with:
+          output: dreamtools/coverage.svg
       - name: Verify coverage badge changed
         uses: tj-actions/verify-changed-files@v9
         id: changed_files
         with:
-          files: coverage.svg
+          files: dreamtools/coverage.svg
       - name: Commit coverage badge
         if: steps.changed_files.outputs.files_changed == 'true'
         run: |
+          cd dreamtools
           git config --local user.email "mtalimanchuk@gmail.com"
           git config --local user.name "Maxim Talimanchuk"
           git add coverage.svg
