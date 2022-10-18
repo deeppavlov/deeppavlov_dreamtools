@@ -2,8 +2,14 @@ import pytest
 from pathlib import Path
 from copy import deepcopy
 
-from deeppavlov_dreamtools.distconfigs.manager import DreamDist, DreamPipeline, DreamComposeOverride, DreamComposeDev, \
-    DreamComposeProxy, DreamComposeLocal
+from deeppavlov_dreamtools.distconfigs.manager import (
+    DreamDist,
+    DreamPipeline,
+    DreamComposeOverride,
+    DreamComposeDev,
+    DreamComposeProxy,
+    DreamComposeLocal,
+)
 
 from deeppavlov_dreamtools.tests.fixtures import dream_root_dir, list_of_dream_dist, list_of_assistant_dists
 
@@ -13,7 +19,6 @@ from deeppavlov_dreamtools.tests.fixtures import dream_root_dir, list_of_dream_d
 # save
 # add_dff_skill
 # create_local_yml
-
 
 
 def test_load_configs_with_default_filenames(list_of_dream_dist: list, dream_assistant_dists_dir: Path):
@@ -33,13 +38,14 @@ def test_load_configs_with_default_filenames(list_of_dream_dist: list, dream_ass
         proxy_in_dist: bool = "proxy.yml" in filenames_in_dist
         local_in_dist: bool = "local.yml" in filenames_in_dist
 
-        configs = DreamDist.load_configs_with_default_filenames(dist_path=dist_path,
-                                                                pipeline_conf=pipeline_in_dist,
-                                                                compose_override=override_in_dist,
-                                                                compose_dev=dev_in_dist,
-                                                                compose_proxy=proxy_in_dist,
-                                                                compose_local=local_in_dist,
-                                                                )
+        configs = DreamDist.load_configs_with_default_filenames(
+            dist_path=dist_path,
+            pipeline_conf=pipeline_in_dist,
+            compose_override=override_in_dist,
+            compose_dev=dev_in_dist,
+            compose_proxy=proxy_in_dist,
+            compose_local=local_in_dist,
+        )
         try:
             if pipeline_in_dist:
                 pipeline_conf = configs["pipeline_conf"]
@@ -68,6 +74,7 @@ def test_load_configs_with_default_filenames(list_of_dream_dist: list, dream_ass
 
         except KeyError:
             KeyError(f"The config object doesn't have one or more config")
+
 
 # @pytest.mark.parametrize(
 #     "dream_dist",
