@@ -1,3 +1,5 @@
+![coverage-badge](report/coverage.svg)
+
 # Installation
 ```
 pip install -e .
