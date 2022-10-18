@@ -1,20 +1,71 @@
 name: Docker Image CI
 
 on:
-  push:
-    branches: [ "main" ]
+#  push:
+#    branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
 
 jobs:
-
   build:
-
+    strategy:
+      matrix:
+        python-version: ["3.10"]
+    name: "Python ${{ matrix.python-version }}"
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v3
-    - name: Build Tests
-      run: docker build . --file deeppavlov_dreamtools/tests/Dockerfile --tag testrunner:latest
-    - name: Run Tests
-      run: docker run testrunner:latest
+      - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
+        with:
+          repository: deeppavlov/dream
+          path: dream
+      - name: Set up python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r deeppavlov_dreamtools/tests/requirements-test.txt
+          pip install black==22.8.0
+      - name: Run codestyle
+        run: black --line-length=120 --check deeppavlov_dreamtools
+      - name: Run unit tests
+        run: cd deeppavlov_dreamtools/tests && pytest .
+      - name: Store coverage file
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage
+          path: deeppavlov_dreamtools/tests/.coverage
+
+  coverage:
+    needs: build
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - uses: actions/download-artifact@v3
+        with:
+          name: coverage
+      - name: Create report directory
+        run: mkdir -p report
+      - name: Create coverage badge
+        uses: tj-actions/coverage-badge-py@v1.8
+        with:
+          output: report/coverage.svg
+      - name: Verify coverage badge changed
+        uses: tj-actions/verify-changed-files@v9
+        id: changed_files
+        with:
+          files: report/coverage.svg
+      - name: Commit coverage badge
+        if: steps.changed_files.outputs.files_changed == 'true'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add report/coverage.svg
+          git commit -m "Updated coverage.svg"
+          git push
