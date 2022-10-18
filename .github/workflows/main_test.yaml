@@ -30,7 +30,7 @@ jobs:
           pip install -r deeppavlov_dreamtools/tests/requirements-test.txt
           pip install black==22.8.0
       - name: Run codestyle
-        run: black --line-length=120 --check .
+        run: black --line-length=120 --check deeppavlov_dreamtools
       - name: Run unit tests
         run: cd deeppavlov_dreamtools/tests && pytest .
       - name: Store coverage file
