@@ -50,6 +50,8 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           name: coverage
+      - name: Create report directory
+        run: mkdir -p report
       - name: Create coverage badge
         uses: tj-actions/coverage-badge-py@v1.8
         with:
