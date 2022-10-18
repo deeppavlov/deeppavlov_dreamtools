@@ -15,12 +15,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-        with:
-          path: dreamtools
       - uses: actions/checkout@v3
         with:
           repository: deeppavlov/dream
-          path: dream
+          path: /home/dream
       - name: Set up python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
         with:
@@ -28,18 +26,18 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r dreamtools/requirements.txt
-          pip install -r dreamtools/deeppavlov_dreamtools/tests/requirements-test.txt
+          pip install -r requirements.txt
+          pip install -r deeppavlov_dreamtools/tests/requirements-test.txt
           pip install black==22.8.0
       - name: Run codestyle
-        run: black --line-length=120 --check dreamtools/.
+        run: black --line-length=120 --check .
       - name: Run unit tests
-        run: cd dreamtools/deeppavlov_dreamtools/tests && pytest .
+        run: cd deeppavlov_dreamtools/tests && pytest .
       - name: Store coverage file
         uses: actions/upload-artifact@v3
         with:
           name: coverage
-          path: dreamtools/deeppavlov_dreamtools/tests/.coverage
+          path: deeppavlov_dreamtools/tests/.coverage
 
   coverage:
     needs: build
@@ -47,28 +45,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-        with:
-          path: dreamtools
       - uses: actions/download-artifact@v3
         with:
           name: coverage
-          path: .
       - name: Check coverage file
         run: |
           ls -a
       - name: Create coverage badge
         uses: tj-actions/coverage-badge-py@v1.8
-        with:
-          output: dreamtools/coverage.svg
       - name: Verify coverage badge changed
         uses: tj-actions/verify-changed-files@v9
         id: changed_files
         with:
-          files: dreamtools/coverage.svg
+          files: coverage.svg
       - name: Commit coverage badge
         if: steps.changed_files.outputs.files_changed == 'true'
         run: |
-          cd dreamtools
           git config --local user.email "mtalimanchuk@gmail.com"
           git config --local user.name "Maxim Talimanchuk"
           git add coverage.svg
