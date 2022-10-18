@@ -81,24 +81,22 @@ def test_load_configs_with_default_filenames(list_of_dream_dist: list, dream_ass
             KeyError(f"The config object doesn't have one or more config")
 
 
-# @pytest.mark.parametrize(
-#     "dream_dist",
-#
-# )
-# def test_dreamdist_save(dream_dist: DreamDist, dream_assistant_dists_dir: Path):
-#     """
-#     Changes only name of dreamdist and then compare configs of new and base distributions
-#     """
-#     test_name = dream_dist.name + "_test"
-#     dream_dist.name = test_name
-#     dream_dist.save()
-#
-#     path_to_test_dir = dream_assistant_dists_dir / test_name
-#
-#     assert path_to_test_dir.exists()
-#     assert path_to_test_dir.is_dir()
-#
-#     for config in dream_dist.iter_loaded_configs():
-#         with open(path_to_test_dir / config.DEFAULT_FILE_NAME, "r") as test:
-#             with open(dream_dist.dist_path, "r") as base:
-#                 assert test == base, f"Testfile {config.DEFAULT_FILE_NAME} doesn't match with the base"
+def test_dreamdist_save(list_of_dream_dist: list[DreamDist], dream_assistant_dists_dir: Path):
+    """
+    Changes only name of dreamdist and then compare configs of new and base distributions
+    """
+    for dream_dist in list_of_dream_dist:
+
+        test_name = dream_dist.name + "_test"
+        dream_dist.name = test_name
+        dream_dist.save()
+
+        path_to_test_dir = dream_assistant_dists_dir / test_name
+
+        assert path_to_test_dir.exists()
+        assert path_to_test_dir.is_dir()
+
+        for config in dream_dist.iter_loaded_configs():
+            with open(path_to_test_dir / config.DEFAULT_FILE_NAME, "r") as test:
+                with open(dream_dist.dist_path, "r") as base:
+                    assert test == base, f"Testfile {config.DEFAULT_FILE_NAME} doesn't match with the base"
