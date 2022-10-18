@@ -11,7 +11,12 @@ from deeppavlov_dreamtools.distconfigs.manager import (
     DreamComposeLocal,
 )
 
-from deeppavlov_dreamtools.tests.fixtures import dream_root_dir, list_of_dream_dist, list_of_assistant_dists
+from deeppavlov_dreamtools.tests.fixtures import (
+    dream_root_dir,
+    list_of_dream_dist,
+    list_of_assistant_dists,
+    dream_assistant_dists_dir,
+)
 
 
 # init -- done
