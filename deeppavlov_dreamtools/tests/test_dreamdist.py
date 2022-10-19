@@ -1,6 +1,5 @@
 import pytest
 from pathlib import Path
-from copy import deepcopy
 
 from deeppavlov_dreamtools.distconfigs.manager import (
     DreamDist,
@@ -18,13 +17,6 @@ from deeppavlov_dreamtools.tests.fixtures import (
     list_of_assistant_dists,
     dream_assistant_dists_dir,
 )
-
-
-# init -- done
-# load_configs_with_default_filenames -- done
-# save
-# add_dff_skill
-# create_local_yml
 
 
 def test_load_configs_with_default_filenames(list_of_dream_dist: list, dream_assistant_dists_dir: Path):
@@ -84,7 +76,7 @@ def test_load_configs_with_default_filenames(list_of_dream_dist: list, dream_ass
 
 def test_dreamdist_save(list_of_dream_dist: list[DreamDist], dream_assistant_dists_dir: Path):
     """
-    Changes only name of dreamdist and then compare configs of new and base distributions
+    Changes name and dist_path of dreamdist and then compare configs of new and base distributions
     """
     for dream_dist in list_of_dream_dist:
 
@@ -109,4 +101,4 @@ def test_dreamdist_save(list_of_dream_dist: list[DreamDist], dream_assistant_dis
                         if test_lines[i].strip() != base_lines[i].strip():
                             print(f"`{test_lines[i]}` != `{base_lines[i]}`\n")
                             differ_lines.append(test_lines[i])
-                    assert not differ_lines, f"{differ_lines}"
+            assert not differ_lines, f"{differ_lines}"
