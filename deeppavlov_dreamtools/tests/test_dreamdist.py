@@ -21,6 +21,7 @@ from deeppavlov_dreamtools.tests.fixtures import (
 # add dff_skill
 # create local yml
 
+
 def test_load_configs_with_default_filenames(list_of_dream_dist: list, dream_assistant_dists_dir: Path):
     """
     Check if load_configs_with_default_filenames method loads and initialize configs properly
@@ -111,10 +112,9 @@ def test_add_dff_skill(dream_root_dir: Path):
     Test based on `deepy_adv` distribution.
     Checks equality of base dff_template_skill directory with new directory.
     """
-    dream_dist_test_object = DreamDist.from_name(name="deepy_adv", dream_root=dream_root_dir,
-                                                 compose_dev=False,
-                                                 compose_local=False,
-                                                 compose_proxy=False)
+    dream_dist_test_object = DreamDist.from_name(
+        name="deepy_adv", dream_root=dream_root_dir, compose_dev=False, compose_local=False, compose_proxy=False
+    )
     dream_dist_test_object.add_dff_skill(name="test", port="1337")
 
     path_to_ground_truth_file = Path(__file__).parents[1] / "static" / "dff_template_skill"
