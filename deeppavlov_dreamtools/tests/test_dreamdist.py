@@ -10,6 +10,7 @@ from deeppavlov_dreamtools.distconfigs.manager import (
     DreamComposeProxy,
     DreamComposeLocal,
 )
+from deeppavlov_dreamtools.distconfigs.const import ASSISTANT_DISTS_DIR_NAME
 
 from deeppavlov_dreamtools.tests.fixtures import (
     dream_root_dir,
@@ -89,6 +90,7 @@ def test_dreamdist_save(list_of_dream_dist: list[DreamDist], dream_assistant_dis
 
         test_name = dream_dist.name + "_test"
         dream_dist.name = test_name
+        dream_dist.dist_path = dream_assistant_dists_dir / test_name
         dream_dist.save()
 
         path_to_test_dir = dream_assistant_dists_dir / test_name
@@ -98,5 +100,13 @@ def test_dreamdist_save(list_of_dream_dist: list[DreamDist], dream_assistant_dis
 
         for config in dream_dist.iter_loaded_configs():
             with open(path_to_test_dir / config.DEFAULT_FILE_NAME, "r") as test:
-                with open(dream_dist.dist_path, "r") as base:
-                    assert test == base, f"Testfile {config.DEFAULT_FILE_NAME} doesn't match with the base"
+                with open(dream_dist.dist_path / config.DEFAULT_FILE_NAME, "r") as base:
+                    differ_lines = []
+
+                    test_lines = test.readlines()
+                    base_lines = base.readlines()
+                    for i in range(len(test_lines)):
+                        if test_lines[i].strip() != base_lines[i].strip():
+                            print(f"`{test_lines[i]}` != `{base_lines[i]}`\n")
+                            differ_lines.append(test_lines[i])
+                    assert not differ_lines, f"{differ_lines}"
