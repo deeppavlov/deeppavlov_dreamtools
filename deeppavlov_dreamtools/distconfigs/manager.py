@@ -523,8 +523,45 @@ class DreamDist:
 
     @name.setter
     def name(self, new_name):
-        self._dist_path = self._dist_path.parents[0] / new_name
+        """
+        Sets new name and also sets new path corresponding to the name
+        """
+        new_path = self._dist_path.parents[0] / new_name
+
+        self._check_if_distribution_path_is_available(new_path)
+        self._dist_path = new_path
+
         self._name = new_name
+
+    @property
+    def dist_path(self):
+        return self._dist_path
+
+    @dist_path.setter
+    def dist_path(self, new_path: Union[str, Path]):
+        self._check_distribution_path_corresponds_with_the_name(new_path)
+        self._check_if_distribution_path_is_available(new_path)
+
+        self._dist_path = new_path
+
+    def _check_if_distribution_path_is_available(self, new_path: Union[str, Path] = None):
+        """
+        Checks if distribution dist_path doesn't match with any existing distribution
+        """
+        if not new_path:
+            new_path = self._dist_path
+
+        if Path(new_path).exists():
+            raise ValueError(f"Distribution path is already exists!")
+
+    def _check_distribution_path_corresponds_with_the_name(self, new_path: Union[str, Path], new_name: str = None):
+        new_path = Path(new_path)
+
+        if new_name is None:
+            new_name = self.name
+
+        if new_path.name != new_name:
+            raise ValueError(f"Distribution path doesn't correspond with the distribution name")
 
     @staticmethod
     def load_configs_with_default_filenames(
