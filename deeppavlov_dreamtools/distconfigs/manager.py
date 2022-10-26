@@ -526,10 +526,9 @@ class DreamDist:
         """
         Sets new name and also sets new path corresponding to the name
         """
-        new_path = self._dist_path.parents[0] / new_name
+        new_path = self.dist_path.with_name(new_name)
 
-        self._check_if_distribution_path_is_available(new_path)
-        self._dist_path = new_path
+        self.dist_path = new_path
 
         self._name = new_name
 
@@ -539,22 +538,25 @@ class DreamDist:
 
     @dist_path.setter
     def dist_path(self, new_path: Union[str, Path]):
-        self._check_distribution_path_corresponds_with_the_name(new_path)
+        new_path = Path(new_path)
+
+        self._check_if_distribution_path_corresponds_with_the_name(new_path)
         self._check_if_distribution_path_is_available(new_path)
+        self._check_if_path_located_in_correct_dream_directory(new_path)
 
         self._dist_path = new_path
 
-    def _check_if_distribution_path_is_available(self, new_path: Union[str, Path] = None):
+    @staticmethod
+    def _check_if_distribution_path_is_available(new_path: Union[str, Path]):
         """
         Checks if distribution dist_path doesn't match with any existing distribution
         """
-        if not new_path:
-            new_path = self._dist_path
+        new_path = Path(new_path)
 
         if Path(new_path).exists():
             raise ValueError(f"Distribution path is already exists!")
 
-    def _check_distribution_path_corresponds_with_the_name(self, new_path: Union[str, Path], new_name: str = None):
+    def _check_if_distribution_path_corresponds_with_the_name(self, new_path: Union[str, Path], new_name: str = None):
         new_path = Path(new_path)
 
         if new_name is None:
@@ -562,6 +564,12 @@ class DreamDist:
 
         if new_path.name != new_name:
             raise ValueError(f"Distribution path doesn't correspond with the distribution name")
+
+    def _check_if_path_located_in_correct_dream_directory(self, path: Union[str, Path]):
+        dream_assistant_path = self.dream_root / const.ASSISTANT_DISTS_DIR_NAME
+
+        if not path.match(dream_assistant_path):
+            raise NotADirectoryError(f"{str(path)} must contain {str(dream_assistant_path)}")
 
     @staticmethod
     def load_configs_with_default_filenames(
@@ -829,9 +837,9 @@ class DreamDist:
         """
         paths = []
 
-        self._dist_path.mkdir(parents=True, exist_ok=overwrite)
+        self.dist_path.mkdir(parents=True, exist_ok=overwrite)
         for config in self.iter_loaded_configs():
-            path = config.to_dist(self._dist_path, overwrite)
+            path = config.to_dist(self.dist_path, overwrite)
             paths.append(path)
 
         return paths
