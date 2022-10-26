@@ -81,3 +81,8 @@ def files_in_dream_weather_dist_dir(dream_weather_dist_dir):
 @pytest.fixture
 def list_of_dream_dist(dream_root_dir):
     yield list_dists(dream_root_dir)
+
+
+@pytest.fixture
+def list_of_assistant_dists(dream_assistant_dists_dir):
+    yield [file.name for file in dream_weather_dist_dir.iterdir()]
