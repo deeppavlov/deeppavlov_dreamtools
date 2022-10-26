@@ -540,7 +540,7 @@ class DreamDist:
     def dist_path(self, new_path: Union[str, Path]):
         new_path = Path(new_path)
 
-        self._check_if_distribution_path_corresponds_with_the_name(new_path)
+        # self._check_if_distribution_path_corresponds_with_the_name(new_path)
         self._check_if_distribution_path_is_available(new_path)
         self._check_if_path_located_in_correct_dream_directory(new_path)
 
@@ -569,7 +569,7 @@ class DreamDist:
         dream_assistant_path = self.dream_root / const.ASSISTANT_DISTS_DIR_NAME
 
         if not path.match(dream_assistant_path):
-            raise NotADirectoryError(f"{str(path)} must contain {str(dream_assistant_path)}")
+            raise ValueError(f"{path} must contain {dream_assistant_path}")
 
     @staticmethod
     def load_configs_with_default_filenames(
