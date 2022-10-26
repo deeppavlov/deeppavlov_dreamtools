@@ -18,9 +18,6 @@ from deeppavlov_dreamtools.tests.fixtures import (
     dream_assistant_dists_dir,
 )
 
-# add dff_skill
-# create local yml
-
 
 def test_load_configs_with_default_filenames(list_of_dream_dist: list, dream_assistant_dists_dir: Path):
     """
@@ -124,11 +121,13 @@ def test_add_dff_skill(dream_root_dir: Path):
     assert not report.diff_files
 
 
-# def test_create_local_yml(dream_root_dir, dream_assistant_dists_dir):
-#     dream_dist = DreamDist.from_name(name="dream", dream_root=dream_root_dir, compose_local=False)
-#     services = [
-#         "convers-evaluator-annotator",
-#         "spacy-nounphrases",
-#     ]
-#     dream_dist.create_local_yml(services=services)
-#     assert (dream_assistant_dists_dir / "dream" / "local.yml").exists()
+def test_namesetter(dream_root_dir: Path):
+    dream_dist_test_object = DreamDist.from_name(
+        name="deepy_adv", dream_root=dream_root_dir, compose_dev=False, compose_local=False, compose_proxy=False
+    )
+    test_name = "deepy_adv_test"
+    dream_dist_test_object.name = test_name
+    assert dream_dist_test_object.name == test_name, f"Name wasn't changed"
+    dream_dist_test_object.save()
+
+    assert dream_dist_test_object.dist_path.exists(), f"DreamDist path wasn't set properly"
