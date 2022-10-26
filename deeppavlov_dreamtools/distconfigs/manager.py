@@ -508,23 +508,14 @@ class DreamDist:
             compose_proxy: instance of DreamComposeProxy config
             compose_local: instance of DreamComposeLocal config
         """
-        self._dist_path = Path(dist_path)
-        self._name = name
+        self.dist_path = Path(dist_path)
+        self.name = name
         self.dream_root = dream_root
         self.pipeline_conf = pipeline_conf
         self.compose_override = compose_override
         self.compose_dev = compose_dev
         self.compose_proxy = compose_proxy
         self.compose_local = compose_local
-
-    @property
-    def name(self):
-        return self._name
-
-    @name.setter
-    def name(self, new_name):
-        self._dist_path = self._dist_path.parents[0] / new_name
-        self._name = new_name
 
     @staticmethod
     def load_configs_with_default_filenames(
@@ -792,9 +783,9 @@ class DreamDist:
         """
         paths = []
 
-        self._dist_path.mkdir(parents=True, exist_ok=overwrite)
+        self.dist_path.mkdir(parents=True, exist_ok=overwrite)
         for config in self.iter_loaded_configs():
-            path = config.to_dist(self._dist_path, overwrite)
+            path = config.to_dist(self.dist_path, overwrite)
             paths.append(path)
 
         return paths
