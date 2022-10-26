@@ -540,7 +540,6 @@ class DreamDist:
     def dist_path(self, new_path: Union[str, Path]):
         new_path = Path(new_path)
 
-        # self._check_if_distribution_path_corresponds_with_the_name(new_path)
         self._check_if_distribution_path_is_available(new_path)
         self._check_if_path_located_in_correct_dream_directory(new_path)
 
@@ -554,21 +553,12 @@ class DreamDist:
         new_path = Path(new_path)
 
         if Path(new_path).exists():
-            raise ValueError(f"Distribution path is already exists!")
-
-    def _check_if_distribution_path_corresponds_with_the_name(self, new_path: Union[str, Path], new_name: str = None):
-        new_path = Path(new_path)
-
-        if new_name is None:
-            new_name = self.name
-
-        if new_path.name != new_name:
-            raise ValueError(f"Distribution path doesn't correspond with the distribution name")
+            raise ValueError(f"Distribution with path {new_path} already exists!")
 
     def _check_if_path_located_in_correct_dream_directory(self, path: Union[str, Path]):
         dream_assistant_path = self.dream_root / const.ASSISTANT_DISTS_DIR_NAME
 
-        if not path.match(dream_assistant_path):
+        if path.parents[0] != dream_assistant_path:
             raise ValueError(f"{path} must contain {dream_assistant_path}")
 
     @staticmethod

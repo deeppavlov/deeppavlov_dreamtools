@@ -125,7 +125,7 @@ def test_namesetter(dream_root_dir: Path):
     dream_dist_test_object = DreamDist.from_name(
         name="deepy_adv", dream_root=dream_root_dir, compose_dev=False, compose_local=False, compose_proxy=False
     )
-    test_name = "deepy_adv_test"
+    test_name = dream_dist_test_object.name + "_test_namesetter"
     dream_dist_test_object.name = test_name
     assert dream_dist_test_object.name == test_name, f"Name wasn't changed"
     dream_dist_test_object.save()
