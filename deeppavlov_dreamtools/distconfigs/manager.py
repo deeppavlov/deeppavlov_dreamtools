@@ -622,15 +622,15 @@ class DreamDist:
 
     @classmethod
     def from_name(
-            cls,
-            name: str,
-            dream_root: Union[str, Path],
-            all_configs: bool = False,
-            pipeline_conf: bool = True,
-            compose_override: bool = True,
-            compose_dev: bool = True,
-            compose_proxy: bool = True,
-            compose_local: bool = True,
+        cls,
+        name: str,
+        dream_root: Union[str, Path],
+        all_configs: bool = False,
+        pipeline_conf: bool = True,
+        compose_override: bool = True,
+        compose_dev: bool = True,
+        compose_proxy: bool = True,
+        compose_local: bool = True,
     ):
         """
         Loads Dream distribution from ``name`` and ``dream_root`` path with default configs.
