@@ -310,7 +310,8 @@ class DreamPipeline(JsonDreamConfig):
 
     def _filter_services_by_name(self, names: list):
         for service_group in self.config.services.editable_groups:
-            for service_name, service in getattr(self.config.services, service_group).items():
+            services = getattr(self.config.services, service_group)
+            for service_name, service in services.items():
                 if hasattr(service.connector, "url"):
                     url = service.connector.url
                     if url:
@@ -330,30 +331,31 @@ class DreamPipeline(JsonDreamConfig):
             required_service_parts = required_service_name.split(".", maxsplit=1)
             if len(required_service_parts) > 1:
                 required_group, required_name = required_service_parts
-                required_service = getattr(self.config.services, required_group)[required_name]
+                service_group = getattr(self.config.services, required_group)
+                required_service = service_group[required_name]
                 yield required_group, required_name, required_service
                 yield from self._recursively_parse_requirements(required_service)
 
     def filter_services(self, include_names: list):
-        filtered_dict = {grp: {} for grp in self.config.services.editable_groups}
+        filtered = {grp: {} for grp in self.config.services.editable_groups}
         include_names_extended = list(include_names).copy()
 
         for group, name, service in self._filter_services_by_name(include_names):
-            filtered_dict[group][name] = service
+            filtered[group][name] = service
 
             for (
                 required_group,
                 required_name,
                 required_service,
             ) in self._recursively_parse_requirements(service):
-                filtered_dict[required_group][required_name] = required_service
+                filtered[required_group][required_name] = required_service
                 include_names_extended.append(required_name)
 
-        filtered_dict["last_chance_service"] = self.config.services.last_chance_service
-        filtered_dict["timeout_service"] = self.config.services.timeout_service
-        filtered_dict["bot_annotator_selector"] = self.config.services.bot_annotator_selector
-        filtered_dict["skill_selectors"] = self.config.services.skill_selectors
-        services = PipelineConfServiceList(**filtered_dict)
+        filtered["last_chance_service"] = self.config.services.last_chance_service
+        filtered["timeout_service"] = self.config.services.timeout_service
+        filtered["bot_annotator_selector"] = self.config.services.bot_annotator_selector
+        filtered["skill_selectors"] = self.config.services.skill_selectors
+        services = PipelineConfServiceList(**filtered)
 
         model_dict = {
             "connectors": self.config.connectors,
@@ -529,6 +531,8 @@ class DreamDist:
         """
         Loads config objects using their default file names located under given Dream distribution path.
 
+        Automatically discovers and loads all existing configs if all flags are set to False.
+
         Args:
             dist_path: path to Dream distribution
             pipeline_conf: if True, loads pipeline_conf.json
@@ -542,6 +546,15 @@ class DreamDist:
 
         """
         kwargs = {}
+
+        if not (pipeline_conf and compose_override and compose_dev and compose_proxy and compose_local):
+            filenames_in_dist = [file.name for file in dist_path.iterdir()]
+
+            pipeline_conf = DreamPipeline.DEFAULT_FILE_NAME in filenames_in_dist
+            compose_dev = DreamComposeDev.DEFAULT_FILE_NAME in filenames_in_dist
+            compose_override = DreamComposeOverride.DEFAULT_FILE_NAME in filenames_in_dist
+            compose_proxy = DreamComposeProxy.DEFAULT_FILE_NAME in filenames_in_dist
+            compose_local = DreamComposeLocal.DEFAULT_FILE_NAME in filenames_in_dist
 
         if pipeline_conf:
             kwargs["pipeline_conf"] = DreamPipeline.from_dist(dist_path)
@@ -625,14 +638,16 @@ class DreamDist:
         cls,
         name: str,
         dream_root: Union[str, Path],
-        pipeline_conf: bool = True,
-        compose_override: bool = True,
-        compose_dev: bool = True,
-        compose_proxy: bool = True,
-        compose_local: bool = True,
+        pipeline_conf: bool = False,
+        compose_override: bool = False,
+        compose_dev: bool = False,
+        compose_proxy: bool = False,
+        compose_local: bool = False,
     ):
         """
         Loads Dream distribution from ``name`` and ``dream_root`` path with default configs.
+
+        Automatically discovers and loads all existing configs if no configs flags provided.
 
         Args:
             name: Dream distribution name.
@@ -647,6 +662,7 @@ class DreamDist:
             instance of DreamDist
         """
         dist_path, name, dream_root = DreamDist.resolve_all_paths(name=name, dream_root=dream_root)
+
         cls_kwargs = cls.load_configs_with_default_filenames(
             dist_path,
             pipeline_conf,
@@ -662,14 +678,16 @@ class DreamDist:
     def from_dist(
         cls,
         dist_path: Union[str, Path] = None,
-        pipeline_conf: bool = True,
-        compose_override: bool = True,
-        compose_dev: bool = True,
-        compose_proxy: bool = True,
-        compose_local: bool = True,
+        pipeline_conf: bool = False,
+        compose_override: bool = False,
+        compose_dev: bool = False,
+        compose_proxy: bool = False,
+        compose_local: bool = False,
     ):
         """
         Loads Dream distribution from ``dist_path`` with default configs.
+
+        Automatically discovers and loads all existing configs if no configs flags provided.
 
         Args:
             dist_path: path to Dream distribution, e.g. ``~/dream/assistant_dists/dream``.
@@ -682,6 +700,7 @@ class DreamDist:
             instance of DreamDist
         """
         dist_path, name, dream_root = DreamDist.resolve_all_paths(dist_path=dist_path)
+
         cls_kwargs = cls.load_configs_with_default_filenames(
             dist_path,
             pipeline_conf,
@@ -721,9 +740,14 @@ class DreamDist:
         Returns:
             instance of DreamDist
         """
-        new_compose_override = new_compose_dev = new_compose_proxy = new_compose_local = None
+        new_compose_override = None
+        new_compose_dev = None
+        new_compose_proxy = None
+        new_compose_local = None
+
         all_names, new_pipeline_conf = self.pipeline_conf.filter_services(service_names)
         all_names += const.MANDATORY_SERVICES
+
         if compose_override:
             _, new_compose_override = self.compose_override.filter_services(all_names)
 
