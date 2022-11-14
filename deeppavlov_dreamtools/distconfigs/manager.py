@@ -310,7 +310,8 @@ class DreamPipeline(JsonDreamConfig):
 
     def _filter_services_by_name(self, names: list):
         for service_group in self.config.services.editable_groups:
-            for service_name, service in getattr(self.config.services, service_group).items():
+            services = getattr(self.config.services, service_group)
+            for service_name, service in services.items():
                 if hasattr(service.connector, "url"):
                     url = service.connector.url
                     if url:
@@ -330,30 +331,31 @@ class DreamPipeline(JsonDreamConfig):
             required_service_parts = required_service_name.split(".", maxsplit=1)
             if len(required_service_parts) > 1:
                 required_group, required_name = required_service_parts
-                required_service = getattr(self.config.services, required_group)[required_name]
+                service_group = getattr(self.config.services, required_group)
+                required_service = service_group[required_name]
                 yield required_group, required_name, required_service
                 yield from self._recursively_parse_requirements(required_service)
 
     def filter_services(self, include_names: list):
-        filtered_dict = {grp: {} for grp in self.config.services.editable_groups}
+        filtered = {grp: {} for grp in self.config.services.editable_groups}
         include_names_extended = list(include_names).copy()
 
         for group, name, service in self._filter_services_by_name(include_names):
-            filtered_dict[group][name] = service
+            filtered[group][name] = service
 
             for (
                 required_group,
                 required_name,
                 required_service,
             ) in self._recursively_parse_requirements(service):
-                filtered_dict[required_group][required_name] = required_service
+                filtered[required_group][required_name] = required_service
                 include_names_extended.append(required_name)
 
-        filtered_dict["last_chance_service"] = self.config.services.last_chance_service
-        filtered_dict["timeout_service"] = self.config.services.timeout_service
-        filtered_dict["bot_annotator_selector"] = self.config.services.bot_annotator_selector
-        filtered_dict["skill_selectors"] = self.config.services.skill_selectors
-        services = PipelineConfServiceList(**filtered_dict)
+        filtered["last_chance_service"] = self.config.services.last_chance_service
+        filtered["timeout_service"] = self.config.services.timeout_service
+        filtered["bot_annotator_selector"] = self.config.services.bot_annotator_selector
+        filtered["skill_selectors"] = self.config.services.skill_selectors
+        services = PipelineConfServiceList(**filtered)
 
         model_dict = {
             "connectors": self.config.connectors,
@@ -748,9 +750,14 @@ class DreamDist:
         Returns:
             instance of DreamDist
         """
-        new_compose_override = new_compose_dev = new_compose_proxy = new_compose_local = None
+        new_compose_override = None
+        new_compose_dev = None
+        new_compose_proxy = None
+        new_compose_local = None
+
         all_names, new_pipeline_conf = self.pipeline_conf.filter_services(service_names)
         all_names += const.MANDATORY_SERVICES
+
         if compose_override:
             _, new_compose_override = self.compose_override.filter_services(all_names)
 
@@ -851,7 +858,9 @@ class DreamDist:
                 previous_services=["skill_selectors"],
                 state_manager_method="add_hypothesis",
             )
-            self.pipeline_conf.add_service(name_with_underscores, "skills", pl_service, inplace=True)
+            self.pipeline_conf.add_service(
+                name_with_underscores, "skills", pl_service, inplace=True
+            )
 
         if self.compose_override:
             override_service = ComposeContainer(
@@ -869,7 +878,9 @@ class DreamDist:
                     )
                 ),
             )
-            self.compose_override.add_service(name_with_dashes, override_service, inplace=True)
+            self.compose_override.add_service(
+                name_with_dashes, override_service, inplace=True
+            )
 
         if self.compose_dev:
             dev_service = ComposeDevContainer(
@@ -881,10 +892,14 @@ class DreamDist:
         if self.compose_proxy:
             proxy_service = ComposeContainer(
                 command=["nginx", "-g", "daemon off;"],
-                build=ContainerBuildDefinition(context=Path("dp/proxy"), dockerfile=Path("Dockerfile")),
+                build=ContainerBuildDefinition(
+                    context=Path("dp/proxy"), dockerfile=Path("Dockerfile")
+                ),
                 environment=[f"PROXY_PASS=dream.deeppavlov.ai:{port}", f"PORT={port}"],
             )
-            self.compose_proxy.add_service(name_with_dashes, proxy_service, inplace=True)
+            self.compose_proxy.add_service(
+                name_with_dashes, proxy_service, inplace=True
+            )
 
         self.save(True)
 
@@ -915,8 +930,12 @@ class DreamDist:
         services = list(services) + ["agent", "mongo"]
 
         dev_config_part = self.compose_dev.filter_services(services, inplace=False)
-        proxy_config_part = self.compose_proxy.filter_services(exclude_names=services, inplace=False)
-        local_config = DreamComposeLocal(ComposeLocal(services=proxy_config_part.config.services))
+        proxy_config_part = self.compose_proxy.filter_services(
+            exclude_names=services, inplace=False
+        )
+        local_config = DreamComposeLocal(
+            ComposeLocal(services=proxy_config_part.config.services)
+        )
         all_config_parts = {
             **dev_config_part.config.services,
             **proxy_config_part.config.services,
