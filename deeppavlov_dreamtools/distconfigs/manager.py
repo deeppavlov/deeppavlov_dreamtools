@@ -529,6 +529,8 @@ class DreamDist:
         """
         Loads config objects using their default file names located under given Dream distribution path.
 
+        Automatically discovers and loads all existing configs if all flags are set to False.
+
         Args:
             dist_path: path to Dream distribution
             pipeline_conf: if True, loads pipeline_conf.json
@@ -542,6 +544,23 @@ class DreamDist:
 
         """
         kwargs = {}
+
+        if not (
+            pipeline_conf
+            and compose_override
+            and compose_dev
+            and compose_proxy
+            and compose_local
+        ):
+            filenames_in_dist = [file.name for file in dist_path.iterdir()]
+
+            pipeline_conf = DreamPipeline.DEFAULT_FILE_NAME in filenames_in_dist
+            compose_dev = DreamComposeDev.DEFAULT_FILE_NAME in filenames_in_dist
+            compose_override = (
+                DreamComposeOverride.DEFAULT_FILE_NAME in filenames_in_dist
+            )
+            compose_proxy = DreamComposeProxy.DEFAULT_FILE_NAME in filenames_in_dist
+            compose_local = DreamComposeLocal.DEFAULT_FILE_NAME in filenames_in_dist
 
         if pipeline_conf:
             kwargs["pipeline_conf"] = DreamPipeline.from_dist(dist_path)
@@ -625,20 +644,20 @@ class DreamDist:
         cls,
         name: str,
         dream_root: Union[str, Path],
-        all_configs: bool = False,
-        pipeline_conf: bool = True,
-        compose_override: bool = True,
-        compose_dev: bool = True,
-        compose_proxy: bool = True,
-        compose_local: bool = True,
+        pipeline_conf: bool = False,
+        compose_override: bool = False,
+        compose_dev: bool = False,
+        compose_proxy: bool = False,
+        compose_local: bool = False,
     ):
         """
         Loads Dream distribution from ``name`` and ``dream_root`` path with default configs.
 
+        Automatically discovers and loads all existing configs if no configs flags provided.
+
         Args:
             name: Dream distribution name.
             dream_root: Dream root path.
-            all_configs: loads all existing configs in the dream distribution
             pipeline_conf: load `pipeline_conf.json` inside ``path``
             compose_override: load `docker-compose.override.yml` inside ``path``
             compose_dev: load `dev.yml` inside ``path``
@@ -648,15 +667,9 @@ class DreamDist:
         Returns:
             instance of DreamDist
         """
-        dist_path, name, dream_root = DreamDist.resolve_all_paths(name=name, dream_root=dream_root)
-
-        if all_configs:
-            filenames_in_dist = [file.name for file in dist_path.iterdir()]
-
-            pipeline_conf = DreamPipeline.DEFAULT_FILE_NAME in filenames_in_dist
-            compose_override = DreamComposeOverride.DEFAULT_FILE_NAME in filenames_in_dist
-            compose_proxy = DreamComposeProxy.DEFAULT_FILE_NAME in filenames_in_dist
-            compose_local = DreamComposeLocal.DEFAULT_FILE_NAME in filenames_in_dist
+        dist_path, name, dream_root = DreamDist.resolve_all_paths(
+            name=name, dream_root=dream_root
+        )
 
         cls_kwargs = cls.load_configs_with_default_filenames(
             dist_path,
@@ -673,19 +686,19 @@ class DreamDist:
     def from_dist(
         cls,
         dist_path: Union[str, Path] = None,
-        all_configs: bool = False,
-        pipeline_conf: bool = True,
-        compose_override: bool = True,
-        compose_dev: bool = True,
-        compose_proxy: bool = True,
-        compose_local: bool = True,
+        pipeline_conf: bool = False,
+        compose_override: bool = False,
+        compose_dev: bool = False,
+        compose_proxy: bool = False,
+        compose_local: bool = False,
     ):
         """
         Loads Dream distribution from ``dist_path`` with default configs.
 
+        Automatically discovers and loads all existing configs if no configs flags provided.
+
         Args:
             dist_path: path to Dream distribution, e.g. ``~/dream/assistant_dists/dream``.
-            all_configs: loads all existing configs in the dream distribution
             pipeline_conf: load `pipeline_conf.json` inside ``path``
             compose_override: load `docker-compose.override.yml` inside ``path``
             compose_dev: load `dev.yml` inside ``path``
@@ -695,14 +708,6 @@ class DreamDist:
             instance of DreamDist
         """
         dist_path, name, dream_root = DreamDist.resolve_all_paths(dist_path=dist_path)
-
-        if all_configs:
-            filenames_in_dist = [file.name for file in dist_path.iterdir()]
-
-            pipeline_conf = DreamPipeline.DEFAULT_FILE_NAME in filenames_in_dist
-            compose_override = DreamComposeOverride.DEFAULT_FILE_NAME in filenames_in_dist
-            compose_proxy = DreamComposeProxy.DEFAULT_FILE_NAME in filenames_in_dist
-            compose_local = DreamComposeLocal.DEFAULT_FILE_NAME in filenames_in_dist
 
         cls_kwargs = cls.load_configs_with_default_filenames(
             dist_path,
