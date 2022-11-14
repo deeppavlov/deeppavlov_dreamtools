@@ -547,20 +547,12 @@ class DreamDist:
         """
         kwargs = {}
 
-        if not (
-            pipeline_conf
-            and compose_override
-            and compose_dev
-            and compose_proxy
-            and compose_local
-        ):
+        if not (pipeline_conf and compose_override and compose_dev and compose_proxy and compose_local):
             filenames_in_dist = [file.name for file in dist_path.iterdir()]
 
             pipeline_conf = DreamPipeline.DEFAULT_FILE_NAME in filenames_in_dist
             compose_dev = DreamComposeDev.DEFAULT_FILE_NAME in filenames_in_dist
-            compose_override = (
-                DreamComposeOverride.DEFAULT_FILE_NAME in filenames_in_dist
-            )
+            compose_override = DreamComposeOverride.DEFAULT_FILE_NAME in filenames_in_dist
             compose_proxy = DreamComposeProxy.DEFAULT_FILE_NAME in filenames_in_dist
             compose_local = DreamComposeLocal.DEFAULT_FILE_NAME in filenames_in_dist
 
@@ -669,9 +661,7 @@ class DreamDist:
         Returns:
             instance of DreamDist
         """
-        dist_path, name, dream_root = DreamDist.resolve_all_paths(
-            name=name, dream_root=dream_root
-        )
+        dist_path, name, dream_root = DreamDist.resolve_all_paths(name=name, dream_root=dream_root)
 
         cls_kwargs = cls.load_configs_with_default_filenames(
             dist_path,
@@ -858,9 +848,7 @@ class DreamDist:
                 previous_services=["skill_selectors"],
                 state_manager_method="add_hypothesis",
             )
-            self.pipeline_conf.add_service(
-                name_with_underscores, "skills", pl_service, inplace=True
-            )
+            self.pipeline_conf.add_service(name_with_underscores, "skills", pl_service, inplace=True)
 
         if self.compose_override:
             override_service = ComposeContainer(
@@ -878,9 +866,7 @@ class DreamDist:
                     )
                 ),
             )
-            self.compose_override.add_service(
-                name_with_dashes, override_service, inplace=True
-            )
+            self.compose_override.add_service(name_with_dashes, override_service, inplace=True)
 
         if self.compose_dev:
             dev_service = ComposeDevContainer(
@@ -892,14 +878,10 @@ class DreamDist:
         if self.compose_proxy:
             proxy_service = ComposeContainer(
                 command=["nginx", "-g", "daemon off;"],
-                build=ContainerBuildDefinition(
-                    context=Path("dp/proxy"), dockerfile=Path("Dockerfile")
-                ),
+                build=ContainerBuildDefinition(context=Path("dp/proxy"), dockerfile=Path("Dockerfile")),
                 environment=[f"PROXY_PASS=dream.deeppavlov.ai:{port}", f"PORT={port}"],
             )
-            self.compose_proxy.add_service(
-                name_with_dashes, proxy_service, inplace=True
-            )
+            self.compose_proxy.add_service(name_with_dashes, proxy_service, inplace=True)
 
         self.save(True)
 
@@ -930,12 +912,8 @@ class DreamDist:
         services = list(services) + ["agent", "mongo"]
 
         dev_config_part = self.compose_dev.filter_services(services, inplace=False)
-        proxy_config_part = self.compose_proxy.filter_services(
-            exclude_names=services, inplace=False
-        )
-        local_config = DreamComposeLocal(
-            ComposeLocal(services=proxy_config_part.config.services)
-        )
+        proxy_config_part = self.compose_proxy.filter_services(exclude_names=services, inplace=False)
+        local_config = DreamComposeLocal(ComposeLocal(services=proxy_config_part.config.services))
         all_config_parts = {
             **dev_config_part.config.services,
             **proxy_config_part.config.services,
