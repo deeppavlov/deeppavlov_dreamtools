@@ -510,14 +510,55 @@ class DreamDist:
             compose_proxy: instance of DreamComposeProxy config
             compose_local: instance of DreamComposeLocal config
         """
-        self.dist_path = Path(dist_path)
-        self.name = name
+        self._dist_path = Path(dist_path)
+        self._name = name
         self.dream_root = dream_root
         self.pipeline_conf = pipeline_conf
         self.compose_override = compose_override
         self.compose_dev = compose_dev
         self.compose_proxy = compose_proxy
         self.compose_local = compose_local
+
+    @property
+    def name(self):
+        return self._name
+
+    @name.setter
+    def name(self, new_name):
+        """
+        Sets new name and also sets new path corresponding to the name
+        """
+        new_path = self.dist_path.with_name(new_name)
+
+        self.dist_path = new_path
+
+        self._name = new_name
+
+    @property
+    def dist_path(self):
+        return self._dist_path
+
+    @dist_path.setter
+    def dist_path(self, new_path: Union[str, Path]):
+        new_path = Path(new_path)
+
+        self._check_if_distribution_path_is_available(new_path)
+        self._check_if_path_located_in_correct_dream_directory(new_path)
+
+        self._dist_path = new_path
+
+    def _check_if_distribution_path_is_available(self, new_path: Path):
+        """
+        Checks if distribution dist_path doesn't match with any existing distribution
+        """
+        if Path(new_path).exists():
+            raise ValueError(f"Distribution with path {new_path} already exists!")
+
+    def _check_if_path_located_in_correct_dream_directory(self, new_path: Path):
+        dream_assistant_path = self.dream_root / const.ASSISTANT_DISTS_DIR_NAME
+
+        if new_path.parent != dream_assistant_path:
+            raise ValueError(f"{new_path} must contain {dream_assistant_path}")
 
     @staticmethod
     def load_configs_with_default_filenames(
