@@ -2,7 +2,8 @@ import json
 import re
 from pathlib import Path
 from shutil import copytree
-from typing import Union, Any, Optional, Tuple, Dict
+from typing import Union, Any, Optional, Tuple, Dict, Literal
+from copy import deepcopy
 
 import yaml
 
@@ -484,6 +485,8 @@ AnyConfigClass = Union[
     DreamComposeLocal,
 ]
 
+DreamConfigLiteral = Literal["pipeline_conf", "compose_override", "compose_dev", "compose_proxy"]
+
 
 class DreamDist:
     def __init__(
@@ -518,6 +521,7 @@ class DreamDist:
         self.compose_dev = compose_dev
         self.compose_proxy = compose_proxy
         self.compose_local = compose_local
+        self.temp_configs: Dict[str, AnyConfigClass] = {}  # {DreamConfig.DEFAULT_FILE_NAME: DreamConfig}
 
     @property
     def name(self):
@@ -973,6 +977,37 @@ class DreamDist:
 
             local_config.add_service(name, service, inplace=True)
         return local_config.to_dist(self.dist_path)
+
+    def enable_service(self, config_type: DreamConfigLiteral, definition: AnyContainer, service_name: str):
+        """
+        Stores config with the new service to temp configs storage
+        """
+        if self.temp_configs.get(config_type) is None:
+            dream_config: AnyConfigClass = getattr(self, config_type)
+            self.temp_configs[config_type] = dream_config
+        else:
+            dream_config = self.temp_configs[config_type]
+
+        dream_temp_config = deepcopy(dream_config)
+        dream_temp_config.add_service(service_name, definition, inplace=True)
+        self.temp_configs[config_type] = dream_temp_config
+
+    def disable_service(self, config_type: DreamConfigLiteral, service_name: str):
+        if self.temp_configs.get(config_type) is None:
+            dream_config: AnyConfigClass = getattr(self, config_type)
+            self.temp_configs[config_type] = dream_config
+        else:
+            dream_config = self.temp_configs[config_type]
+
+        dream_temp_config = deepcopy(dream_config)
+        dream_temp_config.remove_service(service_name, inplace=True)
+        self.temp_configs[config_type] = dream_temp_config
+
+    def submit_changes_to_config(self, config_type: DreamConfigLiteral):
+        """
+        Replaces current config with the temp one.
+        """
+        setattr(self, config_type, self.temp_configs[config_type])
 
 
 def list_dists(dream_root: Union[Path, str]) -> list[DreamDist]:
