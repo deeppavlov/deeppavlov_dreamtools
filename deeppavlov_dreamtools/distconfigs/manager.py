@@ -1025,9 +1025,12 @@ class DreamDist:
 
         return dream_temp_config
 
-    def submit_changes_to_config(self, config_type: DreamConfigLiteral) -> None:
+    def apply_temp_config(self, config_type: DreamConfigLiteral) -> None:
         """
         Replaces current config with the temp one.
+
+        Args:
+            config_type: Literal["pipeline_conf", "compose_override", "compose_dev", "compose_proxy"]
         """
         setattr(self, config_type, self.temp_configs[config_type])
 
