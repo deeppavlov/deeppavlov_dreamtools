@@ -1,6 +1,8 @@
 import pytest
 from pathlib import Path
 import filecmp
+from typing import List
+
 from deeppavlov_dreamtools.distconfigs.manager import (
     DreamDist,
     DreamPipeline,
@@ -74,7 +76,7 @@ def test_load_configs_with_default_filenames(list_of_dream_dist: list, dream_ass
             KeyError(f"The config object doesn't have one or more config")
 
 
-def test_dreamdist_save(list_of_dream_dist: list[DreamDist], dream_assistant_dists_dir: Path):
+def test_dreamdist_save(list_of_dream_dist: List[DreamDist], dream_assistant_dists_dir: Path):
     """
     Changes name and dist_path of dreamdist and then compare configs of new and base distributions
     """

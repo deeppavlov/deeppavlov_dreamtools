@@ -2,7 +2,7 @@ import json
 import re
 from pathlib import Path
 from shutil import copytree
-from typing import Union, Any, Optional, Tuple, Dict, Literal
+from typing import Union, Any, Optional, Tuple, Dict, List, Literal
 from copy import deepcopy
 
 import yaml
@@ -1032,7 +1032,7 @@ class DreamDist:
         setattr(self, config_type, self.temp_configs[config_type])
 
 
-def list_dists(dream_root: Union[Path, str]) -> list[DreamDist]:
+def list_dists(dream_root: Union[Path, str]) -> List[DreamDist]:
     """
     Serializes configs from Dream assistant distributions to list of DreamDist objects
 
