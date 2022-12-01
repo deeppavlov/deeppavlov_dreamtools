@@ -412,7 +412,6 @@ class DreamPipeline(JsonDreamConfig):
         """
         # TODO implement recursive removal of dependent services
         services = self.config.copy().services
-
         try:
             del getattr(services, service_type)[name]
         except AttributeError:
@@ -978,31 +977,39 @@ class DreamDist:
             local_config.add_service(name, service, inplace=True)
         return local_config.to_dist(self.dist_path)
 
-    def enable_service(self, config_type: DreamConfigLiteral, definition: AnyContainer, service_name: str) -> None:
+    def enable_service(
+        self,
+        config_type: DreamConfigLiteral,
+        definition: Union[AnyContainer, PipelineConfService],
+        service_name: str,
+        service_type: str,
+    ) -> None:
         """
         Stores config with the new service to temp configs storage
 
         Args:
             config_type: Literal["pipeline_conf", "compose_override", "compose_dev", "compose_proxy"]
+            service_type: e.g. `post_annotators`
             definition: config to be added to temp storage with the new service
-            service_name: name of the service to be added to config
+            service_name: name of the service to be added to config, e.g. `ner`
         """
         dream_temp_config = self._fetch_dream_temp_config(config_type)
+        dream_temp_config.add_service(name=service_name, service_type=service_type, definition=definition, inplace=True)
 
-        dream_temp_config.add_service(service_name, definition, inplace=True)
         self.temp_configs[config_type] = dream_temp_config
 
-    def disable_service(self, config_type: DreamConfigLiteral, service_name: str) -> None:
+    def disable_service(self, config_type: DreamConfigLiteral, service_type: str, service_name: str) -> None:
         """
         Removes service from the config
 
         Args:
             config_type: Literal["pipeline_conf", "compose_override", "compose_dev", "compose_proxy"]
+            service_type: name of the service_type
             service_name: name of the service to be added to config
         """
-        dream_temp_config = self._fetch_dream_temp_config(config_type)
+        dream_temp_config = self._fetch_dream_temp_config(config_type)  # DreamDist.pipeline_conf, for example
 
-        dream_temp_config.remove_service(service_name, inplace=True)
+        dream_temp_config.remove_service(service_type=service_type, name=service_name, inplace=True)
         self.temp_configs[config_type] = dream_temp_config
 
     def _fetch_dream_temp_config(self, config_type: DreamConfigLiteral):
