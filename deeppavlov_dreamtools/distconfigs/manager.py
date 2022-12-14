@@ -512,7 +512,7 @@ class DreamDist:
         """
         self._dist_path = Path(dist_path)
         self._name = name
-        self.dream_root = dream_root
+        self.dream_root = Path(dream_root)
         self.pipeline_conf = pipeline_conf
         self.compose_override = compose_override
         self.compose_dev = compose_dev
