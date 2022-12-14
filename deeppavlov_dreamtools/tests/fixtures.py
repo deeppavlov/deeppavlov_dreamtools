@@ -45,7 +45,7 @@ def create_weather_dist(dream_root_dir):
         compose_proxy,
         compose_local,
     )
-    new_dist = dream_dist.create_dist(
+    new_dist = dream_dist.clone_dist(
         name,
         dream_root_dir,
         services,

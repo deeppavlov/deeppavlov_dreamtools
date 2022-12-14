@@ -753,7 +753,7 @@ class DreamDist:
 
         return cls(dist_path, name, dream_root, **cls_kwargs)
 
-    def create_dist(
+    def clone_dist(
         self,
         name: str,
         dream_root: Union[str, Path],

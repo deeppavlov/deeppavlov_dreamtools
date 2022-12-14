@@ -43,7 +43,7 @@ def dist(
         mk_compose_proxy,
         mk_compose_local,
     )
-    new_dist = dream_dist.create_dist(
+    new_dist = dream_dist.clone_dist(
         name,
         dream_root,
         services,
