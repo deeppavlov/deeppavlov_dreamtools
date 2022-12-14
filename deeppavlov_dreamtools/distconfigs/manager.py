@@ -2,7 +2,7 @@ import json
 import re
 from pathlib import Path
 from shutil import copytree
-from typing import Union, Any, Optional, Tuple, Dict, List
+from typing import Union, Any, Optional, Tuple, Dict, List, Literal
 
 import yaml
 
@@ -335,6 +335,14 @@ class DreamPipeline(JsonDreamConfig):
                 required_service = service_group[required_name]
                 yield required_group, required_name, required_service
                 yield from self._recursively_parse_requirements(required_service)
+
+    def iter_services(self, replace_underscores: bool = True):
+        for service_group in self.config.services.editable_groups:
+            services = getattr(self.config.services, service_group)
+            for service_name, service in services.items():
+                if replace_underscores:
+                    service_name = service_name.replace("_", "-")
+                yield service_group, service_name, service
 
     def filter_services(self, include_names: list):
         filtered = {grp: {} for grp in self.config.services.editable_groups}
@@ -1007,3 +1015,29 @@ def list_dists(dream_root: Union[Path, str]) -> List[DreamDist]:
         dream_dists.append(dream_dist)
 
     return dream_dists
+
+
+def list_components(dream_root: Union[Path, str], component_group: Literal["annotators", "skills"]) -> Dict[str, dict]:
+    """Lists all components available in the group
+
+    Args:
+        dream_root: path to Dream module
+        component_group: component group
+
+    Returns:
+        components: dictionary with names as keys and config_name: definition as values
+    """
+    main_dist_path = Path(dream_root) / const.ASSISTANT_DISTS_DIR_NAME / "dream"
+    main_dream_dist = DreamDist.from_dist(main_dist_path)
+
+    components = {}
+    for group, name, service in main_dream_dist.pipeline_conf.iter_services(replace_underscores=True):
+        if group == component_group:
+            components[name] = {
+                "pipeline_conf": service,
+                "compose_override": main_dream_dist.compose_override.config.services.get(name),
+                "compose_dev": main_dream_dist.compose_dev.config.services.get(name),
+                "compose_proxy": main_dream_dist.compose_proxy.config.services.get(name),
+            }
+
+    return components
