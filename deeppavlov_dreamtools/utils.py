@@ -1,4 +1,5 @@
 import logging
+from typing import Optional, Tuple
 
 
 def create_logger(
@@ -13,6 +14,34 @@ def create_logger(
     logger.setLevel(level)
 
     return logger
+
+
+def parse_connector_url(
+    url: Optional[str] = None,
+) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    """
+    Deserializes a string into host, port, endpoint components.
+
+    Args:
+        url: Full url string of format http(s)://{host}:{port}/{endpoint}.
+            If empty, returns (None, None, None)
+
+    Returns:
+        tuple of (host, port, endpoint)
+
+    """
+    host = port = endpoint = None
+    if url:
+        url_without_protocol = url.split("//")[-1]
+        url_parts = url_without_protocol.split("/", maxsplit=1)
+
+        host, port = url_parts[0].split(":")
+        endpoint = ""
+
+        if len(url_parts) > 1:
+            endpoint = url_parts[1]
+
+    return host, port, endpoint
 
 
 def iter_field_keys_values(search_dict: dict, field: str):
