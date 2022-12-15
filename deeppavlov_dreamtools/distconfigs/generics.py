@@ -12,10 +12,11 @@ proxy.yml - all nginx tunnels
 """
 import re
 from pathlib import Path
-from typing import Dict, Union, Optional, Any, List, Tuple, Literal, Type
+from typing import Dict, Union, Optional, Any, List, Type
 
 from pydantic import BaseModel, Extra, validator
 
+from deeppavlov_dreamtools.utils import parse_connector_url
 
 class BaseModelNoExtra(BaseModel, extra=Extra.forbid):
     """
@@ -24,13 +25,9 @@ class BaseModelNoExtra(BaseModel, extra=Extra.forbid):
 
 
 class PipelineConfConnector(BaseModelNoExtra):
-    # name: str
     protocol: str
     timeout: Optional[float]
     url: Optional[str]
-    _host: Optional[str]
-    _port: Optional[str]
-    _endpoint: Optional[str]
     class_name: Optional[str]
     response_text: Optional[str]
     annotations: Optional[Dict[str, Any]]
@@ -47,12 +44,16 @@ class PipelineConfService(BaseModelNoExtra):
     tags: Optional[List[str]]
 
     @property
-    def connector_url(self):
+    def container_name(self):
         try:
             url = self.connector.url
         except AttributeError:
-            url = None
-        return url
+            name = None
+        else:
+            host, port, endpoint = parse_connector_url(url)
+            name = host
+
+        return name
 
 
 class PipelineConfServiceList(BaseModelNoExtra):

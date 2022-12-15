@@ -27,34 +27,7 @@ from deeppavlov_dreamtools.distconfigs.generics import (
     DeploymentDefinitionResourcesArg,
 )
 from deeppavlov_dreamtools.distconfigs import const
-
-
-def _parse_connector_url(
-    url: Optional[str] = None,
-) -> Tuple[Optional[str], Optional[str], Optional[str]]:
-    """
-    Deserializes a string into host, port, endpoint components.
-
-    Args:
-        url: Full url string of format http(s)://{host}:{port}/{endpoint}.
-            If empty, returns (None, None, None)
-
-    Returns:
-        tuple of (host, port, endpoint)
-
-    """
-    host = port = endpoint = None
-    if url:
-        url_without_protocol = url.split("//")[-1]
-        url_parts = url_without_protocol.split("/", maxsplit=1)
-
-        host, port = url_parts[0].split(":")
-        endpoint = ""
-
-        if len(url_parts) > 1:
-            endpoint = url_parts[1]
-
-    return host, port, endpoint
+from deeppavlov_dreamtools.utils import parse_connector_url
 
 
 class BaseDreamConfig:
@@ -315,7 +288,7 @@ class DreamPipeline(JsonDreamConfig):
                 if hasattr(service.connector, "url"):
                     url = service.connector.url
                     if url:
-                        host, port, endpoint = _parse_connector_url(url)
+                        host, port, endpoint = parse_connector_url(url)
                         if host in names:
                             yield service_group, service_name, service
                 else:
@@ -336,12 +309,10 @@ class DreamPipeline(JsonDreamConfig):
                 yield required_group, required_name, required_service
                 yield from self._recursively_parse_requirements(required_service)
 
-    def iter_services(self, replace_underscores: bool = True):
+    def iter_services(self):
         for service_group in self.config.services.editable_groups:
             services = getattr(self.config.services, service_group)
             for service_name, service in services.items():
-                if replace_underscores:
-                    service_name = service_name.replace("_", "-")
                 yield service_group, service_name, service
 
     def filter_services(self, include_names: list):
