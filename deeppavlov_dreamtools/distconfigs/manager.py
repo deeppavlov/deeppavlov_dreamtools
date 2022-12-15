@@ -2,7 +2,7 @@ import json
 import re
 from pathlib import Path
 from shutil import copytree
-from typing import Union, Any, Optional, Tuple, Dict, List, Literal
+from typing import Union, Any, Optional, Tuple, Dict, List, Literal, Generator
 
 import yaml
 
@@ -309,7 +309,7 @@ class DreamPipeline(JsonDreamConfig):
                 yield required_group, required_name, required_service
                 yield from self._recursively_parse_requirements(required_service)
 
-    def iter_services(self):
+    def iter_services(self) -> Generator[Tuple[str, str, PipelineConfService], None, None]:
         for service_group in self.config.services.editable_groups:
             services = getattr(self.config.services, service_group)
             for service_name, service in services.items():
@@ -988,7 +988,9 @@ def list_dists(dream_root: Union[Path, str]) -> List[DreamDist]:
     return dream_dists
 
 
-def list_components(dream_root: Union[Path, str], component_group: Literal["annotators", "skills"]) -> Dict[str, dict]:
+def list_components(
+    dream_root: Union[Path, str], component_group: Literal["annotators", "skills"]
+) -> Dict[str, Dict[str, dict]]:
     """Lists all components available in the group
 
     Args:
@@ -999,16 +1001,27 @@ def list_components(dream_root: Union[Path, str], component_group: Literal["anno
         components: dictionary with names as keys and config_name: definition as values
     """
     main_dist_path = Path(dream_root) / const.ASSISTANT_DISTS_DIR_NAME / "dream"
-    main_dream_dist = DreamDist.from_dist(main_dist_path)
+    main_dist = DreamDist.from_dist(main_dist_path)
 
     components = {}
-    for group, name, service in main_dream_dist.pipeline_conf.iter_services(replace_underscores=True):
+
+    for group, name, service in main_dist.pipeline_conf.iter_services():
         if group == component_group:
+            override_svc = dev_svc = proxy_svc = None
+
+            container_name = service.container_name
+            if container_name:
+                override_svc = main_dist.compose_override.config.services.get(container_name).dict(exclude_none=True)
+                dev_svc = main_dist.compose_dev.config.services.get(container_name).dict(exclude_none=True)
+                proxy_svc = main_dist.compose_proxy.config.services.get(container_name).dict(exclude_none=True)
+
+            service = service.dict(exclude_none=True)
+
             components[name] = {
                 "pipeline_conf": service,
-                "compose_override": main_dream_dist.compose_override.config.services.get(name),
-                "compose_dev": main_dream_dist.compose_dev.config.services.get(name),
-                "compose_proxy": main_dream_dist.compose_proxy.config.services.get(name),
+                "compose_override": override_svc,
+                "compose_dev": dev_svc,
+                "compose_proxy": proxy_svc,
             }
 
     return components

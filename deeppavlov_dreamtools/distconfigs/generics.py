@@ -10,8 +10,9 @@ local.yml - nginx tunnels currently in use
 proxy.yml - all nginx tunnels
 
 """
-import re
+from datetime import datetime
 from pathlib import Path
+import re
 from typing import Dict, Union, Optional, Any, List, Type
 
 from pydantic import BaseModel, Extra, validator
@@ -100,6 +101,17 @@ class PipelineConfServiceList(BaseModelNoExtra):
     #     return flattened_service_dict
 
 
+class PipelineConfMetadata(BaseModelNoExtra):
+    display_name: str
+    author: str
+    description: str
+    version: str
+    date_created: datetime
+    ram_usage: str
+    gpu_usage: str
+    disk_usage: str
+
+
 class PipelineConf(BaseModelNoExtra):
     """
     Implements pipeline.json config structure
@@ -107,6 +119,7 @@ class PipelineConf(BaseModelNoExtra):
 
     connectors: Optional[Dict[str, PipelineConfConnector]]
     services: PipelineConfServiceList
+    metadata: Optional[PipelineConfMetadata]
 
 
 class ContainerBuildDefinition(BaseModelNoExtra):
