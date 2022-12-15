@@ -19,6 +19,7 @@ from pydantic import BaseModel, Extra, validator
 
 from deeppavlov_dreamtools.utils import parse_connector_url
 
+
 class BaseModelNoExtra(BaseModel, extra=Extra.forbid):
     """
     Implements BaseModel which throws an Exception when children are instantiated with extra kwargs
