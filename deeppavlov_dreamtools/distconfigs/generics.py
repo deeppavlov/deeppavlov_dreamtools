@@ -76,7 +76,7 @@ class PipelineConfServiceList(BaseModelNoExtra):
 
     @property
     def editable_groups(self):
-        return [
+        group_names = [
             "post_annotators",
             "annotators",
             # "skill_selectors",
@@ -84,6 +84,13 @@ class PipelineConfServiceList(BaseModelNoExtra):
             "post_skill_selector_annotators",
             "response_selectors",
         ]
+
+        groups = []
+        for name in group_names:
+            if getattr(self, name):
+                groups.append(name)
+
+        return groups
 
     # @property
     # def flattened_dict(self) -> Dict[str, PipelineConfService]:
@@ -271,6 +278,32 @@ class ComposeLocal(BaseComposeConfigModel):
     services: Dict[str, ComposeLocalContainer]
 
 
+class ComponentMetadata(BaseModelNoExtra):
+    type: str
+    display_name: str
+    author: str
+    description: str
+    version: str
+    date_created: datetime
+    ram_usage: str
+    gpu_usage: str
+    disk_usage: str
+    execution_time: float
+
+
+class Component(BaseModelNoExtra):
+    name: str
+    group: str
+    assistant_dist: str
+    pipeline_conf: PipelineConfService
+    compose_override: Optional[ComposeContainer]
+    compose_dev: Optional[ComposeDevContainer]
+    compose_proxy: Optional[ComposeContainer]
+    compose_local: Optional[ComposeLocalContainer]
+    metadata: Optional[ComponentMetadata]
+
+
 AnyContainer = Union[ComposeContainer, ComposeDevContainer, ComposeLocalContainer]
+AnyComposeConfig = Union[ComposeOverride, ComposeDev, ComposeProxy, ComposeLocal]
 AnyConfig = Union[PipelineConf, ComposeOverride, ComposeDev, ComposeProxy, ComposeLocal]
 AnyConfigType = Type[Union[PipelineConf, ComposeOverride, ComposeDev, ComposeProxy, ComposeLocal]]

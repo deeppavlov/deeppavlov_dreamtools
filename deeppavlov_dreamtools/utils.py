@@ -16,9 +16,7 @@ def create_logger(
     return logger
 
 
-def parse_connector_url(
-    url: Optional[str] = None,
-) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+def parse_connector_url(url: str) -> Tuple[str, str, str]:
     """
     Deserializes a string into host, port, endpoint components.
 
@@ -29,17 +27,20 @@ def parse_connector_url(
     Returns:
         tuple of (host, port, endpoint)
 
+    Raises:
+        ValueError if not appropriate url string format
     """
-    host = port = endpoint = None
-    if url:
+    try:
         url_without_protocol = url.split("//")[-1]
         url_parts = url_without_protocol.split("/", maxsplit=1)
 
         host, port = url_parts[0].split(":")
-        endpoint = ""
+    except (AttributeError, ValueError):
+        raise ValueError(f"{url} does not fit the http(s)://{{host}}:{{port}}/{{endpoint}} format")
 
-        if len(url_parts) > 1:
-            endpoint = url_parts[1]
+    endpoint = ""
+    if len(url_parts) > 1:
+        endpoint = url_parts[1]
 
     return host, port, endpoint
 
