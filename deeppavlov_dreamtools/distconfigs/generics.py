@@ -10,11 +10,14 @@ local.yml - nginx tunnels currently in use
 proxy.yml - all nginx tunnels
 
 """
-import re
+from datetime import datetime
 from pathlib import Path
-from typing import Dict, Union, Optional, Any, List, Tuple, Literal, Type
+import re
+from typing import Dict, Union, Optional, Any, List, Type
 
 from pydantic import BaseModel, Extra, validator
+
+from deeppavlov_dreamtools.utils import parse_connector_url
 
 
 class BaseModelNoExtra(BaseModel, extra=Extra.forbid):
@@ -24,13 +27,9 @@ class BaseModelNoExtra(BaseModel, extra=Extra.forbid):
 
 
 class PipelineConfConnector(BaseModelNoExtra):
-    # name: str
     protocol: str
     timeout: Optional[float]
     url: Optional[str]
-    _host: Optional[str]
-    _port: Optional[str]
-    _endpoint: Optional[str]
     class_name: Optional[str]
     response_text: Optional[str]
     annotations: Optional[Dict[str, Any]]
@@ -47,12 +46,16 @@ class PipelineConfService(BaseModelNoExtra):
     tags: Optional[List[str]]
 
     @property
-    def connector_url(self):
+    def container_name(self):
         try:
             url = self.connector.url
         except AttributeError:
-            url = None
-        return url
+            name = None
+        else:
+            host, port, endpoint = parse_connector_url(url)
+            name = host
+
+        return name
 
 
 class PipelineConfServiceList(BaseModelNoExtra):
@@ -73,7 +76,7 @@ class PipelineConfServiceList(BaseModelNoExtra):
 
     @property
     def editable_groups(self):
-        return [
+        group_names = [
             "post_annotators",
             "annotators",
             # "skill_selectors",
@@ -81,6 +84,13 @@ class PipelineConfServiceList(BaseModelNoExtra):
             "post_skill_selector_annotators",
             "response_selectors",
         ]
+
+        groups = []
+        for name in group_names:
+            if getattr(self, name):
+                groups.append(name)
+
+        return groups
 
     # @property
     # def flattened_dict(self) -> Dict[str, PipelineConfService]:
@@ -99,6 +109,17 @@ class PipelineConfServiceList(BaseModelNoExtra):
     #     return flattened_service_dict
 
 
+class PipelineConfMetadata(BaseModelNoExtra):
+    display_name: str
+    author: str
+    description: str
+    version: str
+    date_created: datetime
+    ram_usage: str
+    gpu_usage: str
+    disk_usage: str
+
+
 class PipelineConf(BaseModelNoExtra):
     """
     Implements pipeline.json config structure
@@ -106,6 +127,7 @@ class PipelineConf(BaseModelNoExtra):
 
     connectors: Optional[Dict[str, PipelineConfConnector]]
     services: PipelineConfServiceList
+    metadata: Optional[PipelineConfMetadata]
 
 
 class ContainerBuildDefinition(BaseModelNoExtra):
@@ -256,6 +278,32 @@ class ComposeLocal(BaseComposeConfigModel):
     services: Dict[str, ComposeLocalContainer]
 
 
+class ComponentMetadata(BaseModelNoExtra):
+    type: str
+    display_name: str
+    author: str
+    description: str
+    version: str
+    date_created: datetime
+    ram_usage: str
+    gpu_usage: str
+    disk_usage: str
+    execution_time: float
+
+
+class Component(BaseModelNoExtra):
+    name: str
+    group: str
+    assistant_dist: str
+    pipeline_conf: PipelineConfService
+    compose_override: Optional[ComposeContainer]
+    compose_dev: Optional[ComposeDevContainer]
+    compose_proxy: Optional[ComposeContainer]
+    compose_local: Optional[ComposeLocalContainer]
+    metadata: Optional[ComponentMetadata]
+
+
 AnyContainer = Union[ComposeContainer, ComposeDevContainer, ComposeLocalContainer]
+AnyComposeConfig = Union[ComposeOverride, ComposeDev, ComposeProxy, ComposeLocal]
 AnyConfig = Union[PipelineConf, ComposeOverride, ComposeDev, ComposeProxy, ComposeLocal]
 AnyConfigType = Type[Union[PipelineConf, ComposeOverride, ComposeDev, ComposeProxy, ComposeLocal]]

@@ -1,9 +1,11 @@
+import datetime
 import json
 import re
 from pathlib import Path
 from shutil import copytree
-from typing import Union, Any, Optional, Tuple, Dict, List, Literal
-from copy import deepcopy
+
+from typing import Union, Any, Optional, Tuple, Dict, List, Literal, Generator
+
 
 import yaml
 
@@ -26,36 +28,12 @@ from deeppavlov_dreamtools.distconfigs.generics import (
     ContainerBuildDefinition,
     DeploymentDefinitionResources,
     DeploymentDefinitionResourcesArg,
+    Component,
+    ComponentMetadata,
+    AnyComposeConfig,
 )
 from deeppavlov_dreamtools.distconfigs import const
-
-
-def _parse_connector_url(
-    url: Optional[str] = None,
-) -> Tuple[Optional[str], Optional[str], Optional[str]]:
-    """
-    Deserializes a string into host, port, endpoint components.
-
-    Args:
-        url: Full url string of format http(s)://{host}:{port}/{endpoint}.
-            If empty, returns (None, None, None)
-
-    Returns:
-        tuple of (host, port, endpoint)
-
-    """
-    host = port = endpoint = None
-    if url:
-        url_without_protocol = url.split("//")[-1]
-        url_parts = url_without_protocol.split("/", maxsplit=1)
-
-        host, port = url_parts[0].split(":")
-        endpoint = ""
-
-        if len(url_parts) > 1:
-            endpoint = url_parts[1]
-
-    return host, port, endpoint
+from deeppavlov_dreamtools.utils import parse_connector_url
 
 
 class BaseDreamConfig:
@@ -211,8 +189,8 @@ class YmlDreamConfig(BaseDreamConfig):
 
         return path
 
-    def __getitem__(self, item) -> AnyContainer:
-        return self.config.services[item]
+    def get_service(self, name: str) -> AnyContainer:
+        return self.config.services.get(name)
 
     def iter_services(self):
         for s_name, s_definition in self.config.services.items():
@@ -316,7 +294,7 @@ class DreamPipeline(JsonDreamConfig):
                 if hasattr(service.connector, "url"):
                     url = service.connector.url
                     if url:
-                        host, port, endpoint = _parse_connector_url(url)
+                        host, port, endpoint = parse_connector_url(url)
                         if host in names:
                             yield service_group, service_name, service
                 else:
@@ -336,6 +314,39 @@ class DreamPipeline(JsonDreamConfig):
                 required_service = service_group[required_name]
                 yield required_group, required_name, required_service
                 yield from self._recursively_parse_requirements(required_service)
+
+    def resolve_container_name(self, connector: Union[str, PipelineConfConnector]):
+        """Resolves container name for the provided connector by recursively parsing it
+
+        Args:
+            connector: instance of PipelineConfConnector
+
+        Returns:
+            container name or None
+        """
+        if isinstance(connector, str) and connector.startswith("connectors"):
+            connector_name = connector.split(".", maxsplit=1)[-1]
+            connector = self.config.connectors[connector_name]
+
+        try:
+            url = connector.url
+        except AttributeError:
+            name = None
+        else:
+            try:
+                host, port, endpoint = parse_connector_url(url)
+            except ValueError:
+                name = None
+            else:
+                name = host
+
+        return name
+
+    def iter_services(self) -> Generator[Tuple[str, str, PipelineConfService], None, None]:
+        for service_group in self.config.services.editable_groups:
+            services = getattr(self.config.services, service_group)
+            for service_name, service in services.items():
+                yield service_group, service_name, service
 
     def filter_services(self, include_names: list):
         filtered = {grp: {} for grp in self.config.services.editable_groups}
@@ -514,7 +525,7 @@ class DreamDist:
         """
         self._dist_path = Path(dist_path)
         self._name = name
-        self.dream_root = dream_root
+        self.dream_root = Path(dream_root)
         self.pipeline_conf = pipeline_conf
         self.compose_override = compose_override
         self.compose_dev = compose_dev
@@ -600,8 +611,7 @@ class DreamDist:
             compose_proxy = DreamComposeProxy.DEFAULT_FILE_NAME in filenames_in_dist
             compose_local = DreamComposeLocal.DEFAULT_FILE_NAME in filenames_in_dist
 
-        if pipeline_conf:
-            kwargs["pipeline_conf"] = DreamPipeline.from_dist(dist_path)
+        kwargs["pipeline_conf"] = DreamPipeline.from_dist(dist_path)
         if compose_override:
             kwargs["compose_override"] = DreamComposeOverride.from_dist(dist_path)
         if compose_dev:
@@ -839,6 +849,52 @@ class DreamDist:
             if config:
                 yield config
 
+    def iter_container_configs(self) -> Generator[Tuple[str, YmlDreamConfig], None, None]:
+        config_names = [
+            "compose_override",
+            "compose_dev",
+            "compose_proxy",
+            "compose_local",
+        ]
+
+        for name in config_names:
+            config = getattr(self, name)
+            if config:
+                yield name, config
+
+    def iter_components(self, component_group: Literal["annotators", "skills"]):
+        for group, name, service in self.pipeline_conf.iter_services():
+            if group != component_group:
+                continue
+
+            compose_kwargs = {}
+            container_name = self.pipeline_conf.resolve_container_name(service.connector)
+
+            if container_name:
+                for config_name, config in self.iter_container_configs():
+                    compose_kwargs[config_name] = config.get_service(container_name)
+
+            # TODO fix placeholder values
+            yield Component(
+                name=name,
+                group=group,
+                assistant_dist=self.name,
+                pipeline_conf=service,
+                metadata=ComponentMetadata(
+                    type="retrieval",
+                    display_name=" ".join(word.capitalize() for word in name.split("_")),
+                    author="DeepPavlov",
+                    description=f"One of the {group} used by {self.name} distribution. Add it to your distribution and try it out",
+                    version="0.1.0",
+                    date_created=datetime.datetime.now(),
+                    ram_usage="1.0 GB",
+                    gpu_usage="1.0 GB",
+                    disk_usage="1.0 GB",
+                    execution_time=1.5,
+                ),
+                **compose_kwargs,
+            )
+
     def save(self, overwrite: bool = False):
         """
         Dumps current config objects to files.
@@ -1061,16 +1117,32 @@ def list_dists(dream_root: Union[Path, str]) -> List[DreamDist]:
     for distribution in distributions_paths:
         if distribution.is_file():
             continue
-        filenames = [file.name for file in distribution.iterdir()]
 
-        dream_dist = DreamDist.from_dist(
-            distribution,
-            pipeline_conf="pipeline_conf.json" in filenames,
-            compose_override="docker-compose.override.yml" in filenames,
-            compose_dev="dev.yml" in filenames,
-            compose_proxy="proxy.yml" in filenames,
-            compose_local="local.yml" in filenames,
-        )
-        dream_dists.append(dream_dist)
+        try:
+            dream_dist = DreamDist.from_dist(distribution)
+            dream_dists.append(dream_dist)
+        except FileNotFoundError:
+            pass
 
     return dream_dists
+
+
+def list_components(
+    dream_root: Union[Path, str], component_group: Literal["annotators", "skills"]
+) -> List[Component]:
+    """Lists all components available in the group
+
+    Args:
+        dream_root: path to Dream module
+        component_group: component group
+
+    Returns:
+        components: dictionary with names as keys and config_name: definition as values
+    """
+    components = []
+
+    for dist in list_dists(dream_root):
+        for component in dist.iter_components(component_group):
+            components.append(component)
+
+    return components
