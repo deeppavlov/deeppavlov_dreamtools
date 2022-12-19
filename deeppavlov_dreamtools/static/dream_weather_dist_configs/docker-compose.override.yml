@@ -65,7 +65,8 @@ services:
         PRETRAINED_MODEL_NAME_OR_PATH: microsoft/DialoGPT-medium
         SERVICE_NAME: dialogpt
         SERVICE_PORT: 8125
-      context: services/dialogpt
+      context: .
+      dockerfile: services/dialogpt/Dockerfile
     command: flask run -h 0.0.0.0 -p 8125
     deploy:
       resources:
