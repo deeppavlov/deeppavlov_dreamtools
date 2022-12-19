@@ -1127,9 +1127,7 @@ def list_dists(dream_root: Union[Path, str]) -> List[DreamDist]:
     return dream_dists
 
 
-def list_components(
-    dream_root: Union[Path, str], component_group: Literal["annotators", "skills"]
-) -> List[Component]:
+def list_components(dream_root: Union[Path, str], component_group: Literal["annotators", "skills"]) -> List[Component]:
     """Lists all components available in the group
 
     Args:
