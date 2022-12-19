@@ -5,7 +5,7 @@ from pathlib import Path
 from shutil import copytree
 
 from typing import Union, Any, Optional, Tuple, Dict, List, Literal, Generator
-
+from copy import deepcopy
 
 import yaml
 
