@@ -57,6 +57,16 @@ class PipelineConfService(BaseModelNoExtra):
 
         return name
 
+    @property
+    def container_port(self):
+        try:
+            url = self.connector.url
+        except AttributeError:
+            port = None
+        else:
+            host, port, endpoint = parse_connector_url(url)
+
+        return port
 
 class PipelineConfServiceList(BaseModelNoExtra):
     last_chance_service: Optional[PipelineConfService]
