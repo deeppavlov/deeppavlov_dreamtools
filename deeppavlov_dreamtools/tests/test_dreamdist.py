@@ -133,3 +133,37 @@ def test_namesetter(dream_root_dir: Path):
     dream_dist_test_object.save()
 
     assert dream_dist_test_object.dist_path.exists(), f"DreamDist path wasn't set properly"
+
+
+def test_disable_enable_config(dream_root_dir: Path):
+    service_type = "post_annotators"
+    service_name = "sentseg"
+    config_type = "pipeline_conf"
+
+    dream_dist = DreamDist.from_name(name="dream", dream_root=dream_root_dir)
+    post_annotators = dream_dist.pipeline_conf.config.services.post_annotators
+
+    dream_dist.disable_service(config_type=config_type, service_type=service_type, service_name=service_name)
+    assert (
+        dream_dist.temp_configs[config_type].config.services.post_annotators.get(service_name) is None
+    ), "Service wasn't disabled properly in temp_config storage. See DreamDist.disable_service"
+
+    dream_dist.apply_temp_config(config_type=config_type)
+    assert (
+        dream_dist.pipeline_conf.config.services.post_annotators.get(service_name) is None
+    ), "Service wasn't disabled properly after applying changes"
+    dream_dist.enable_service(
+        config_type=config_type,
+        service_name=service_name,
+        definition=post_annotators[service_name],
+        service_type=service_type,
+    )
+    assert (
+        dream_dist.temp_configs[config_type].config.services.post_annotators[service_name]
+        == post_annotators[service_name]
+    ), "Service wasn't enabled properly in temp_config storage. See DreamDist.enable_service"
+
+    dream_dist.apply_temp_config(config_type=config_type)
+    assert (
+        dream_dist.pipeline_conf.config.services.post_annotators[service_name] == post_annotators[service_name]
+    ), "Service wasn't enabled properly after applying changes"
