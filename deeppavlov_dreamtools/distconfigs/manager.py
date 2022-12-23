@@ -449,14 +449,18 @@ class DreamPipeline(JsonDreamConfig):
         Returns:
             port in integer representation
         """
+        port = None
+        url = None
         try:
             url = service.connector.url
         except AttributeError:
-            return None
+            pass
 
         if url:
             host, port, endpoint = parse_connector_url(url)
-            return int(port)
+            port = int(port)
+
+        return port
 
 
 class DreamComposeOverride(YmlDreamConfig):
