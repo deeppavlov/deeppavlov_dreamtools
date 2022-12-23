@@ -27,6 +27,7 @@ services:
     - 8125:8125
     volumes:
     - ./services/dialogpt:/src
+    - ./common:/src/common
   entity-detection:
     ports:
     - 8103:8103

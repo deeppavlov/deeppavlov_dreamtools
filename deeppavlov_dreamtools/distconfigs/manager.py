@@ -3,7 +3,9 @@ import json
 import re
 from pathlib import Path
 from shutil import copytree
+
 from typing import Union, Any, Optional, Tuple, Dict, List, Literal, Generator
+from copy import deepcopy
 
 import yaml
 
@@ -421,7 +423,6 @@ class DreamPipeline(JsonDreamConfig):
         """
         # TODO implement recursive removal of dependent services
         services = self.config.copy().services
-
         try:
             del getattr(services, service_type)[name]
         except AttributeError:
@@ -494,6 +495,8 @@ AnyConfigClass = Union[
     DreamComposeLocal,
 ]
 
+DreamConfigLiteral = Literal["pipeline_conf", "compose_override", "compose_dev", "compose_proxy"]
+
 
 class DreamDist:
     def __init__(
@@ -528,6 +531,7 @@ class DreamDist:
         self.compose_dev = compose_dev
         self.compose_proxy = compose_proxy
         self.compose_local = compose_local
+        self.temp_configs: Dict[str, AnyConfigClass] = {}  # {DreamConfig.DEFAULT_FILE_NAME: DreamConfig}
 
     @property
     def name(self):
@@ -1029,6 +1033,70 @@ class DreamDist:
             local_config.add_service(name, service, inplace=True)
         return local_config.to_dist(self.dist_path)
 
+    def enable_service(
+        self,
+        config_type: DreamConfigLiteral,
+        definition: Union[AnyContainer, PipelineConfService],
+        service_name: str,
+        service_type: str,
+    ) -> None:
+        """
+        Stores config with the new service to temp configs storage
+
+        Args:
+            config_type: Literal["pipeline_conf", "compose_override", "compose_dev", "compose_proxy"]
+            service_type: e.g. `post_annotators`
+            definition: config to be added to temp storage with the new service
+            service_name: name of the service to be added to config, e.g. `ner`
+        """
+        dream_temp_config = self._fetch_dream_temp_config(config_type)
+        dream_temp_config.add_service(name=service_name, service_type=service_type, definition=definition, inplace=True)
+
+        self.temp_configs[config_type] = dream_temp_config
+
+    def disable_service(self, config_type: DreamConfigLiteral, service_type: str, service_name: str) -> None:
+        """
+        Removes service from the config
+
+        Args:
+            config_type: Literal["pipeline_conf", "compose_override", "compose_dev", "compose_proxy"]
+            service_type: name of the service_type
+            service_name: name of the service to be added to config
+        """
+        dream_temp_config = self._fetch_dream_temp_config(config_type)  # DreamDist.pipeline_conf, for example
+
+        dream_temp_config.remove_service(service_type=service_type, name=service_name, inplace=True)
+        self.temp_configs[config_type] = dream_temp_config
+
+    def _fetch_dream_temp_config(self, config_type: DreamConfigLiteral):
+        """
+        Fetches DreamDist attribute with name `config_type` and copies it
+
+        Args:
+            config_type: Literal["pipeline_conf", "compose_override", "compose_dev", "compose_proxy"]
+        """
+        if self.temp_configs.get(config_type) is None:
+            dream_config: AnyConfigClass = getattr(self, config_type)
+            self.temp_configs[config_type] = dream_config
+
+            if dream_config is None:
+                raise AttributeError("The config is neither in the temp storage nor in the DreamDist attributes")
+        else:
+            dream_config = self.temp_configs[config_type]
+
+        dream_temp_config = deepcopy(dream_config)
+
+        return dream_temp_config
+
+    def apply_temp_config(self, config_type: DreamConfigLiteral) -> None:
+        """
+        Replaces current config with the temp one.
+
+        Args:
+            config_type: Literal["pipeline_conf", "compose_override", "compose_dev", "compose_proxy"]
+        """
+        setattr(self, config_type, self.temp_configs[config_type])
+
 
 def list_dists(dream_root: Union[Path, str]) -> List[DreamDist]:
     """
@@ -1059,9 +1127,7 @@ def list_dists(dream_root: Union[Path, str]) -> List[DreamDist]:
     return dream_dists
 
 
-def list_components(
-    dream_root: Union[Path, str], component_group: Literal["annotators", "skills"]
-) -> List[Component]:
+def list_components(dream_root: Union[Path, str], component_group: Literal["annotators", "skills"]) -> List[Component]:
     """Lists all components available in the group
 
     Args:
