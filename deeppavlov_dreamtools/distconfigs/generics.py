@@ -68,6 +68,7 @@ class PipelineConfService(BaseModelNoExtra):
 
         return port
 
+
 class PipelineConfServiceList(BaseModelNoExtra):
     last_chance_service: Optional[PipelineConfService]
     timeout_service: Optional[PipelineConfService]
