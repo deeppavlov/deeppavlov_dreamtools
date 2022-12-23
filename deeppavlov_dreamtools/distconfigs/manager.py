@@ -442,6 +442,22 @@ class DreamPipeline(JsonDreamConfig):
             value = self.__class__(config)
         return value
 
+    def discover_port(self, service: Union[PipelineConfService, str]) -> Union[None, int]:
+        """
+        Extract port from service
+
+        Returns:
+            port in integer representation
+        """
+        try:
+            url = service.connector.url
+        except AttributeError:
+            return None
+
+        if url:
+            host, port, endpoint = parse_connector_url(url)
+            return int(port)
+
 
 class DreamComposeOverride(YmlDreamConfig):
     """
@@ -452,6 +468,59 @@ class DreamComposeOverride(YmlDreamConfig):
 
     DEFAULT_FILE_NAME = "docker-compose.override.yml"
     GENERIC_MODEL = ComposeOverride
+
+    def discover_port(self, service: Union[ComposeContainer, str]) -> int:
+        """
+        Fetches port from docker-compose.override.yml file.
+
+        Get ports from SERVICE_PORT and command section. In case of mismatching values
+        """
+        if isinstance(service, str):
+            service = self.get_service(service)
+
+        service_port = self._get_service_port(service)
+        command_port = self._get_command_port(service)
+
+        if service_port and command_port and service_port != command_port:
+            raise ValueError(
+                f"In the {self.__class__.DEFAULT_FILE_NAME} file there are mismatching ports from service and command sections: "
+                f"\n{service_port=}\n{command_port=}"
+            )
+
+        return service_port
+
+    def _get_service_port(self, service: Union[ComposeContainer, str]) -> Union[None, int]:
+        """
+        Fetches port from `ARGS.SERVICE_PORT` section of docker-compose.override.yml file
+        """
+        if service.build.args is None:
+            return None
+        port = service.build.args.get("SERVICE_PORT")
+
+        if not port:
+            port = service.build.args.get("PORT")
+
+        return port
+
+    def _get_command_port(self, service: Union[ComposeContainer, str]) -> Union[None, int]:
+        """
+        Fetches port from `command` section of docker-compose.override.yml file
+        """
+        command_port = None
+        command = service.command
+        if not command:
+            return None
+
+        commands = command.split()
+        for i, command in enumerate(commands):
+            if command.startswith("0.0.0.0"):
+                if ":" in command:
+                    command_port = command.split(":", maxsplit=1)[-1]
+                    break
+            elif command in ["-p", "--port"]:
+                command_port = commands[i + 1]
+
+        return int(command_port)
 
 
 class DreamComposeDev(YmlDreamConfig):
@@ -464,6 +533,18 @@ class DreamComposeDev(YmlDreamConfig):
     DEFAULT_FILE_NAME = "dev.yml"
     GENERIC_MODEL = ComposeDev
 
+    def discover_port(self, service: Union[ComposeDevContainer, str]) -> int:
+        """
+        Fetches port from dev.yml file.
+
+        Get ports from SERVICE_PORT and command section. In case of mismatching values
+        """
+        if isinstance(service, str):
+            service = self.get_service(service)
+
+        port = service.ports[-1].split(":")[-1]
+        return int(port)
+
 
 class DreamComposeProxy(YmlDreamConfig):
     """
@@ -474,6 +555,59 @@ class DreamComposeProxy(YmlDreamConfig):
 
     DEFAULT_FILE_NAME = "proxy.yml"
     GENERIC_MODEL = ComposeProxy
+
+    def discover_port(self, service: Union[ComposeContainer, str]) -> int:
+        """
+        Fetches port from proxy.yml file.
+
+        Get ports from SERVICE_PORT and command section. In case of mismatching values
+
+        Example of proxy.yml service (assistant_dists/dream/proxy.yml):
+        dff-program-y-skill:
+            command: ["nginx", "-g", "daemon off;"]
+            build:
+            context: dp/proxy/
+            dockerfile: Dockerfile
+            environment:
+                - PROXY_PASS=dream.deeppavlov.ai:8008
+                - PORT=8008
+
+        """
+        if isinstance(service, str):
+            service = self.get_service(service)
+
+        environment_port = self._get_environment_port(service)
+        environment_proxy_pass_port = self._get_proxy_pass_port(service)
+
+        if environment_port != environment_proxy_pass_port:
+            raise ValueError(
+                f"In the {self.__class__.DEFAULT_FILE_NAME} file there are mismatching ports from service and command sections:"
+                f"\n{environment_port=}\n{environment_proxy_pass_port=}"
+            )
+
+        return environment_port
+
+    def _get_environment_port(self, service: Union[ComposeContainer, str]) -> int:
+        """
+        Fetches port from `ARGS.SERVICE_PORT` section of docker-compose.override.yml file
+        """
+        port = None
+        for env_object in service.environment:
+            if env_object.startswith("PORT"):
+                port = int(env_object.split("=")[1])
+
+        return port
+
+    def _get_proxy_pass_port(self, service: Union[ComposeContainer, str]) -> int:
+        """
+        Fetches port from `command` section of docker-compose.override.yml file
+        """
+        port = None
+        for env_object in service.environment:
+            if env_object.startswith("PROXY_PASS"):
+                port = int(env_object.split(":")[-1])
+
+        return port
 
 
 class DreamComposeLocal(YmlDreamConfig):
@@ -1097,6 +1231,39 @@ class DreamDist:
         """
         setattr(self, config_type, self.temp_configs[config_type])
 
+    def check_ports(self):
+        """
+        Checks all available dream distributions configs for matching ports in services
+
+        Example of service with mismatching ports(proxy.yml):
+        ```
+        dialogpt-persona-based:
+            command: [ "nginx", "-g", "daemon off;" ]
+            build:
+              context: dp/proxy/
+              dockerfile: Dockerfile
+            environment:
+              - PROXY_PASS=dream.deeppavlov.ai:8131
+              - PORT=8125
+        ```
+        """
+        mismatching_ports_info: List[str] = []
+
+        for config in self.iter_loaded_configs():
+            if isinstance(config, DreamPipeline):
+                for service_group, service_name, service in config.iter_services():
+                    config.discover_port(service)
+            else:
+                for service_name, service in config.iter_services():
+                    if service_name in const.NON_SERVICES:
+                        continue
+                    try:
+                        config.discover_port(service)
+                    except ValueError as e:
+                        mismatching_ports_info.append(f"{service_name}: {str(e)}")
+        if mismatching_ports_info:
+            raise ValueError("\n".join(mismatching_ports_info))
+
 
 def list_dists(dream_root: Union[Path, str]) -> List[DreamDist]:
     """
@@ -1144,3 +1311,31 @@ def list_components(dream_root: Union[Path, str], component_group: Literal["anno
             components.append(component)
 
     return components
+
+
+def check_ports_in_all_distributions(dream_root: Union[Path, str]):
+    """
+    Checks all available dream assistant distributions for matching ports in services
+
+    Example of service with mismatching ports(proxy.yml):
+    ```
+    dialogpt-persona-based:
+        command: [ "nginx", "-g", "daemon off;" ]
+        build:
+          context: dp/proxy/
+          dockerfile: Dockerfile
+        environment:
+          - PROXY_PASS=dream.deeppavlov.ai:8131
+          - PORT=8125
+    ```
+    """
+    mismatching_ports_info: List[str] = []
+
+    for dream_dist in list_dists(dream_root):
+        try:
+            dream_dist.check_ports()
+        except ValueError as e:
+            mismatching_ports_info.append(f"{dream_dist.dist_path}:\n{str(e)}")
+
+    if mismatching_ports_info:
+        raise ValueError(f"{' '.join(mismatching_ports_info)}\n")
