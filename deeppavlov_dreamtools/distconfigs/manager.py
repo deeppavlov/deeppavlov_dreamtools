@@ -442,7 +442,7 @@ class DreamPipeline(JsonDreamConfig):
             value = self.__class__(config)
         return value
 
-    def discover_port(self, service: Union[PipelineConfService, str]) -> Union[None, int]:
+    def discover_port(self, service: PipelineConfService) -> Union[None, int]:
         """
         Extract port from service
 
@@ -491,7 +491,7 @@ class DreamComposeOverride(YmlDreamConfig):
                 f"\n{service_port=}\n{command_port=}"
             )
 
-        return service_port
+        return service_port or command_port
 
     def _get_service_port(self, service: Union[ComposeContainer, str]) -> Union[None, int]:
         """
@@ -504,7 +504,7 @@ class DreamComposeOverride(YmlDreamConfig):
         if not port:
             port = service.build.args.get("PORT")
 
-        return port
+        return int(port)
 
     def _get_command_port(self, service: Union[ComposeContainer, str]) -> Union[None, int]:
         """
@@ -598,9 +598,9 @@ class DreamComposeProxy(YmlDreamConfig):
         port = None
         for env_object in service.environment:
             if env_object.startswith("PORT"):
-                port = int(env_object.split("=")[1])
+                port = env_object.split("=")[1]
 
-        return port
+        return int(port)
 
     def _get_proxy_pass_port(self, service: Union[ComposeContainer, str]) -> int:
         """
@@ -609,9 +609,9 @@ class DreamComposeProxy(YmlDreamConfig):
         port = None
         for env_object in service.environment:
             if env_object.startswith("PROXY_PASS"):
-                port = int(env_object.split(":")[-1])
+                port = env_object.split(":")[-1]
 
-        return port
+        return int(port)
 
 
 class DreamComposeLocal(YmlDreamConfig):
