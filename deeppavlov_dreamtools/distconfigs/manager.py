@@ -451,6 +451,7 @@ class DreamPipeline(JsonDreamConfig):
         """
         port = None
         url = None
+
         try:
             url = service.connector.url
         except AttributeError:
@@ -482,8 +483,8 @@ class DreamComposeOverride(YmlDreamConfig):
         if isinstance(service, str):
             service = self.get_service(service)
 
-        service_port = self._get_service_port(service)
-        command_port = self._get_command_port(service)
+        service_port = self._discover_service_port(service)
+        command_port = self._discover_command_port(service)
 
         if service_port and command_port and service_port != command_port:
             raise ValueError(
@@ -493,7 +494,7 @@ class DreamComposeOverride(YmlDreamConfig):
 
         return service_port or command_port
 
-    def _get_service_port(self, service: Union[ComposeContainer, str]) -> Union[None, int]:
+    def _discover_service_port(self, service: Union[ComposeContainer, str]) -> Union[None, int]:
         """
         Fetches port from `ARGS.SERVICE_PORT` section of docker-compose.override.yml file
         """
@@ -506,7 +507,7 @@ class DreamComposeOverride(YmlDreamConfig):
 
         return int(port)
 
-    def _get_command_port(self, service: Union[ComposeContainer, str]) -> Union[None, int]:
+    def _discover_command_port(self, service: Union[ComposeContainer, str]) -> Union[None, int]:
         """
         Fetches port from `command` section of docker-compose.override.yml file
         """
@@ -580,8 +581,8 @@ class DreamComposeProxy(YmlDreamConfig):
         if isinstance(service, str):
             service = self.get_service(service)
 
-        environment_port = self._get_environment_port(service)
-        environment_proxy_pass_port = self._get_proxy_pass_port(service)
+        environment_port = self._discover_environment_port(service)
+        environment_proxy_pass_port = self._discover_proxy_pass_port(service)
 
         if environment_port != environment_proxy_pass_port:
             raise ValueError(
@@ -591,7 +592,7 @@ class DreamComposeProxy(YmlDreamConfig):
 
         return environment_port
 
-    def _get_environment_port(self, service: Union[ComposeContainer, str]) -> int:
+    def _discover_environment_port(self, service: Union[ComposeContainer, str]) -> int:
         """
         Fetches port from `ARGS.SERVICE_PORT` section of docker-compose.override.yml file
         """
@@ -602,7 +603,7 @@ class DreamComposeProxy(YmlDreamConfig):
 
         return int(port)
 
-    def _get_proxy_pass_port(self, service: Union[ComposeContainer, str]) -> int:
+    def _discover_proxy_pass_port(self, service: Union[ComposeContainer, str]) -> int:
         """
         Fetches port from `command` section of docker-compose.override.yml file
         """
