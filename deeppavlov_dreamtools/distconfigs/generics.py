@@ -30,7 +30,7 @@ def convert_datetime_to_str(dt: datetime) -> str:
         ISO 8601 datetime string
     """
 
-    return dt.strftime('%Y-%m-%dT%H:%M:%S')
+    return dt.strftime("%Y-%m-%dT%H:%M:%S")
 
 
 class BaseModelNoExtra(BaseModel):
