@@ -20,10 +20,30 @@ from pydantic import BaseModel, Extra, validator
 from deeppavlov_dreamtools.utils import parse_connector_url
 
 
-class BaseModelNoExtra(BaseModel, extra=Extra.forbid):
+def convert_datetime_to_str(dt: datetime) -> str:
+    """Converts datetime object into ISO 8601 string without ms
+
+    Args:
+        dt: datetime object
+
+    Returns:
+        ISO 8601 datetime string
+    """
+
+    return dt.strftime("%Y-%m-%dT%H:%M:%S")
+
+
+class BaseModelNoExtra(BaseModel):
     """
     Implements BaseModel which throws an Exception when children are instantiated with extra kwargs
     """
+
+    class Config:
+        extra = Extra.forbid
+        json_encoders = {
+            # custom output conversion for datetime
+            datetime: convert_datetime_to_str
+        }
 
 
 class PipelineConfConnector(BaseModelNoExtra):
@@ -37,6 +57,7 @@ class PipelineConfConnector(BaseModelNoExtra):
 
 
 class PipelineConfService(BaseModelNoExtra):
+    is_enabled: Optional[bool] = True
     connector: Union[str, PipelineConfConnector]
     dialog_formatter: Optional[str]
     response_formatter: Optional[str]
@@ -72,27 +93,21 @@ class PipelineConfService(BaseModelNoExtra):
 class PipelineConfServiceList(BaseModelNoExtra):
     last_chance_service: Optional[PipelineConfService]
     timeout_service: Optional[PipelineConfService]
-    bot_annotator_selector: Optional[PipelineConfService]
-    post_annotators: Optional[Dict[str, PipelineConfService]]
     annotators: Dict[str, PipelineConfService]
+    response_annotators: Optional[Dict[str, PipelineConfService]]
+    response_annotator_selectors: Optional[PipelineConfService]
+    candidate_annotators: Optional[Dict[str, PipelineConfService]]
     skill_selectors: Optional[Dict[str, PipelineConfService]]
     skills: Dict[str, PipelineConfService]
-    post_skill_selector_annotators: Optional[Dict[str, PipelineConfService]]
     response_selectors: Dict[str, PipelineConfService]
-    response_annotators: Optional[Dict[str, PipelineConfService]]
-
-    @property
-    def flat_keys(self):
-        return ["last_chance_service", "timeout_service", "bot_annotator_selector"]
 
     @property
     def editable_groups(self):
         group_names = [
-            "post_annotators",
             "annotators",
-            # "skill_selectors",
+            "response_annotators",
+            "candidate_annotators",
             "skills",
-            "post_skill_selector_annotators",
             "response_selectors",
         ]
 
@@ -102,22 +117,6 @@ class PipelineConfServiceList(BaseModelNoExtra):
                 groups.append(name)
 
         return groups
-
-    # @property
-    # def flattened_dict(self) -> Dict[str, PipelineConfService]:
-    #     flattened_service_dict = {
-    #         **self.post_annotators,
-    #         **self.annotators,
-    #         **self.skill_selectors,
-    #         **self.skills,
-    #         **self.post_skill_selector_annotators,
-    #         **self.response_selectors,
-    #         "last_chance_service": self.last_chance_service,
-    #         "timeout_service": self.timeout_service,
-    #         "bot_annotator_selector": self.bot_annotator_selector,
-    #     }
-    #
-    #     return flattened_service_dict
 
 
 class PipelineConfMetadata(BaseModelNoExtra):
@@ -306,7 +305,8 @@ class Component(BaseModelNoExtra):
     name: str
     group: str
     assistant_dist: str
-    pipeline_conf: PipelineConfService
+    port: Optional[int]
+    pipeline_conf: Optional[PipelineConfService]
     compose_override: Optional[ComposeContainer]
     compose_dev: Optional[ComposeDevContainer]
     compose_proxy: Optional[ComposeContainer]

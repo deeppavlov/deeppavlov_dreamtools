@@ -39,6 +39,7 @@ def test_load_configs_with_default_filenames(list_of_dream_dist: list, dream_ass
         local_in_dist: bool = "local.yml" in filenames_in_dist
 
         configs = DreamDist.load_configs_with_default_filenames(
+            dream_assistant_dists_dir.parent,
             dist_path=dist_path,
             pipeline_conf=pipeline_in_dist,
             compose_override=override_in_dist,
@@ -141,16 +142,16 @@ def test_disable_enable_config(dream_root_dir: Path):
     config_type = "pipeline_conf"
 
     dream_dist = DreamDist.from_name(name="dream", dream_root=dream_root_dir)
-    post_annotators = dream_dist.pipeline_conf.config.services.post_annotators
+    post_annotators = dream_dist.pipeline_conf.config.services.response_annotators
 
     dream_dist.disable_service(config_type=config_type, service_type=service_type, service_name=service_name)
     assert (
-        dream_dist.temp_configs[config_type].config.services.post_annotators.get(service_name) is None
+        dream_dist.temp_configs[config_type].config.services.response_annotators.get(service_name) is None
     ), "Service wasn't disabled properly in temp_config storage. See DreamDist.disable_service"
 
     dream_dist.apply_temp_config(config_type=config_type)
     assert (
-        dream_dist.pipeline_conf.config.services.post_annotators.get(service_name) is None
+        dream_dist.pipeline_conf.config.services.response_annotators.get(service_name) is None
     ), "Service wasn't disabled properly after applying changes"
     dream_dist.enable_service(
         config_type=config_type,
@@ -159,11 +160,11 @@ def test_disable_enable_config(dream_root_dir: Path):
         service_type=service_type,
     )
     assert (
-        dream_dist.temp_configs[config_type].config.services.post_annotators[service_name]
+        dream_dist.temp_configs[config_type].config.services.response_annotators[service_name]
         == post_annotators[service_name]
     ), "Service wasn't enabled properly in temp_config storage. See DreamDist.enable_service"
 
     dream_dist.apply_temp_config(config_type=config_type)
     assert (
-        dream_dist.pipeline_conf.config.services.post_annotators[service_name] == post_annotators[service_name]
+        dream_dist.pipeline_conf.config.services.response_annotators[service_name] == post_annotators[service_name]
     ), "Service wasn't enabled properly after applying changes"

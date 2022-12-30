@@ -1,12 +1,13 @@
-import datetime
 import json
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from shutil import copytree
 
 from typing import Union, Any, Optional, Tuple, Dict, List, Literal, Generator
 from copy import deepcopy
 
+from pydantic import parse_obj_as
 import yaml
 
 from deeppavlov_dreamtools.distconfigs.generics import (
@@ -70,7 +71,7 @@ class BaseDreamConfig:
 
         """
         data = cls.load(path)
-        config = cls.GENERIC_MODEL.parse_obj(data)
+        config = parse_obj_as(cls.GENERIC_MODEL, data)
         return cls(config)
 
     def to_path(self, path: Union[str, Path], overwrite: bool = False):
@@ -260,6 +261,9 @@ class YmlDreamConfig(BaseDreamConfig):
             value = self.__class__(config)
         return value
 
+    def discover_port(self, service: Union[ComposeContainer, str]):
+        raise NotImplementedError("Override this function")
+
 
 class DreamPipeline(JsonDreamConfig):
     """
@@ -365,7 +369,7 @@ class DreamPipeline(JsonDreamConfig):
 
         filtered["last_chance_service"] = self.config.services.last_chance_service
         filtered["timeout_service"] = self.config.services.timeout_service
-        filtered["bot_annotator_selector"] = self.config.services.bot_annotator_selector
+        filtered["response_annotator_selectors"] = self.config.services.response_annotator_selectors
         filtered["skill_selectors"] = self.config.services.skill_selectors
         services = PipelineConfServiceList(**filtered)
 
@@ -464,6 +468,17 @@ class DreamPipeline(JsonDreamConfig):
         return port
 
 
+class DreamGlobalComponents(JsonDreamConfig):
+    """
+    Main class which wraps a ``components.json`` config model.
+
+    Implements or overrides methods specific to the pipeline config.
+    """
+
+    DEFAULT_FILE_NAME = "components.json"
+    GENERIC_MODEL = List[Component]
+
+
 class DreamComposeOverride(YmlDreamConfig):
     """
     Main class which wraps a ``docker-compose.override.yml`` config model.
@@ -498,14 +513,17 @@ class DreamComposeOverride(YmlDreamConfig):
         """
         Fetches port from `ARGS.SERVICE_PORT` section of docker-compose.override.yml file
         """
-        if service.build.args is None:
-            return None
-        port = service.build.args.get("SERVICE_PORT")
+        try:
+            port = service.build.args.get("SERVICE_PORT")
+            if not port:
+                port = service.build.args.get("PORT")
+        except AttributeError:
+            port = None
+        else:
+            if port:
+                port = int(port)
 
-        if not port:
-            port = service.build.args.get("PORT")
-
-        return int(port)
+        return port
 
     def _discover_command_port(self, service: Union[ComposeContainer, str]) -> Union[None, int]:
         """
@@ -648,6 +666,7 @@ class DreamDist:
         compose_dev: DreamComposeDev = None,
         compose_proxy: DreamComposeProxy = None,
         compose_local: DreamComposeLocal = None,
+        global_components: DreamGlobalComponents = None,
     ):
         """
         Instantiates a new DreamDist object
@@ -670,6 +689,7 @@ class DreamDist:
         self.compose_dev = compose_dev
         self.compose_proxy = compose_proxy
         self.compose_local = compose_local
+        self.global_components = global_components
         self.temp_configs: Dict[str, AnyConfigClass] = {}  # {DreamConfig.DEFAULT_FILE_NAME: DreamConfig}
 
     @property
@@ -715,6 +735,7 @@ class DreamDist:
 
     @staticmethod
     def load_configs_with_default_filenames(
+        dream_root,
         dist_path: Union[str, Path],
         pipeline_conf: bool,
         compose_override: bool,
@@ -728,6 +749,7 @@ class DreamDist:
         Automatically discovers and loads all existing configs if all flags are set to False.
 
         Args:
+            dream_root: path to Dream root directory
             dist_path: path to Dream distribution
             pipeline_conf: if True, loads pipeline_conf.json
             compose_override: if True, loads docker-compose.override.yml
@@ -751,6 +773,9 @@ class DreamDist:
             compose_local = DreamComposeLocal.DEFAULT_FILE_NAME in filenames_in_dist
 
         kwargs["pipeline_conf"] = DreamPipeline.from_dist(dist_path)
+        kwargs["global_components"] = DreamGlobalComponents.from_path(
+            dream_root / DreamGlobalComponents.DEFAULT_FILE_NAME
+        )
         if compose_override:
             kwargs["compose_override"] = DreamComposeOverride.from_dist(dist_path)
         if compose_dev:
@@ -857,12 +882,7 @@ class DreamDist:
         dist_path, name, dream_root = DreamDist.resolve_all_paths(name=name, dream_root=dream_root)
 
         cls_kwargs = cls.load_configs_with_default_filenames(
-            dist_path,
-            pipeline_conf,
-            compose_override,
-            compose_dev,
-            compose_proxy,
-            compose_local,
+            dream_root, dist_path, pipeline_conf, compose_override, compose_dev, compose_proxy, compose_local
         )
 
         return cls(dist_path, name, dream_root, **cls_kwargs)
@@ -895,12 +915,7 @@ class DreamDist:
         dist_path, name, dream_root = DreamDist.resolve_all_paths(dist_path=dist_path)
 
         cls_kwargs = cls.load_configs_with_default_filenames(
-            dist_path,
-            pipeline_conf,
-            compose_override,
-            compose_dev,
-            compose_proxy,
-            compose_local,
+            dream_root, dist_path, pipeline_conf, compose_override, compose_dev, compose_proxy, compose_local
         )
 
         return cls(dist_path, name, dream_root, **cls_kwargs)
@@ -1001,38 +1016,59 @@ class DreamDist:
             if config:
                 yield name, config
 
-    def iter_components(self, component_group: Literal["annotators", "skills"]):
-        for group, name, service in self.pipeline_conf.iter_services():
-            if group != component_group:
+    def _extract_component_from_service(self, group: str, name: str, service: PipelineConfService):
+        compose_kwargs = {}
+
+        container_name = self.pipeline_conf.resolve_container_name(service.connector)
+        port = self.pipeline_conf.discover_port(service)
+
+        if container_name:
+            for config_name, config in self.iter_container_configs():
+                compose_service = config.get_service(container_name)
+                try:
+                    # verify ports are correct inside yml configs
+                    # keep the exception until local yml is deprecated
+                    if compose_service:
+                        config.discover_port(compose_service)
+                except NotImplementedError:
+                    pass
+                compose_kwargs[config_name] = compose_service
+
+        # TODO fix placeholder values
+        return Component(
+            name=name,
+            group=group,
+            assistant_dist=self.name,
+            port=port,
+            pipeline_conf=service,
+            metadata=ComponentMetadata(
+                type="retrieval",
+                display_name=" ".join(word.capitalize() for word in name.split("_")),
+                author="DeepPavlov",
+                description=f"One of the {group} used by {self.name} distribution. Add it to your distribution and try it out",
+                version="0.1.0",
+                date_created=datetime.now(timezone.utc),
+                ram_usage="1.0 GB",
+                gpu_usage="1.0 GB",
+                disk_usage="1.0 GB",
+                execution_time=1.5,
+            ),
+            **compose_kwargs,
+        )
+
+    def get_component(self, name: str, group: Literal["annotators", "skills"]):
+        for service_group, service_name, service in self.pipeline_conf.iter_services():
+            if service_group == group and service_name == name:
+                return self._extract_component_from_service(service_group, service_name, service)
+
+        raise KeyError(f"Cannot find {name} in {group}")
+
+    def iter_components(self, group: Literal["annotators", "skills"]):
+        for service_group, service_name, service in self.pipeline_conf.iter_services():
+            if service_group != group:
                 continue
 
-            compose_kwargs = {}
-            container_name = self.pipeline_conf.resolve_container_name(service.connector)
-
-            if container_name:
-                for config_name, config in self.iter_container_configs():
-                    compose_kwargs[config_name] = config.get_service(container_name)
-
-            # TODO fix placeholder values
-            yield Component(
-                name=name,
-                group=group,
-                assistant_dist=self.name,
-                pipeline_conf=service,
-                metadata=ComponentMetadata(
-                    type="retrieval",
-                    display_name=" ".join(word.capitalize() for word in name.split("_")),
-                    author="DeepPavlov",
-                    description=f"One of the {group} used by {self.name} distribution. Add it to your distribution and try it out",
-                    version="0.1.0",
-                    date_created=datetime.datetime.now(),
-                    ram_usage="1.0 GB",
-                    gpu_usage="1.0 GB",
-                    disk_usage="1.0 GB",
-                    execution_time=1.5,
-                ),
-                **compose_kwargs,
-            )
+            yield self._extract_component_from_service(service_group, service_name, service)
 
     def save(self, overwrite: bool = False):
         """
@@ -1299,12 +1335,12 @@ def list_dists(dream_root: Union[Path, str]) -> List[DreamDist]:
     return dream_dists
 
 
-def list_components(dream_root: Union[Path, str], component_group: Literal["annotators", "skills"]) -> List[Component]:
+def list_components(dream_root: Union[Path, str], group: Literal["annotators", "skills"]) -> List[Component]:
     """Lists all components available in the group
 
     Args:
         dream_root: path to Dream module
-        component_group: component group
+        group: component group
 
     Returns:
         components: dictionary with names as keys and config_name: definition as values
@@ -1312,7 +1348,7 @@ def list_components(dream_root: Union[Path, str], component_group: Literal["anno
     components = []
 
     for dist in list_dists(dream_root):
-        for component in dist.iter_components(component_group):
+        for component in dist.iter_components(group):
             components.append(component)
 
     return components
