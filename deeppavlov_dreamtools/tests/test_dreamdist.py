@@ -137,12 +137,12 @@ def test_namesetter(dream_root_dir: Path):
 
 
 def test_disable_enable_config(dream_root_dir: Path):
-    service_type = "post_annotators"
+    service_type = "response_annotators"
     service_name = "sentseg"
     config_type = "pipeline_conf"
 
     dream_dist = DreamDist.from_name(name="dream", dream_root=dream_root_dir)
-    post_annotators = dream_dist.pipeline_conf.config.services.response_annotators
+    response_annotators = dream_dist.pipeline_conf.config.services.response_annotators
 
     dream_dist.disable_service(config_type=config_type, service_type=service_type, service_name=service_name)
     assert (
@@ -156,15 +156,15 @@ def test_disable_enable_config(dream_root_dir: Path):
     dream_dist.enable_service(
         config_type=config_type,
         service_name=service_name,
-        definition=post_annotators[service_name],
+        definition=response_annotators[service_name],
         service_type=service_type,
     )
     assert (
         dream_dist.temp_configs[config_type].config.services.response_annotators[service_name]
-        == post_annotators[service_name]
+        == response_annotators[service_name]
     ), "Service wasn't enabled properly in temp_config storage. See DreamDist.enable_service"
 
     dream_dist.apply_temp_config(config_type=config_type)
     assert (
-        dream_dist.pipeline_conf.config.services.response_annotators[service_name] == post_annotators[service_name]
+        dream_dist.pipeline_conf.config.services.response_annotators[service_name] == response_annotators[service_name]
     ), "Service wasn't enabled properly after applying changes"
