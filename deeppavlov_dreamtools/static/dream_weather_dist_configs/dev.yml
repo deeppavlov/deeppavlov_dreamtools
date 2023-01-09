@@ -28,12 +28,14 @@ services:
     volumes:
     - ./services/dialogpt:/src
     - ./common:/src/common
+    - ~/.deeppavlov/cache:/root/.cache
   entity-detection:
     ports:
     - 8103:8103
     volumes:
     - ./annotators/entity_detection:/src
     - ~/.deeppavlov:/root/.deeppavlov
+    - ~/.deeppavlov/cache:/root/.cache
   intent-catcher:
     ports:
     - 8014:8014
@@ -41,6 +43,7 @@ services:
     - ./annotators/IntentCatcherTransformers:/src
     - ./common:/src/common
     - ~/.deeppavlov:/root/.deeppavlov
+    - ~/.deeppavlov/cache:/root/.cache
   mongo:
     ports:
     - 27017:27017
@@ -65,5 +68,6 @@ services:
     ports:
     - 8074:8074
     volumes:
-    - ./annotators/spelling_preprocessing:/src
+    - ./annotators/spelling_preprocessing_dp:/src
+    - ~/.deeppavlov:/root/.deeppavlov
 version: '3.7'
