@@ -305,7 +305,8 @@ class Component(BaseModelNoExtra):
     name: str
     group: str
     assistant_dist: str
-    port: Optional[int]
+    port: int
+    is_editable: bool
     pipeline_conf: Optional[PipelineConfService]
     compose_override: Optional[ComposeContainer]
     compose_dev: Optional[ComposeDevContainer]
