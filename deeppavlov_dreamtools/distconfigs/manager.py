@@ -1,22 +1,21 @@
 import json
 import re
+from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 from shutil import copytree
-
 from typing import Union, Any, Optional, Tuple, Dict, List, Literal, Generator
-from copy import deepcopy
 
-from pydantic import parse_obj_as
 import yaml
+from pydantic import parse_obj_as
 
+from deeppavlov_dreamtools.distconfigs import const
 from deeppavlov_dreamtools.distconfigs.generics import (
     PipelineConf,
     ComposeOverride,
     ComposeDev,
     ComposeProxy,
     AnyConfig,
-    AnyConfigType,
     PipelineConfServiceList,
     PipelineConfService,
     PipelineConfConnector,
@@ -30,10 +29,7 @@ from deeppavlov_dreamtools.distconfigs.generics import (
     DeploymentDefinitionResources,
     DeploymentDefinitionResourcesArg,
     Component,
-    ComponentMetadata,
-    AnyComposeConfig,
 )
-from deeppavlov_dreamtools.distconfigs import const
 from deeppavlov_dreamtools.utils import parse_connector_url
 
 
@@ -186,7 +182,7 @@ class YmlDreamConfig(BaseDreamConfig):
     def dump(data: Any, path: Union[Path, str], overwrite: bool = False):
         mode = "w" if overwrite else "x"
         with open(path, mode, encoding="utf-8") as yml_f:
-            yaml.dump(data, yml_f)
+            yaml.dump(data, yml_f, sort_keys=False)
 
         return path
 
@@ -468,17 +464,6 @@ class DreamPipeline(JsonDreamConfig):
         return port
 
 
-class DreamGlobalComponents(JsonDreamConfig):
-    """
-    Main class which wraps a ``components.json`` config model.
-
-    Implements or overrides methods specific to the pipeline config.
-    """
-
-    DEFAULT_FILE_NAME = "components.json"
-    GENERIC_MODEL = List[Component]
-
-
 class DreamComposeOverride(YmlDreamConfig):
     """
     Main class which wraps a ``docker-compose.override.yml`` config model.
@@ -655,7 +640,7 @@ AnyConfigClass = Union[
 DreamConfigLiteral = Literal["pipeline_conf", "compose_override", "compose_dev", "compose_proxy"]
 
 
-class DreamDist:
+class AssistantDist:
     def __init__(
         self,
         dist_path: Union[str, Path],
@@ -666,7 +651,6 @@ class DreamDist:
         compose_dev: DreamComposeDev = None,
         compose_proxy: DreamComposeProxy = None,
         compose_local: DreamComposeLocal = None,
-        global_components: DreamGlobalComponents = None,
     ):
         """
         Instantiates a new DreamDist object
@@ -684,12 +668,12 @@ class DreamDist:
         self._dist_path = Path(dist_path)
         self._name = name
         self.dream_root = Path(dream_root)
+        self.pipeline = {}
         self.pipeline_conf = pipeline_conf
         self.compose_override = compose_override
         self.compose_dev = compose_dev
         self.compose_proxy = compose_proxy
         self.compose_local = compose_local
-        self.global_components = global_components
         self.temp_configs: Dict[str, AnyConfigClass] = {}  # {DreamConfig.DEFAULT_FILE_NAME: DreamConfig}
 
     @property
@@ -773,9 +757,6 @@ class DreamDist:
             compose_local = DreamComposeLocal.DEFAULT_FILE_NAME in filenames_in_dist
 
         kwargs["pipeline_conf"] = DreamPipeline.from_dist(dist_path)
-        kwargs["global_components"] = DreamGlobalComponents.from_path(
-            dream_root / DreamGlobalComponents.DEFAULT_FILE_NAME
-        )
         if compose_override:
             kwargs["compose_override"] = DreamComposeOverride.from_dist(dist_path)
         if compose_dev:
@@ -810,12 +791,13 @@ class DreamDist:
             NotADirectoryError: dist_path is not a valid Dream distribution directory
         """
         if dist_path:
-            name, dream_root = DreamDist.resolve_name_and_dream_root(dist_path)
+            name, dream_root = AssistantDist.resolve_name_and_dream_root(dist_path)
         elif name and dream_root:
-            dist_path = DreamDist.resolve_dist_path(name, dream_root)
+            dist_path = AssistantDist.resolve_dist_path(name, dream_root)
         else:
             raise ValueError("Provide either dist_path or name and dream_root")
 
+        dist_path = Path(dist_path)
         if not dist_path.exists() and dist_path.is_dir():
             raise NotADirectoryError(f"{dist_path} is not a Dream distribution")
 
@@ -879,7 +861,7 @@ class DreamDist:
         Returns:
             instance of DreamDist
         """
-        dist_path, name, dream_root = DreamDist.resolve_all_paths(name=name, dream_root=dream_root)
+        dist_path, name, dream_root = AssistantDist.resolve_all_paths(name=name, dream_root=dream_root)
 
         cls_kwargs = cls.load_configs_with_default_filenames(
             dream_root, dist_path, pipeline_conf, compose_override, compose_dev, compose_proxy, compose_local
@@ -912,7 +894,7 @@ class DreamDist:
         Returns:
             instance of DreamDist
         """
-        dist_path, name, dream_root = DreamDist.resolve_all_paths(dist_path=dist_path)
+        dist_path, name, dream_root = AssistantDist.resolve_all_paths(dist_path=dist_path)
 
         cls_kwargs = cls.load_configs_with_default_filenames(
             dream_root, dist_path, pipeline_conf, compose_override, compose_dev, compose_proxy, compose_local
@@ -974,7 +956,7 @@ class DreamDist:
         if compose_local:
             _, new_compose_local = self.compose_local.filter_services(all_names)
 
-        return DreamDist(
+        return AssistantDist(
             self.resolve_dist_path(name, dream_root),
             name,
             dream_root,
@@ -1306,7 +1288,7 @@ class DreamDist:
             raise ValueError("\n".join(mismatching_ports_info))
 
 
-def list_dists(dream_root: Union[Path, str]) -> List[DreamDist]:
+def list_dists(dream_root: Union[Path, str]) -> List[AssistantDist]:
     """
     Serializes configs from Dream assistant distributions to list of DreamDist objects
 
@@ -1327,7 +1309,7 @@ def list_dists(dream_root: Union[Path, str]) -> List[DreamDist]:
             continue
 
         try:
-            dream_dist = DreamDist.from_dist(distribution)
+            dream_dist = AssistantDist.from_dist(distribution)
             dream_dists.append(dream_dist)
         except FileNotFoundError:
             pass

@@ -3,7 +3,7 @@ from deeppavlov_dreamtools.distconfigs.manager import (
     DreamComposeDev,
     DreamComposeOverride,
     DreamComposeProxy,
-    DreamDist,
+    AssistantDist,
     DreamPipeline,
 )
 from deeppavlov_dreamtools.tests.fixtures import (
@@ -38,8 +38,8 @@ def test_dream_dist_classmethods(dream_assistant_dists_dir, dream_root_dir):
     dist_name = "dream"
     dist_path = dream_assistant_dists_dir / dist_name
 
-    dream_dist_from_dist = DreamDist.from_dist(dist_path, compose_local=False)
-    dream_dist_from_name = DreamDist.from_name(dist_name, dream_root_dir, compose_local=False)
+    dream_dist_from_dist = AssistantDist.from_dist(dist_path, compose_local=False)
+    dream_dist_from_name = AssistantDist.from_name(dist_name, dream_root_dir, compose_local=False)
 
     for config_from_dist, config_from_name in zip(
         dream_dist_from_dist.iter_loaded_configs(),

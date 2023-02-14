@@ -4,7 +4,7 @@ import filecmp
 from typing import List
 
 from deeppavlov_dreamtools.distconfigs.manager import (
-    DreamDist,
+    AssistantDist,
     DreamPipeline,
     DreamComposeOverride,
     DreamComposeDev,
@@ -38,7 +38,7 @@ def test_load_configs_with_default_filenames(list_of_dream_dist: list, dream_ass
         proxy_in_dist: bool = "proxy.yml" in filenames_in_dist
         local_in_dist: bool = "local.yml" in filenames_in_dist
 
-        configs = DreamDist.load_configs_with_default_filenames(
+        configs = AssistantDist.load_configs_with_default_filenames(
             dream_assistant_dists_dir.parent,
             dist_path=dist_path,
             pipeline_conf=pipeline_in_dist,
@@ -77,7 +77,7 @@ def test_load_configs_with_default_filenames(list_of_dream_dist: list, dream_ass
             KeyError(f"The config object doesn't have one or more config")
 
 
-def test_dreamdist_save(list_of_dream_dist: List[DreamDist], dream_assistant_dists_dir: Path):
+def test_dreamdist_save(list_of_dream_dist: List[AssistantDist], dream_assistant_dists_dir: Path):
     """
     Changes name and dist_path of dreamdist and then compare configs of new and base distributions
     """
@@ -112,7 +112,7 @@ def test_add_dff_skill(dream_root_dir: Path):
     Test based on `deepy_adv` distribution.
     Checks equality of base dff_template_skill directory with new directory.
     """
-    dream_dist_test_object = DreamDist.from_name(
+    dream_dist_test_object = AssistantDist.from_name(
         name="deepy_adv", dream_root=dream_root_dir, compose_dev=False, compose_local=False, compose_proxy=False
     )
     dream_dist_test_object.add_dff_skill(name="test", port="1337")
@@ -125,7 +125,7 @@ def test_add_dff_skill(dream_root_dir: Path):
 
 
 def test_namesetter(dream_root_dir: Path):
-    dream_dist_test_object = DreamDist.from_name(
+    dream_dist_test_object = AssistantDist.from_name(
         name="deepy_adv", dream_root=dream_root_dir, compose_dev=False, compose_local=False, compose_proxy=False
     )
     test_name = dream_dist_test_object.name + "_test_namesetter"
@@ -141,7 +141,7 @@ def test_disable_enable_config(dream_root_dir: Path):
     service_name = "sentseg"
     config_type = "pipeline_conf"
 
-    dream_dist = DreamDist.from_name(name="dream", dream_root=dream_root_dir)
+    dream_dist = AssistantDist.from_name(name="dream", dream_root=dream_root_dir)
     response_annotators = dream_dist.pipeline_conf.config.services.response_annotators
 
     dream_dist.disable_service(config_type=config_type, service_type=service_type, service_name=service_name)

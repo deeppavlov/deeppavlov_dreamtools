@@ -13,11 +13,33 @@ proxy.yml - all nginx tunnels
 from datetime import datetime
 from pathlib import Path
 import re
-from typing import Dict, Union, Optional, Any, List, Type
+from typing import Dict, Union, Optional, Any, List, Type, Literal
 
-from pydantic import BaseModel, Extra, validator
+from pydantic import BaseModel, Extra, validator, Field
 
 from deeppavlov_dreamtools.utils import parse_connector_url
+
+
+def check_memory_format(value: str) -> None:
+    """Checks if the string has the correct memory format
+
+    Args:
+        value: string containing memory usage
+
+    Raises:
+        Value error if value is not in the correct format
+    """
+    memory_unit = value[-1]
+    memory_value = value[:-1]
+
+    if memory_unit not in ["G", "M"]:
+        raise ValueError("'memory' value must contain units, e.g. '2.5G' or '256M'")
+    try:
+        float(memory_value)
+    except ValueError:
+        raise ValueError(
+            "'memory' value must contain a float-like value before the unit substring, e.g. '2.5G' or '256M'"
+        )
 
 
 def convert_datetime_to_str(dt: datetime) -> str:
@@ -46,6 +68,51 @@ class BaseModelNoExtra(BaseModel):
         }
 
 
+class ComponentEndpoint(BaseModelNoExtra):
+    group: str
+    port: int
+    endpoint: str
+
+
+COMPONENT_TYPES = Literal[
+    "Script-based with NNs",
+    "Script-based w/o NNs",
+    "Fallback",
+    "Generative",
+    "FAQ",
+    "Retrieval",
+]
+
+MODEL_TYPES = Literal[
+    "Dictionary/Pattern-based",
+    "NN-based",
+    "ML-based",
+    "External API",
+]
+
+
+class Component(BaseModelNoExtra):
+    name: str
+    display_name: str
+    container_name: str
+    component_type: Optional[COMPONENT_TYPES]
+    model_type: MODEL_TYPES
+    is_customizable: bool
+    author: str
+    description: str
+    ram_usage: str
+    gpu_usage: Optional[str]
+    execution_time: float
+    endpoints: List[ComponentEndpoint]
+    build_args: Optional[dict]
+    date_created: datetime = Field(default_factory=datetime.utcnow)
+
+    @validator("ram_usage", "gpu_usage")
+    def check_memory_format(cls, v):
+        check_memory_format(v)
+        return v
+
+
 class PipelineConfConnector(BaseModelNoExtra):
     protocol: str
     timeout: Optional[float]
@@ -56,8 +123,14 @@ class PipelineConfConnector(BaseModelNoExtra):
     annotator_names: Optional[list]
 
 
-class PipelineConfService(BaseModelNoExtra):
-    is_enabled: Optional[bool] = True
+class PipelineConfComponentSource(BaseModelNoExtra):
+    directory: Path
+    container: str
+    endpoint: Optional[str]
+
+
+class PipelineConfServiceComponent(BaseModelNoExtra):
+    group: Optional[str]
     connector: Union[str, PipelineConfConnector]
     dialog_formatter: Optional[str]
     response_formatter: Optional[str]
@@ -88,6 +161,25 @@ class PipelineConfService(BaseModelNoExtra):
             host, port, endpoint = parse_connector_url(url)
 
         return port
+
+    @property
+    def container_endpoint(self):
+        try:
+            url = self.connector.url
+        except AttributeError:
+            endpoint = None
+        else:
+            host, port, endpoint = parse_connector_url(url)
+
+        return endpoint
+
+
+class PipelineConfService(PipelineConfServiceComponent):
+    is_enabled: bool
+    source: Optional[PipelineConfComponentSource] = {
+        "directory": "",
+        "container": "",
+    }
 
 
 class PipelineConfServiceList(BaseModelNoExtra):
@@ -154,17 +246,7 @@ class DeploymentDefinitionResourcesArg(BaseModelNoExtra):
 
     @validator("memory")
     def check_memory_format(cls, v):
-        memory_unit = v[-1]
-        memory_value = v[:-1]
-
-        if memory_unit not in ["G", "M"]:
-            raise ValueError("'memory' value must contain units, e.g. '2.5G' or '256M'")
-        try:
-            float(memory_value)
-        except ValueError:
-            raise ValueError(
-                "'memory' value must contain a float-like value before the unit substring, e.g. '2.5G' or '256M'"
-            )
+        check_memory_format(v)
         return v
 
 
@@ -180,6 +262,7 @@ class DeploymentDefinition(BaseModelNoExtra):
 
 
 class ComposeContainer(BaseModelNoExtra):
+    image: Optional[str]
     volumes: Optional[List[str]]
     env_file: Optional[list]
     build: Optional[ContainerBuildDefinition]
@@ -286,33 +369,6 @@ class ComposeLocal(BaseComposeConfigModel):
     """
 
     services: Dict[str, ComposeLocalContainer]
-
-
-class ComponentMetadata(BaseModelNoExtra):
-    type: str
-    display_name: str
-    author: str
-    description: str
-    version: str
-    date_created: datetime
-    ram_usage: str
-    gpu_usage: str
-    disk_usage: str
-    execution_time: float
-
-
-class Component(BaseModelNoExtra):
-    name: str
-    group: str
-    assistant_dist: str
-    port: int
-    is_editable: bool
-    pipeline_conf: Optional[PipelineConfService]
-    compose_override: Optional[ComposeContainer]
-    compose_dev: Optional[ComposeDevContainer]
-    compose_proxy: Optional[ComposeContainer]
-    compose_local: Optional[ComposeLocalContainer]
-    metadata: Optional[ComponentMetadata]
 
 
 AnyContainer = Union[ComposeContainer, ComposeDevContainer, ComposeLocalContainer]

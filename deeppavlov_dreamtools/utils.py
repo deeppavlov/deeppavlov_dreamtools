@@ -1,5 +1,9 @@
+import json
 import logging
-from typing import Optional, Tuple
+from pathlib import Path
+from typing import Tuple, Union, Any
+
+import yaml
 
 
 def create_logger(
@@ -43,6 +47,36 @@ def parse_connector_url(url: str) -> Tuple[str, str, str]:
         endpoint = url_parts[1]
 
     return host, port, endpoint
+
+
+def load_json(path: Union[Path, str]):
+    with open(path, "r", encoding="utf-8") as json_f:
+        data = json.load(json_f)
+
+    return data
+
+
+def dump_json(data: Any, path: Union[Path, str], overwrite: bool = False):
+    mode = "w" if overwrite else "x"
+    with open(path, mode, encoding="utf-8") as yml_f:
+        json.dump(data, yml_f, indent=4)
+
+    return path
+
+
+def load_yml(path: Union[Path, str]):
+    with open(path, "r", encoding="utf-8") as yml_f:
+        data = yaml.load(yml_f, yaml.FullLoader)
+
+    return data
+
+
+def dump_yml(data: Any, path: Union[Path, str], overwrite: bool = False):
+    mode = "w" if overwrite else "x"
+    with open(path, mode, encoding="utf-8") as yml_f:
+        yaml.dump(data, yml_f, sort_keys=False)
+
+    return path
 
 
 def iter_field_keys_values(search_dict: dict, field: str):
