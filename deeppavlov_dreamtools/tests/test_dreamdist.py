@@ -3,7 +3,7 @@ from pathlib import Path
 import filecmp
 from typing import List
 
-from deeppavlov_dreamtools.distconfigs.manager import (
+from deeppavlov_dreamtools.distconfigs.assistant_dists import (
     AssistantDist,
     DreamPipeline,
     DreamComposeOverride,

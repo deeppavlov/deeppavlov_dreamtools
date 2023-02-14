@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from deeppavlov_dreamtools.distconfigs.manager import AssistantDist, DreamPipeline
+from deeppavlov_dreamtools.distconfigs.assistant_dists import AssistantDist, DreamPipeline
 from deeppavlov_dreamtools.tests.fixtures import dream_root_dir
 
 

@@ -1,4 +1,4 @@
-from deeppavlov_dreamtools.distconfigs.manager import (
+from deeppavlov_dreamtools.distconfigs.assistant_dists import (
     AssistantDist,
     list_dists,
     list_components,

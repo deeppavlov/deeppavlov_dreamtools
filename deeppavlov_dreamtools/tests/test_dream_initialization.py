@@ -1,5 +1,5 @@
 import pytest
-from deeppavlov_dreamtools.distconfigs.manager import (
+from deeppavlov_dreamtools.distconfigs.assistant_dists import (
     DreamComposeDev,
     DreamComposeOverride,
     DreamComposeProxy,

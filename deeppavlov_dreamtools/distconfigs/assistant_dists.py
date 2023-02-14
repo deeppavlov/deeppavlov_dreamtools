@@ -1,6 +1,6 @@
 import json
 import re
-from copy import deepcopy
+from copy import deepcopy, copy
 from datetime import datetime, timezone
 from pathlib import Path
 from shutil import copytree
@@ -902,16 +902,10 @@ class AssistantDist:
 
         return cls(dist_path, name, dream_root, **cls_kwargs)
 
-    def create_dist(
+    def clone(
         self,
         name: str,
-        dream_root: Union[str, Path],
         service_names: Optional[list] = None,
-        pipeline_conf: bool = True,
-        compose_override: bool = True,
-        compose_dev: bool = True,
-        compose_proxy: bool = True,
-        compose_local: bool = True,
     ):
         """
         Creates Dream distribution inherited from another distribution.
@@ -930,36 +924,33 @@ class AssistantDist:
         Returns:
             instance of DreamDist
         """
-        new_compose_override = None
-        new_compose_dev = None
-        new_compose_proxy = None
-        new_compose_local = None
+        # all_names, new_pipeline_conf = self.pipeline_conf.filter_services(service_names)
+        # all_names += const.MANDATORY_SERVICES
 
-        all_names, new_pipeline_conf = self.pipeline_conf.filter_services(service_names)
-        all_names += const.MANDATORY_SERVICES
+        # _, new_compose_override = self.compose_override.filter_services(all_names)
 
-        if compose_override:
-            _, new_compose_override = self.compose_override.filter_services(all_names)
+        new_pipeline_conf = deepcopy(self.pipeline_conf)
+        new_compose_override = deepcopy(self.compose_override)
+        new_agent_command = re.sub(
+            f"assistant_dists/{self.name}/pipeline_conf.json",
+            f"assistant_dists/{name}/pipeline_conf.json",
+            new_compose_override.config.services["agent"].command,
+        )
+        new_compose_override.config.services["agent"].command = new_agent_command
 
-            new_agent_command = re.sub(
-                f"assistant_dists/{self.name}/pipeline_conf.json",
-                f"assistant_dists/{name}/pipeline_conf.json",
-                new_compose_override.config.services["agent"].command,
-            )
-            new_compose_override.config.services["agent"].command = new_agent_command
-
-            new_compose_override.config.services["agent"].environment["WAIT_HOSTS"] = ""
-        if compose_dev:
-            _, new_compose_dev = self.compose_dev.filter_services(all_names)
-        if compose_proxy:
-            _, new_compose_proxy = self.compose_proxy.filter_services(all_names)
-        if compose_local:
-            _, new_compose_local = self.compose_local.filter_services(all_names)
+        # new_compose_override.config.services["agent"].environment["WAIT_HOSTS"] = ""
+        new_compose_dev = new_compose_proxy = new_compose_local = None
+        if self.compose_dev:
+            new_compose_dev = deepcopy(self.compose_dev)
+        if self.compose_proxy:
+            new_compose_proxy = deepcopy(self.compose_proxy)
+        if self.compose_local:
+            new_compose_local = deepcopy(self.compose_local)
 
         return AssistantDist(
-            self.resolve_dist_path(name, dream_root),
+            self.resolve_dist_path(name, self.dream_root),
             name,
-            dream_root,
+            self.dream_root,
             new_pipeline_conf,
             new_compose_override,
             new_compose_dev,
@@ -1017,26 +1008,26 @@ class AssistantDist:
                 compose_kwargs[config_name] = compose_service
 
         # TODO fix placeholder values
-        return Component(
-            name=name,
-            group=group,
-            assistant_dist=self.name,
-            port=port,
-            pipeline_conf=service,
-            metadata=ComponentMetadata(
-                type="retrieval",
-                display_name=" ".join(word.capitalize() for word in name.split("_")),
-                author="DeepPavlov",
-                description=f"One of the {group} used by {self.name} distribution. Add it to your distribution and try it out",
-                version="0.1.0",
-                date_created=datetime.now(timezone.utc),
-                ram_usage="1.0 GB",
-                gpu_usage="1.0 GB",
-                disk_usage="1.0 GB",
-                execution_time=1.5,
-            ),
-            **compose_kwargs,
-        )
+        # return Component(
+        #     name=name,
+        #     group=group,
+        #     assistant_dist=self.name,
+        #     port=port,
+        #     pipeline_conf=service,
+        #     metadata=ComponentMetadata(
+        #         type="retrieval",
+        #         display_name=" ".join(word.capitalize() for word in name.split("_")),
+        #         author="DeepPavlov",
+        #         description=f"One of the {group} used by {self.name} distribution. Add it to your distribution and try it out",
+        #         version="0.1.0",
+        #         date_created=datetime.now(timezone.utc),
+        #         ram_usage="1.0 GB",
+        #         gpu_usage="1.0 GB",
+        #         disk_usage="1.0 GB",
+        #         execution_time=1.5,
+        #     ),
+        #     **compose_kwargs,
+        # )
 
     def get_component(self, name: str, group: Literal["annotators", "skills"]):
         for service_group, service_name, service in self.pipeline_conf.iter_services():
