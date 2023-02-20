@@ -1,7 +1,7 @@
 import json
 import re
-from copy import deepcopy, copy
-from datetime import datetime, timezone
+import shutil
+from copy import deepcopy
 from pathlib import Path
 from shutil import copytree
 from typing import Union, Any, Optional, Tuple, Dict, List, Literal, Generator
@@ -314,6 +314,22 @@ class DreamPipeline(JsonDreamConfig):
                 required_service = service_group[required_name]
                 yield required_group, required_name, required_service
                 yield from self._recursively_parse_requirements(required_service)
+
+    @property
+    def display_name(self):
+        return self.config.metadata.display_name
+
+    @display_name.setter
+    def display_name(self, new_display_name):
+        self.config.metadata.display_name = new_display_name
+
+    @property
+    def description(self):
+        return self.config.metadata.description
+
+    @description.setter
+    def description(self, new_description):
+        self.config.metadata.description = new_description
 
     def resolve_container_name(self, connector: Union[str, PipelineConfConnector]):
         """Resolves container name for the provided connector by recursively parsing it
@@ -905,6 +921,7 @@ class AssistantDist:
     def clone(
         self,
         name: str,
+        description: str = "",
         service_names: Optional[list] = None,
     ):
         """
@@ -914,13 +931,8 @@ class AssistantDist:
 
         Args:
             name: name of new Dream distribution
-            dream_root: path to Dream root directory
+            description: name of new Dream distribution
             service_names: list of services to be included in new distribution
-            pipeline_conf: load `pipeline_conf.json` inside ``path``
-            compose_override: load `docker-compose.override.yml` inside ``path``
-            compose_dev: load `dev.yml` inside ``path``
-            compose_proxy: load `proxy.yml` inside ``path``
-            compose_local: load `local.yml` inside ``path``
         Returns:
             instance of DreamDist
         """
@@ -930,6 +942,9 @@ class AssistantDist:
         # _, new_compose_override = self.compose_override.filter_services(all_names)
 
         new_pipeline_conf = deepcopy(self.pipeline_conf)
+        new_pipeline_conf.display_name = name
+        new_pipeline_conf.description = description
+
         new_compose_override = deepcopy(self.compose_override)
         new_agent_command = re.sub(
             f"assistant_dists/{self.name}/pipeline_conf.json",
@@ -1277,6 +1292,9 @@ class AssistantDist:
                         mismatching_ports_info.append(f"{service_name}: {str(e)}")
         if mismatching_ports_info:
             raise ValueError("\n".join(mismatching_ports_info))
+
+    def delete(self):
+        shutil.rmtree(self.dist_path, ignore_errors=True)
 
 
 def list_dists(dream_root: Union[Path, str]) -> List[AssistantDist]:
