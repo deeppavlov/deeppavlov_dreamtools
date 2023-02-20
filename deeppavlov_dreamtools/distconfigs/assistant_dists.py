@@ -921,6 +921,7 @@ class AssistantDist:
     def clone(
         self,
         name: str,
+        display_name: str,
         description: str = "",
         service_names: Optional[list] = None,
     ):
@@ -931,6 +932,7 @@ class AssistantDist:
 
         Args:
             name: name of new Dream distribution
+            display_name: human-readable name of new Dream distribution
             description: name of new Dream distribution
             service_names: list of services to be included in new distribution
         Returns:
@@ -942,7 +944,7 @@ class AssistantDist:
         # _, new_compose_override = self.compose_override.filter_services(all_names)
 
         new_pipeline_conf = deepcopy(self.pipeline_conf)
-        new_pipeline_conf.display_name = name
+        new_pipeline_conf.display_name = display_name
         new_pipeline_conf.description = description
 
         new_compose_override = deepcopy(self.compose_override)
