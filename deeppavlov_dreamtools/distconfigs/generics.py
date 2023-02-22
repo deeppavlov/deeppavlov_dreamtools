@@ -222,7 +222,7 @@ class PipelineConfMetadata(BaseModelNoExtra):
     disk_usage: str
 
 
-class PipelineConf(BaseModelNoExtra):
+class PipelineConfModel(BaseModelNoExtra):
     """
     Implements pipeline.json config structure
     """
@@ -373,5 +373,5 @@ class ComposeLocal(BaseComposeConfigModel):
 
 AnyContainer = Union[ComposeContainer, ComposeDevContainer, ComposeLocalContainer]
 AnyComposeConfig = Union[ComposeOverride, ComposeDev, ComposeProxy, ComposeLocal]
-AnyConfig = Union[PipelineConf, ComposeOverride, ComposeDev, ComposeProxy, ComposeLocal]
-AnyConfigType = Type[Union[PipelineConf, ComposeOverride, ComposeDev, ComposeProxy, ComposeLocal]]
+AnyConfig = Union[PipelineConfModel, ComposeOverride, ComposeDev, ComposeProxy, ComposeLocal]
+AnyConfigType = Type[Union[PipelineConfModel, ComposeOverride, ComposeDev, ComposeProxy, ComposeLocal]]

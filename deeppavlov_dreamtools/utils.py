@@ -5,6 +5,8 @@ from typing import Tuple, Union, Any
 
 import yaml
 
+from deeppavlov_dreamtools.distconfigs import const
+
 
 def create_logger(
     name: str,
@@ -77,6 +79,71 @@ def dump_yml(data: Any, path: Union[Path, str], overwrite: bool = False):
         yaml.dump(data, yml_f, sort_keys=False)
 
     return path
+
+
+def resolve_all_paths(
+    dist_path: Union[str, Path] = None,
+    name: str = None,
+    dream_root: Union[str, Path] = None,
+):
+    """
+    Resolves path to Dream distribution, its name, and Dream root path
+    from either ``dist_path`` or ``name`` and ``dream_root``.
+
+    Args:
+        dist_path: path to Dream distribution
+        name: name of Dream distribution
+        dream_root: path to Dream root directory
+
+    Returns:
+        tuple of (distribution path, distribution name, dream root path)
+
+    Raises:
+        ValueError: not enough arguments to resolve
+        NotADirectoryError: dist_path is not a valid Dream distribution directory
+    """
+    if dist_path:
+        name, dream_root = resolve_name_and_dream_root(dist_path)
+    elif name and dream_root:
+        dist_path = resolve_dist_path(name, dream_root)
+    else:
+        raise ValueError("Provide either dist_path or name and dream_root")
+
+    dist_path = Path(dist_path)
+    if not dist_path.exists() and dist_path.is_dir():
+        raise NotADirectoryError(f"{dist_path} is not a Dream distribution")
+
+    return dist_path, name, dream_root
+
+
+def resolve_dist_path(name: str, dream_root: Union[str, Path]):
+    """
+    Resolves path to Dream distribution from name and Dream root path.
+
+    Args:
+        name: name of Dream distribution
+        dream_root: path to Dream root directory
+
+    Returns:
+        path to Dream distribution
+
+    """
+    return Path(dream_root) / const.ASSISTANT_DISTS_DIR_NAME / name
+
+
+def resolve_name_and_dream_root(path: Union[str, Path]):
+    """
+    Resolves name and Dream root directory path from Dream distribution path.
+
+    Args:
+        path: path to Dream distribution
+
+    Returns:
+        tuple of (name of Dream distribution, path to Dream root directory)
+
+    """
+    path = Path(path)
+    return path.name, path.parents[1]
 
 
 def iter_field_keys_values(search_dict: dict, field: str):

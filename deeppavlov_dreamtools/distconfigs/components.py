@@ -12,12 +12,14 @@ from deeppavlov_dreamtools.utils import parse_connector_url
 class DreamComponent:
     def __init__(
         self,
+        component_dir: Union[Path, str],
         config: Component,
         pipeline: PipelineConfServiceComponent,
         container_name: str,
         group: str,
         endpoint: Optional[str] = None,
     ):
+        self.component_dir = Path(component_dir)
         self.config = config
         self.pipeline = pipeline
         self.container_name = container_name
@@ -44,11 +46,14 @@ class DreamComponent:
         """
         path = Path(path)
 
-        config_path = path / COMPONENT_CARD_FILENAME
-        config = utils.load_yml(config_path)
+        try:
+            config_path = path / COMPONENT_CARD_FILENAME
+            config = utils.load_yml(config_path)
 
-        pipeline_path = path / COMPONENT_PIPELINE_FILENAME
-        pipeline = utils.load_yml(pipeline_path)
+            pipeline_path = path / COMPONENT_PIPELINE_FILENAME
+            pipeline = utils.load_yml(pipeline_path)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"{container_name} {group} {endpoint} does not exist in {path}")
 
         try:
             config = parse_obj_as(Component, config[container_name])
@@ -76,4 +81,4 @@ class DreamComponent:
         except KeyError:
             raise KeyError(f"{container_name} container does not exist in {pipeline_path}")
 
-        return cls(config, pipeline, container_name, group, endpoint)
+        return cls(path, config, pipeline, container_name, group, endpoint)
