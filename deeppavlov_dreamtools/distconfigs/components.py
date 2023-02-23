@@ -45,12 +45,11 @@ class DreamComponent:
             DreamComponent config instance
         """
         path = Path(path)
+        config_path = path / COMPONENT_CARD_FILENAME
+        pipeline_path = path / COMPONENT_PIPELINE_FILENAME
 
         try:
-            config_path = path / COMPONENT_CARD_FILENAME
             config = utils.load_yml(config_path)
-
-            pipeline_path = path / COMPONENT_PIPELINE_FILENAME
             pipeline = utils.load_yml(pipeline_path)
         except FileNotFoundError:
             raise FileNotFoundError(f"{container_name} {group} {endpoint} does not exist in {path}")
@@ -76,7 +75,8 @@ class DreamComponent:
                     else:
                         pipeline_dict = pl
 
-                pipeline = parse_obj_as(PipelineConfServiceComponent, pipeline_dict)
+                if pipeline_dict:
+                    pipeline = parse_obj_as(PipelineConfServiceComponent, pipeline_dict)
 
         except KeyError:
             raise KeyError(f"{container_name} container does not exist in {pipeline_path}")
