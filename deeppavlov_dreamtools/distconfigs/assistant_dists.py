@@ -777,6 +777,7 @@ class AssistantDist:
             compose_proxy = DreamComposeProxy.DEFAULT_FILE_NAME in filenames_in_dist
             compose_local = DreamComposeLocal.DEFAULT_FILE_NAME in filenames_in_dist
 
+        kwargs["pipeline"] = Pipeline.from_dist(dist_path)
         kwargs["pipeline_conf"] = DreamPipeline.from_dist(dist_path)
         if compose_override:
             kwargs["compose_override"] = DreamComposeOverride.from_dist(dist_path)
