@@ -96,7 +96,7 @@ class Component(BaseModelNoExtra):
     display_name: str
     container_name: str
     component_type: Optional[COMPONENT_TYPES]
-    model_type: MODEL_TYPES
+    model_type: Optional[MODEL_TYPES]
     is_customizable: bool
     author: str
     description: str
@@ -175,11 +175,11 @@ class PipelineConfServiceComponent(BaseModelNoExtra):
 
 
 class PipelineConfService(PipelineConfServiceComponent):
-    is_enabled: bool
-    source: Optional[PipelineConfComponentSource] = {
-        "directory": "",
-        "container": "",
-    }
+    is_enabled: Optional[bool] = True
+    source: Optional[PipelineConfComponentSource] = PipelineConfComponentSource(
+        directory=Path(),
+        container="",
+    )
 
 
 class PipelineConfServiceList(BaseModelNoExtra):
