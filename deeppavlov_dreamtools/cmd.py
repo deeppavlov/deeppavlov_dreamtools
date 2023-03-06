@@ -3,7 +3,7 @@ from pathlib import Path
 
 import click
 
-from deeppavlov_dreamtools import commands
+from deeppavlov_dreamtools import commands, AssistantDist
 
 
 class ContextObject:
@@ -140,86 +140,30 @@ def new_dff(
 
 @new.command("dist")
 @click.argument("name")
-@click.option("-d", "--dist", help="Dream distribution name")
-@click.option(
-    "-s",
-    "--services",
-    multiple=True,
-    default=[],
-    help="Dream distribution name",
-)
+@click.option("--display-name", help="Human-readable distribution name")
+@click.option("--description", help="Distribution description")
 @click.option(
     "--overwrite/--no-overwrite",
     default=False,
     help="Overwrite distribution directory if it exists",
 )
-@click.option(
-    "--all",
-    "all_configs",
-    is_flag=True,
-    default=False,
-    help="Create all configs (defaults to False). Overrides --pipeline and all other --compose-* flags",
-)
-@click.option(
-    "--pipeline/--no-pipeline",
-    default=True,
-    help="Create pipeline_conf.json config (defaults to True)",
-)
-@click.option(
-    "--compose-override/--no-compose-override",
-    default=False,
-    help="Create docker-compose.override.yml config (defaults to False)",
-)
-@click.option(
-    "--compose-dev/--no-compose-dev",
-    default=False,
-    help="Create dev.yml config (defaults to False)",
-)
-@click.option(
-    "--compose-proxy/--no-compose-proxy",
-    default=False,
-    help="Create proxy.yml config (defaults to False)",
-)
-@click.option(
-    "--compose-local/--no-compose-local",
-    default=False,
-    help="Create local.yml config (defaults to False)",
-)
 @click.pass_context
 @must_be_inside_dream
 def new_dist(
     ctx: click.Context,
-    name,
-    dist,
-    services,
-    overwrite,
-    all_configs,
-    pipeline,
-    compose_override,
-    compose_dev,
-    compose_proxy,
-    compose_local,
+    name: str,
+    display_name: str,
+    description: str,
+    overwrite: bool
 ):
     """Creates new distribution in ./assistant_dists"""
-    if all_configs:
-        pipeline = compose_override = compose_dev = compose_proxy = compose_local = True
 
     try:
-        new_config_paths = commands.new.dist(
-            name,
-            ctx.obj.dream_root,
-            dist,
-            services,
-            overwrite,
-            pipeline,
-            compose_override,
-            compose_dev,
-            compose_proxy,
-            compose_local,
-        )
+        dist = AssistantDist.from_name("dream_persona_prompted", ctx.obj.dream_root)
+        cloned_dist = dist.clone(name, display_name, description)
+        cloned_dist.save(overwrite)
 
-        new_config_paths = ", ".join(str(p) for p in new_config_paths)
-        click.echo(f"Created new Dream distribution {name} from {dist} with configs: {new_config_paths}")
+        click.echo(f"Created new Dream distribution {cloned_dist.name}")
     except FileExistsError:
         raise click.ClickException(
             f"{name} distribution already exists! "
@@ -263,6 +207,47 @@ def new_local(
         single_replica=single_replica,
     )
     click.echo(f"Created new local.yml under {path}")
+
+
+@cli.group()
+@click.pass_context
+def clone(ctx: click.Context):
+    """Clone distribution or skill"""
+
+
+@clone.command("dist")
+@click.argument("name")
+@click.option("--template", help="Name of the original distribution")
+@click.option("--display-name", help="Human-readable distribution name")
+@click.option("--description", help="Distribution description")
+@click.option(
+    "--overwrite/--no-overwrite",
+    default=False,
+    help="Overwrite distribution directory if it exists",
+)
+@click.pass_context
+@must_be_inside_dream
+def clone_dist(
+    ctx: click.Context,
+    name: str,
+    template: str,
+    display_name: str,
+    description: str,
+    overwrite: bool
+):
+    """Clones distribution from a template in ./assistant_dists"""
+
+    try:
+        dist = AssistantDist.from_name(template, ctx.obj.dream_root)
+        cloned_dist = dist.clone(name, display_name, description)
+        cloned_dist.save(overwrite)
+
+        click.echo(f"Created new Dream distribution {cloned_dist.name}")
+    except FileExistsError:
+        raise click.ClickException(
+            f"{name} distribution already exists! "
+            "Run 'dreamtools new dist' with --overwrite flag to avoid this error message"
+        )
 
 
 @cli.group()
