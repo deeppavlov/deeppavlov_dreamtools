@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from deeppavlov_dreamtools import DreamDist
+from deeppavlov_dreamtools import AssistantDist
 from deeppavlov_dreamtools.distconfigs import list_dists
 from deeppavlov_dreamtools.tests.fixtures import (
     create_weather_dist,
@@ -38,7 +38,7 @@ def create_weather_dist(dream_root_dir):
     compose_local = False
     overwrite = True
 
-    dream_dist = DreamDist.from_name(
+    dream_dist = AssistantDist.from_name(
         template_name,
         dream_root_dir,
         pipeline_conf,
