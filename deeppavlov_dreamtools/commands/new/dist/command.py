@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Union
 
-from deeppavlov_dreamtools import DreamDist
+from deeppavlov_dreamtools import AssistantDist
 
 
 def dist(
@@ -34,7 +34,7 @@ def dist(
     Returns:
 
     """
-    dream_dist = DreamDist.from_name(
+    dream_dist = AssistantDist.from_name(
         template_name,
         dream_root,
         mk_pipeline_conf,

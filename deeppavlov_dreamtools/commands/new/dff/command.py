@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Union
 
-from deeppavlov_dreamtools import DreamDist
+from deeppavlov_dreamtools import AssistantDist
 
 
 def dff(
@@ -31,7 +31,7 @@ def dff(
         path to created DFF skill.
 
     """
-    dist = DreamDist.from_name(
+    dist = AssistantDist.from_name(
         dream_dist,
         dream_root,
         pipeline_conf=True,

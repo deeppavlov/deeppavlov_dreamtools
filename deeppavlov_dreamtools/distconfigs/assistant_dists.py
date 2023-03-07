@@ -1,22 +1,23 @@
 import json
 import re
-from datetime import datetime, timezone
+import shutil
+from copy import deepcopy
 from pathlib import Path
 from shutil import copytree
-
 from typing import Union, Any, Optional, Tuple, Dict, List, Literal, Generator
-from copy import deepcopy
 
-from pydantic import parse_obj_as
 import yaml
+from pydantic import parse_obj_as
 
+from deeppavlov_dreamtools import utils
+from deeppavlov_dreamtools.distconfigs import const
+from deeppavlov_dreamtools.distconfigs.components import DreamComponent
 from deeppavlov_dreamtools.distconfigs.generics import (
-    PipelineConf,
+    PipelineConfModel,
     ComposeOverride,
     ComposeDev,
     ComposeProxy,
     AnyConfig,
-    AnyConfigType,
     PipelineConfServiceList,
     PipelineConfService,
     PipelineConfConnector,
@@ -30,10 +31,9 @@ from deeppavlov_dreamtools.distconfigs.generics import (
     DeploymentDefinitionResources,
     DeploymentDefinitionResourcesArg,
     Component,
-    ComponentMetadata,
-    AnyComposeConfig,
+    PipelineConfMetadata,
 )
-from deeppavlov_dreamtools.distconfigs import const
+from deeppavlov_dreamtools.distconfigs.pipeline import Pipeline
 from deeppavlov_dreamtools.utils import parse_connector_url
 
 
@@ -186,7 +186,7 @@ class YmlDreamConfig(BaseDreamConfig):
     def dump(data: Any, path: Union[Path, str], overwrite: bool = False):
         mode = "w" if overwrite else "x"
         with open(path, mode, encoding="utf-8") as yml_f:
-            yaml.dump(data, yml_f)
+            yaml.dump(data, yml_f, sort_keys=False)
 
         return path
 
@@ -273,7 +273,7 @@ class DreamPipeline(JsonDreamConfig):
     """
 
     DEFAULT_FILE_NAME = "pipeline_conf.json"
-    GENERIC_MODEL = PipelineConf
+    GENERIC_MODEL = PipelineConfModel
 
     # @property
     # def container_names(self):
@@ -318,6 +318,22 @@ class DreamPipeline(JsonDreamConfig):
                 required_service = service_group[required_name]
                 yield required_group, required_name, required_service
                 yield from self._recursively_parse_requirements(required_service)
+
+    @property
+    def display_name(self):
+        return self.config.metadata.display_name
+
+    @display_name.setter
+    def display_name(self, new_display_name):
+        self.config.metadata.display_name = new_display_name
+
+    @property
+    def description(self):
+        return self.config.metadata.description
+
+    @description.setter
+    def description(self, new_description):
+        self.config.metadata.description = new_description
 
     def resolve_container_name(self, connector: Union[str, PipelineConfConnector]):
         """Resolves container name for the provided connector by recursively parsing it
@@ -466,17 +482,6 @@ class DreamPipeline(JsonDreamConfig):
             port = int(port)
 
         return port
-
-
-class DreamGlobalComponents(JsonDreamConfig):
-    """
-    Main class which wraps a ``components.json`` config model.
-
-    Implements or overrides methods specific to the pipeline config.
-    """
-
-    DEFAULT_FILE_NAME = "components.json"
-    GENERIC_MODEL = List[Component]
 
 
 class DreamComposeOverride(YmlDreamConfig):
@@ -655,18 +660,18 @@ AnyConfigClass = Union[
 DreamConfigLiteral = Literal["pipeline_conf", "compose_override", "compose_dev", "compose_proxy"]
 
 
-class DreamDist:
+class AssistantDist:
     def __init__(
         self,
         dist_path: Union[str, Path],
         name: str,
         dream_root: Union[str, Path],
+        pipeline: Pipeline,
         pipeline_conf: DreamPipeline = None,
         compose_override: DreamComposeOverride = None,
         compose_dev: DreamComposeDev = None,
         compose_proxy: DreamComposeProxy = None,
         compose_local: DreamComposeLocal = None,
-        global_components: DreamGlobalComponents = None,
     ):
         """
         Instantiates a new DreamDist object
@@ -684,12 +689,12 @@ class DreamDist:
         self._dist_path = Path(dist_path)
         self._name = name
         self.dream_root = Path(dream_root)
+        self.pipeline = pipeline
         self.pipeline_conf = pipeline_conf
         self.compose_override = compose_override
         self.compose_dev = compose_dev
         self.compose_proxy = compose_proxy
         self.compose_local = compose_local
-        self.global_components = global_components
         self.temp_configs: Dict[str, AnyConfigClass] = {}  # {DreamConfig.DEFAULT_FILE_NAME: DreamConfig}
 
     @property
@@ -772,10 +777,8 @@ class DreamDist:
             compose_proxy = DreamComposeProxy.DEFAULT_FILE_NAME in filenames_in_dist
             compose_local = DreamComposeLocal.DEFAULT_FILE_NAME in filenames_in_dist
 
+        kwargs["pipeline"] = Pipeline.from_dist(dist_path)
         kwargs["pipeline_conf"] = DreamPipeline.from_dist(dist_path)
-        kwargs["global_components"] = DreamGlobalComponents.from_path(
-            dream_root / DreamGlobalComponents.DEFAULT_FILE_NAME
-        )
         if compose_override:
             kwargs["compose_override"] = DreamComposeOverride.from_dist(dist_path)
         if compose_dev:
@@ -810,12 +813,13 @@ class DreamDist:
             NotADirectoryError: dist_path is not a valid Dream distribution directory
         """
         if dist_path:
-            name, dream_root = DreamDist.resolve_name_and_dream_root(dist_path)
+            name, dream_root = AssistantDist.resolve_name_and_dream_root(dist_path)
         elif name and dream_root:
-            dist_path = DreamDist.resolve_dist_path(name, dream_root)
+            dist_path = AssistantDist.resolve_dist_path(name, dream_root)
         else:
             raise ValueError("Provide either dist_path or name and dream_root")
 
+        dist_path = Path(dist_path)
         if not dist_path.exists() and dist_path.is_dir():
             raise NotADirectoryError(f"{dist_path} is not a Dream distribution")
 
@@ -879,7 +883,7 @@ class DreamDist:
         Returns:
             instance of DreamDist
         """
-        dist_path, name, dream_root = DreamDist.resolve_all_paths(name=name, dream_root=dream_root)
+        dist_path, name, dream_root = AssistantDist.resolve_all_paths(name=name, dream_root=dream_root)
 
         cls_kwargs = cls.load_configs_with_default_filenames(
             dream_root, dist_path, pipeline_conf, compose_override, compose_dev, compose_proxy, compose_local
@@ -912,7 +916,7 @@ class DreamDist:
         Returns:
             instance of DreamDist
         """
-        dist_path, name, dream_root = DreamDist.resolve_all_paths(dist_path=dist_path)
+        dist_path, name, dream_root = AssistantDist.resolve_all_paths(dist_path=dist_path)
 
         cls_kwargs = cls.load_configs_with_default_filenames(
             dream_root, dist_path, pipeline_conf, compose_override, compose_dev, compose_proxy, compose_local
@@ -920,16 +924,16 @@ class DreamDist:
 
         return cls(dist_path, name, dream_root, **cls_kwargs)
 
-    def create_dist(
+    @property
+    def components(self):
+        return self.pipeline.components
+
+    def clone(
         self,
         name: str,
-        dream_root: Union[str, Path],
+        display_name: str,
+        description: str = "",
         service_names: Optional[list] = None,
-        pipeline_conf: bool = True,
-        compose_override: bool = True,
-        compose_dev: bool = True,
-        compose_proxy: bool = True,
-        compose_local: bool = True,
     ):
         """
         Creates Dream distribution inherited from another distribution.
@@ -938,46 +942,45 @@ class DreamDist:
 
         Args:
             name: name of new Dream distribution
-            dream_root: path to Dream root directory
+            display_name: human-readable name of new Dream distribution
+            description: name of new Dream distribution
             service_names: list of services to be included in new distribution
-            pipeline_conf: load `pipeline_conf.json` inside ``path``
-            compose_override: load `docker-compose.override.yml` inside ``path``
-            compose_dev: load `dev.yml` inside ``path``
-            compose_proxy: load `proxy.yml` inside ``path``
-            compose_local: load `local.yml` inside ``path``
         Returns:
             instance of DreamDist
         """
-        new_compose_override = None
-        new_compose_dev = None
-        new_compose_proxy = None
-        new_compose_local = None
+        # all_names, new_pipeline_conf = self.pipeline_conf.filter_services(service_names)
+        # all_names += const.MANDATORY_SERVICES
 
-        all_names, new_pipeline_conf = self.pipeline_conf.filter_services(service_names)
-        all_names += const.MANDATORY_SERVICES
+        # _, new_compose_override = self.compose_override.filter_services(all_names)
 
-        if compose_override:
-            _, new_compose_override = self.compose_override.filter_services(all_names)
+        new_pipeline = deepcopy(self.pipeline)
 
-            new_agent_command = re.sub(
-                f"assistant_dists/{self.name}/pipeline_conf.json",
-                f"assistant_dists/{name}/pipeline_conf.json",
-                new_compose_override.config.services["agent"].command,
-            )
-            new_compose_override.config.services["agent"].command = new_agent_command
+        new_pipeline_conf = deepcopy(self.pipeline_conf)
+        new_pipeline_conf.display_name = display_name
+        new_pipeline_conf.description = description
 
-            new_compose_override.config.services["agent"].environment["WAIT_HOSTS"] = ""
-        if compose_dev:
-            _, new_compose_dev = self.compose_dev.filter_services(all_names)
-        if compose_proxy:
-            _, new_compose_proxy = self.compose_proxy.filter_services(all_names)
-        if compose_local:
-            _, new_compose_local = self.compose_local.filter_services(all_names)
+        new_compose_override = deepcopy(self.compose_override)
+        new_agent_command = re.sub(
+            f"assistant_dists/{self.name}/pipeline_conf.json",
+            f"assistant_dists/{name}/pipeline_conf.json",
+            new_compose_override.config.services["agent"].command,
+        )
+        new_compose_override.config.services["agent"].command = new_agent_command
 
-        return DreamDist(
-            self.resolve_dist_path(name, dream_root),
+        # new_compose_override.config.services["agent"].environment["WAIT_HOSTS"] = ""
+        new_compose_dev = new_compose_proxy = new_compose_local = None
+        if self.compose_dev:
+            new_compose_dev = deepcopy(self.compose_dev)
+        if self.compose_proxy:
+            new_compose_proxy = deepcopy(self.compose_proxy)
+        if self.compose_local:
+            new_compose_local = deepcopy(self.compose_local)
+
+        return AssistantDist(
+            self.resolve_dist_path(name, self.dream_root),
             name,
-            dream_root,
+            self.dream_root,
+            new_pipeline,
             new_pipeline_conf,
             new_compose_override,
             new_compose_dev,
@@ -1035,26 +1038,26 @@ class DreamDist:
                 compose_kwargs[config_name] = compose_service
 
         # TODO fix placeholder values
-        return Component(
-            name=name,
-            group=group,
-            assistant_dist=self.name,
-            port=port,
-            pipeline_conf=service,
-            metadata=ComponentMetadata(
-                type="retrieval",
-                display_name=" ".join(word.capitalize() for word in name.split("_")),
-                author="DeepPavlov",
-                description=f"One of the {group} used by {self.name} distribution. Add it to your distribution and try it out",
-                version="0.1.0",
-                date_created=datetime.now(timezone.utc),
-                ram_usage="1.0 GB",
-                gpu_usage="1.0 GB",
-                disk_usage="1.0 GB",
-                execution_time=1.5,
-            ),
-            **compose_kwargs,
-        )
+        # return Component(
+        #     name=name,
+        #     group=group,
+        #     assistant_dist=self.name,
+        #     port=port,
+        #     pipeline_conf=service,
+        #     metadata=ComponentMetadata(
+        #         type="retrieval",
+        #         display_name=" ".join(word.capitalize() for word in name.split("_")),
+        #         author="DeepPavlov",
+        #         description=f"One of the {group} used by {self.name} distribution. Add it to your distribution and try it out",
+        #         version="0.1.0",
+        #         date_created=datetime.now(timezone.utc),
+        #         ram_usage="1.0 GB",
+        #         gpu_usage="1.0 GB",
+        #         disk_usage="1.0 GB",
+        #         execution_time=1.5,
+        #     ),
+        #     **compose_kwargs,
+        # )
 
     def get_component(self, name: str, group: Literal["annotators", "skills"]):
         for service_group, service_name, service in self.pipeline_conf.iter_services():
@@ -1305,8 +1308,11 @@ class DreamDist:
         if mismatching_ports_info:
             raise ValueError("\n".join(mismatching_ports_info))
 
+    def delete(self):
+        shutil.rmtree(self.dist_path, ignore_errors=True)
 
-def list_dists(dream_root: Union[Path, str]) -> List[DreamDist]:
+
+def list_dists(dream_root: Union[Path, str]) -> List[AssistantDist]:
     """
     Serializes configs from Dream assistant distributions to list of DreamDist objects
 
@@ -1327,7 +1333,7 @@ def list_dists(dream_root: Union[Path, str]) -> List[DreamDist]:
             continue
 
         try:
-            dream_dist = DreamDist.from_dist(distribution)
+            dream_dist = AssistantDist.from_dist(distribution)
             dream_dists.append(dream_dist)
         except FileNotFoundError:
             pass

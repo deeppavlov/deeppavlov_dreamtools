@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Union
 
-from deeppavlov_dreamtools import DreamDist
+from deeppavlov_dreamtools import AssistantDist
 
 
 def local_yml(
@@ -11,7 +11,7 @@ def local_yml(
     drop_ports: bool = True,
     single_replica: bool = True,
 ):
-    dist = DreamDist.from_name(
+    dist = AssistantDist.from_name(
         dist_name,
         dream_root,
         pipeline_conf=False,
