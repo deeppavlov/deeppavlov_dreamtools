@@ -20,7 +20,6 @@ logger = logging.getLogger("dreamtools.SwarmDeployer")
 
 class SwarmDeployer:
     # TODO: add getting DREAM_ROOT_PATH from os.env
-    # TODO: write unittest
     # TODO: stdout from terminal to save in log files [later]
     def __init__(self, host: str, path_to_keyfile: str, user_identifier: str, connection: Connection = None):
         """
@@ -32,13 +31,37 @@ class SwarmDeployer:
             self.connection: Connection = connection
         self.user_identifier = user_identifier
 
-    def deploy(self, dream_dist: DreamDist, dream_root_remote: Union[Path, str]) -> None:
+    def deploy(self, dream_dist: DreamDist, dream_root_path_remote: Union[Path, str]) -> None:
         """
         Creates local files and then transfers it to the remote machine (`dream_root_remote`)
 
         """
+        self._set_up_local_configs()
+
+        logger.info(f"Transferring local config objects to remote machine")
+        dream_dist_path_remote = Path(dream_root_path_remote) / "assistant_dists" / dream_dist.name
+        self.transfer_files_to_remote_machine(
+            from_local_path=dream_dist.dist_path, to_remote_path=dream_dist_path_remote
+        )
+        shutil.rmtree(dream_dist.dist_path)  # delete local files of the created distribution
+        logger.info("Building images for distribution")
+        self.connection.run(
+            self._get_docker_build_command_from_dist_configs(dream_dist, DREAM_ROOT_PATH_REMOTE)
+        )
+        logger.info("Images built")
+
+        logger.info("Deploying services on the node")
+        command = self._get_swarm_deploy_command_from_dreamdist(dream_dist, dream_root_path_remote)
+        self.connection.run(command, hide=True)
+        logger.info("Services deployed")
+
+        self.connection.run("docker service list")
+        self.connection.run("docker node ps")
+
+    def _set_up_local_configs(self):
         prefix = self.user_identifier + "_"
         dream_dist.name = prefix + dream_dist.name
+
         logger.info(f"Creating files for {dream_dist.name} distribution")
 
         self.change_pipeline_conf_services_url_for_deployment(dream_pipeline=dream_dist.pipeline_conf, prefix=prefix)
@@ -46,33 +69,29 @@ class SwarmDeployer:
 
         self.create_yml_file_with_explicit_images_in_local_dist(dream_dist=dream_dist)
 
-        logger.info(f"Transferring config objects to remote machine")
-        dream_dist_path_remote = Path(DREAM_ROOT_PATH_REMOTE) / "assistant_dists" / dream_dist.name
-        self.transfer_files_to_remote_machine(
-            from_local_path=dream_dist.dist_path, to_remote_path=dream_dist_path_remote
-        )
-        shutil.rmtree(dream_dist.dist_path)  # delete local files of the created distribution
-
-        logger.info("Building images for distribution")
-        self.connection.run(
-            self._get_docker_build_command_from_dist_configs(dream_dist, DREAM_ROOT_PATH_REMOTE), hide=True
-        )
-        logger.info("Images built")
-
-        logger.info("Deploying services on the node")
-        command = self._get_swarm_deploy_command_from_dreamdist(dream_dist, dream_root_remote)
-        self.connection.run(command, hide=True)
-        logger.info("Services deployed")
-
-        self.connection.run("docker service list")
-        self.connection.run("docker node ps")
-
     def transfer_files_to_remote_machine(self, from_local_path: Union[Path, str], to_remote_path: Union[Path, str]):
         self.connection.run(f"mkdir -p {to_remote_path}")
         for file in Path(from_local_path).iterdir():
             if not file.is_file():
                 continue
             self.connection.put(str(file), str(to_remote_path))
+
+    def _get_raw_command_with_filenames(self, dream_dist: DreamDist) -> list[str]:
+        """
+        Return:
+            list with string filenames of the existing configs. List like
+            ["docker-compose.override.yml", "dev.yml", "user_deployment.yml"]
+        """
+        existing_config_filenames = [
+            config.DEFAULT_FILE_NAME
+            for config in dream_dist.iter_loaded_configs()
+            if not isinstance(config, DreamPipeline)
+        ]
+
+        deployment_filename = f"{self.user_identifier}_deployment.yml"
+        existing_config_filenames.append(deployment_filename)
+
+        return existing_config_filenames
 
     def _get_docker_build_command_from_dist_configs(self, dream_dist: DreamDist, dream_root_remote_path: str) -> str:
         """
@@ -83,31 +102,14 @@ class SwarmDeployer:
         config_command_list = []
         dist_path_str = dream_root_remote_path + f"assistant_dists/{dream_dist.name}/"
 
-        compose_override_command = (
-            f"-f {dist_path_str + dream_dist.compose_override.DEFAULT_FILE_NAME}"
-            if dream_dist.compose_override
-            else None
-        )
-
-        proxy_command = (
-            f"-f {dist_path_str + dream_dist.compose_proxy.DEFAULT_FILE_NAME}" if dream_dist.compose_proxy else None
-        )
-
-        dev_command = (
-            f"-f {dist_path_str + dream_dist.compose_dev.DEFAULT_FILE_NAME}" if dream_dist.compose_dev else None
-        )
-
-        deployment_config_filename = f"{self.user_identifier}_deployment.yml"
-        deployment_command = f"-f {dist_path_str + deployment_config_filename}"
-
-        config_commands_list = [compose_override_command, proxy_command, dev_command, deployment_command]
-        for command in config_commands_list:
+        existing_configs_filenames = self._get_raw_command_with_filenames(dream_dist)
+        for command in existing_configs_filenames:
             if command:
-                config_command_list.append(command)
+                config_command_list.append("".join(["-f ", dist_path_str, command]))
+        config_command_list.insert(0, f"-f {dream_root_remote_path}docker-compose.yml")
+        command = " ".join(config_command_list)
 
-        command = " ".join(config_commands_list)
-
-        return f"docker-compose  -f {DREAM_ROOT_PATH_REMOTE + 'docker-compose.yml'} {command} build"
+        return f"docker-compose {command} build"
 
     def _get_swarm_deploy_command_from_dreamdist(self, dream_dist: DreamDist, dream_root_remote_path: str) -> str:
         """
@@ -126,40 +128,14 @@ class SwarmDeployer:
         config_command_list = []
         dist_path_str = dream_root_remote_path + f"assistant_dists/{dream_dist.name}/"
 
-        dream_compose_command = f"-c {DREAM_ROOT_PATH_REMOTE + 'docker-compose.yml'}"
-
-        compose_override_command = (
-            f"-c {dist_path_str + dream_dist.compose_override.DEFAULT_FILE_NAME}"
-            if dream_dist.compose_override
-            else None
-        )
-
-        proxy_command = (
-            f"-c {dist_path_str + dream_dist.compose_proxy.DEFAULT_FILE_NAME}" if dream_dist.compose_proxy else None
-        )
-
-        dev_command = (
-            f"-c {dist_path_str + dream_dist.compose_dev.DEFAULT_FILE_NAME}" if dream_dist.compose_dev else None
-        )
-
-
-        deployment_config_filename = f"{self.user_identifier}_deployment.yml"
-        deployment_command = f"-c {dist_path_str + deployment_config_filename}"
-
-        config_commands_list = [
-            dream_compose_command,
-            compose_override_command,
-            proxy_command,
-            dev_command,
-            deployment_command,
-        ]
-        for command in config_commands_list:
+        existing_configs_filenames = self._get_raw_command_with_filenames(dream_dist)
+        for command in existing_configs_filenames:
             if command:
-                config_command_list.append(command)
+                config_command_list.append("".join(["-c ", dist_path_str, command]))
 
-        command = " ".join(config_commands_list)
+        command = " ".join(config_command_list)
 
-        return f"docker stack deploy {command}  {dream_dist.name}"
+        return f"docker stack deploy {command} {dream_dist.name}"
 
     @staticmethod
     def change_pipeline_conf_services_url_for_deployment(
@@ -205,7 +181,9 @@ class SwarmDeployer:
         """
         services = {}
         dict_yml = {"version": "3.7", "services": services}
-        for yml_config_object in [dream_dist.compose_override, dream_dist.compose_dev, dream_dist.compose_proxy]:
+        for yml_config_object in dream_dist.iter_loaded_configs():
+            if isinstance(yml_config_object, DreamPipeline):
+                continue
             for service_name, _ in yml_config_object.iter_services():
                 image_name = f"{dream_dist.name}_{service_name}" if service_name != "mongo" else service_name
                 services.update({service_name: {"image": image_name}})
