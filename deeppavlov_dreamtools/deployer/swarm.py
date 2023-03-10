@@ -1,6 +1,6 @@
 import shutil
 from pathlib import Path
-from typing import Union
+from typing import Union, List
 import logging
 
 import yaml
@@ -28,12 +28,14 @@ class SwarmDeployer:
         self.connection: Connection = Connection(host=host, port=port, connect_kwargs={"key_filename": path_to_keyfile})
         self.user_identifier = user_identifier
 
-    def deploy(self, dist: AssistantDist, dream_root_path_remote: Union[Path, str]) -> None:
+    def deploy(
+        self, dist: AssistantDist, dream_root_path_remote: Union[Path, str], user_services: List[str] = None
+    ) -> None:
         """
         Creates local files and then transfers it to the remote machine (`dream_root_remote`)
 
         """
-        self._set_up_local_configs(dist=dist)
+        self._set_up_local_configs(dist=dist, user_services=user_services)
         self.transfer_configs_to_remote_machine(dist, dream_root_path_remote)
         shutil.rmtree(dist.dist_path)  # delete local files of the created distribution
         self._build_images(dist, dream_root_path_remote)
@@ -45,13 +47,15 @@ class SwarmDeployer:
         self.connection.run("docker service list")
         self.connection.run("docker node ps")
 
-    def _set_up_local_configs(self, dist: AssistantDist):
+    def _set_up_local_configs(self, dist: AssistantDist, user_services: Union[List[str], None]):
         prefix = self.user_identifier + "_"
         dist.name = prefix + dist.name
 
         logger.info(f"Creating files for {dist.name} distribution")
 
-        self.change_pipeline_conf_services_url_for_deployment(dream_pipeline=dist.pipeline_conf, prefix=prefix)
+        self.change_pipeline_conf_services_url_for_deployment(
+            dream_pipeline=dist.pipeline_conf, prefix=prefix, user_services=user_services
+        )
         dist.save(overwrite=True)
 
         self.create_yml_file_with_explicit_images_in_local_dist(dist=dist)
@@ -74,7 +78,7 @@ class SwarmDeployer:
                 continue
             self.connection.put(str(file), str())
 
-    def _get_raw_command_with_filenames(self, dist: AssistantDist) -> list[str]:
+    def _get_raw_command_with_filenames(self, dist: AssistantDist) -> List[str]:
         """
         Return:
             list with string filenames of the existing configs. List like
@@ -136,7 +140,7 @@ class SwarmDeployer:
 
     @staticmethod
     def change_pipeline_conf_services_url_for_deployment(
-        dream_pipeline: DreamPipeline, prefix: str, user_services: list[str] = None
+        dream_pipeline: DreamPipeline, prefix: str, user_services: List[str] = None
     ) -> None:
         """
         user_services -- the services not to change by this function
