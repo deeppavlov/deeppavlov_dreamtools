@@ -21,14 +21,11 @@ logger = logging.getLogger("dreamtools.SwarmDeployer")
 class SwarmDeployer:
     # TODO: add getting DREAM_ROOT_PATH from os.env
     # TODO: stdout from terminal to save in log files [later]
-    def __init__(self, host: str, path_to_keyfile: str, user_identifier: str, connection: Connection = None):
+    def __init__(self, host: str, path_to_keyfile: str, user_identifier: str, port: int = None):
         """
         self.connection is the fabric.Connection object that allows to run virtual terminal.
         """
-        if connection is None:
-            self.connection: Connection = Connection(host=host, connect_kwargs={"key_filename": path_to_keyfile})
-        else:
-            self.connection: Connection = connection
+        self.connection: Connection = Connection(host=host, port=port, connect_kwargs={"key_filename": path_to_keyfile})
         self.user_identifier = user_identifier
 
     def deploy(self, dist: AssistantDist, dream_root_path_remote: Union[Path, str]) -> None:
@@ -193,16 +190,10 @@ class SwarmDeployer:
 
 
 if __name__ == "__main__":
-    dist = AssistantDist.from_name(name="deepy_base", dream_root=DREAM_ROOT_PATH)
+    dream_dist = AssistantDist.from_name(name="dream", dream_root=DREAM_ROOT_PATH)
     deployer = SwarmDeployer(
-        host="zzz@localhost",
-        path_to_keyfile="/home/zzz/.ssh/id_rsa",
+        host="ubuntu@aws.com",
+        path_to_keyfile="key.pem",
         user_identifier="test",
-        connection=Connection(
-            host="zzz@localhost", port=2222, connect_kwargs={"key_filename": "/home/zzz/.ssh/id_rsa"}
-        ),
     )
-    # dist.name = "test_dream_mini"
-    # deployer.deploy(dist, "/home/zzz/work/dream/")
-    print(deployer._get_docker_build_command_from_dist_configs(dist, "/home/zzz/work/dream/"))
-    print(deployer._get_swarm_deploy_command_from_dreamdist(dist, "/home/zzz/work/dream/"))
+    deployer.deploy(dream_dist, DREAM_ROOT_PATH_REMOTE)
