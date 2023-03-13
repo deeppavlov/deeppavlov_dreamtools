@@ -8,7 +8,7 @@ from deeppavlov_dreamtools.distconfigs.assistant_dists import AssistantDist, Dre
 from fabric import Connection
 
 # FOR LOCAL TESTS
-DREAM_ROOT_PATH_REMOTE = "/home/zzz/dream/"
+DREAM_ROOT_PATH_REMOTE = "/home/zzz/work/dream/"
 DREAM_ROOT_PATH = Path(__file__).parents[3] / "dream/"
 
 url_http_slice = slice(0, 7)
@@ -21,11 +21,13 @@ logger = logging.getLogger("dreamtools.SwarmDeployer")
 class SwarmDeployer:
     # TODO: add getting DREAM_ROOT_PATH from os.env
     # TODO: stdout from terminal to save in log files [later]
-    def __init__(self, host: str, path_to_keyfile: str, user_identifier: str, port: int = None):
+    # TODO: add support of multiple nodes (`cls.check_for_errors_in_services`)
+
+    def __init__(self, host: str, path_to_keyfile: str, user_identifier: str, **kwargs):
         """
         self.connection is the fabric.Connection object that allows to run virtual terminal.
         """
-        self.connection: Connection = Connection(host=host, port=port, connect_kwargs={"key_filename": path_to_keyfile})
+        self.connection: Connection = Connection(host=host, connect_kwargs={"key_filename": path_to_keyfile}, **kwargs)
         self.user_identifier = user_identifier
 
     def deploy(
@@ -36,7 +38,7 @@ class SwarmDeployer:
 
         """
         self._set_up_local_configs(dist=dist, user_services=user_services)
-        self.transfer_configs_to_remote_machine(dist, dream_root_path_remote)
+        self._transfer_configs_to_remote_machine(dist, dream_root_path_remote)
         shutil.rmtree(dist.dist_path)  # delete local files of the created distribution
         self._build_images(dist, dream_root_path_remote)
 
@@ -44,8 +46,7 @@ class SwarmDeployer:
         self.connection.run(self._get_swarm_deploy_command_from_dreamdist(dist, dream_root_path_remote), hide=True)
         logger.info("Services deployed")
 
-        self.connection.run("docker service list")
-        self.connection.run("docker node ps")
+        self._check_for_errors_in_services()  # DOESN'T SUPPORT MULTIPLE NODES. Status will be displayed in logs
 
     def _set_up_local_configs(self, dist: AssistantDist, user_services: Union[List[str], None]):
         prefix = self.user_identifier + "_"
@@ -53,22 +54,14 @@ class SwarmDeployer:
 
         logger.info(f"Creating files for {dist.name} distribution")
 
-        self.change_pipeline_conf_services_url_for_deployment(
+        self._change_pipeline_conf_services_url_for_deployment(
             dream_pipeline=dist.pipeline_conf, prefix=prefix, user_services=user_services
         )
         dist.save(overwrite=True)
 
-        self.create_yml_file_with_explicit_images_in_local_dist(dist=dist)
+        self._create_yml_file_with_explicit_images_in_local_dist(dist=dist)
 
-    def _build_images(self, dist: AssistantDist, dream_root_path_remote: str):
-        logger.info("Building images for distribution")
-        with self.connection.cd(dream_root_path_remote):
-            self.connection.run(
-                self._get_docker_build_command_from_dist_configs(dist, dream_root_path_remote), hide=False
-            )
-        logger.info("Images built")
-
-    def transfer_configs_to_remote_machine(self, dist: AssistantDist, dream_root_path_remote: str):
+    def _transfer_configs_to_remote_machine(self, dist: AssistantDist, dream_root_path_remote: str):
         logger.info(f"Transferring local config objects to remote machine")
 
         dist_path_remote = Path(dream_root_path_remote) / "assistant_dists" / dist.name
@@ -77,6 +70,14 @@ class SwarmDeployer:
             if not file.is_file():
                 continue
             self.connection.put(str(file), str())
+
+    def _build_images(self, dist: AssistantDist, dream_root_path_remote: str):
+        logger.info("Building images for distribution")
+        with self.connection.cd(dream_root_path_remote):
+            self.connection.run(
+                self._get_docker_build_command_from_dist_configs(dist, dream_root_path_remote), hide=True
+            )
+        logger.info("Images built")
 
     def _get_raw_command_with_filenames(self, dist: AssistantDist) -> List[str]:
         """
@@ -99,14 +100,13 @@ class SwarmDeployer:
             string like
             `docker-compose -f dream/docker-compose.yml -f dream/assistant_dists/docker-compose.override.yml build`
         """
-        config_command_list = []
+        config_command_list = ["-f docker-compose.yml"]
         dist_path_str = dream_root_remote_path + f"assistant_dists/{dist.name}/"
 
         existing_configs_filenames = self._get_raw_command_with_filenames(dist)
         for command in existing_configs_filenames:
             if command:
                 config_command_list.append("".join(["-f ", dist_path_str, command]))
-        config_command_list.insert(0, f"-f docker-compose.yml")
         command = " ".join(config_command_list)
 
         return f"docker-compose {command} build"
@@ -139,7 +139,7 @@ class SwarmDeployer:
         return f"docker stack deploy {command} {dist.name}"
 
     @staticmethod
-    def change_pipeline_conf_services_url_for_deployment(
+    def _change_pipeline_conf_services_url_for_deployment(
         dream_pipeline: DreamPipeline, prefix: str, user_services: List[str] = None
     ) -> None:
         """
@@ -169,7 +169,7 @@ class SwarmDeployer:
             raise AttributeError
         return "".join([connector_url[url_http_slice], prefix, connector_url[url_address_slice]])
 
-    def create_yml_file_with_explicit_images_in_local_dist(self, dist: AssistantDist) -> None:
+    def _create_yml_file_with_explicit_images_in_local_dist(self, dist: AssistantDist) -> None:
         """
         Creates yml file in dist.dist_path directory with name `{user_id}_deployment.yaml` with structure like
         ```
@@ -191,6 +191,24 @@ class SwarmDeployer:
         filepath = dist.dist_path / f"{self.user_identifier}_deployment.yml"
         with open(filepath, "w") as file:
             yaml.dump(dict_yml, file)
+
+    def _check_for_errors_in_services(self):
+        """
+        docker node ps - get running tasks on master node
+        awk parameters explained:
+            -F '   +' : sets the field separator to a regular expression consisting of three or more consecutive spaces.
+            -v OFS=';' : sets the output field separator to a semicolon (space isn't suitable)
+            'NR>1 && $7 != "" {print $1, $2, $4, $7}' -- excluding header, shows id, name, node, error if an error occurs
+            $1, $2, $4, $7 - data in columns ID, NAME, NODE, ERROR
+        """
+        result = self.connection.run(
+            "docker node ps | awk -F '   +' -v OFS=';' 'NR>1 && $7 != \"\" {print $1, $2, $4, $7}'", hide=True
+        )
+        if not result.stdout:
+            logger.info(f"No errors found using `docker node ps`")
+        for docker_service in result.stdout.splitlines():
+            ID, NAME, NODE, ERROR_DESCRIPTION = docker_service.split(";")
+            logger.error(f"The service couldn't be deployed: {ID=}, {NAME=}, {NODE=}, {ERROR_DESCRIPTION=}")
 
 
 if __name__ == "__main__":

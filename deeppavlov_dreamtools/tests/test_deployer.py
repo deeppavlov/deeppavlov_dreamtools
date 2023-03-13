@@ -23,7 +23,7 @@ def test_get_url_prefixed(dream_root_dir):
 
 def test_change_pipeline_conf_services_url_for_deployment(list_of_dream_dist: list[DreamDist]):
     for dream_dist in list_of_dream_dist:
-        SwarmDeployer.change_pipeline_conf_services_url_for_deployment(dream_dist.pipeline_conf, "test_")
+        SwarmDeployer._change_pipeline_conf_services_url_for_deployment(dream_dist.pipeline_conf, "test_")
         for _, service_name, service in dream_dist.pipeline_conf.iter_services():
             try:
                 url = service.connector.url
@@ -37,7 +37,7 @@ def test_change_pipeline_conf_services_url_for_deployment(list_of_dream_dist: li
 
 def test_create_yml_file_with_explicit_images_in_local_dist(dream_root_dir, swarm_deployer_instance):
     dream_dist = DreamDist.from_name(dream_root=dream_root_dir, name="dream")
-    swarm_deployer_instance.create_yml_file_with_explicit_images_in_local_dist(dream_dist)
+    swarm_deployer_instance._create_yml_file_with_explicit_images_in_local_dist(dream_dist)
     dream_dist_path = dream_dist.dist_path
     filepath = dream_dist_path / "test_deployment.yml"
     assert filepath.exists()
