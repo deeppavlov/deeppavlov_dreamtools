@@ -243,6 +243,10 @@ class SwarmDeployer:
             if service.get("Error"):
                 logger.error(f"Error raised in service: {service}")
 
+    def remove_services(self, stack_name: str):
+        self.connection.run(f"docker stack rm {stack_name}")
+        logger.info(f"{stack_name} succesfully removed")
+
 
 if __name__ == "__main__":
     dream_dist = AssistantDist.from_name(name="dream", dream_root=DREAM_ROOT_PATH)
@@ -252,3 +256,4 @@ if __name__ == "__main__":
         user_identifier="test",
     )
     deployer.deploy(dream_dist, DREAM_ROOT_PATH_REMOTE)
+    deployer.remove_services(stack_name=dream_dist.name)
