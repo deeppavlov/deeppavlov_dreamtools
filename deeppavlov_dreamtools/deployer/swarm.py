@@ -24,13 +24,17 @@ class SwarmDeployer:
     # TODO: stdout from terminal to save in log files [later]
     # TODO: add support of multiple nodes (`cls.check_for_errors_in_services`)
     # TODO: parse `cls.check_for_errors_in_services` using `--format json` and python objects?
-
-    def __init__(self, host: str, path_to_keyfile: str, user_identifier: str, **kwargs):
+    # TODO: deal with the versions of images(`cls._create_yml_file_with_explicit_images_in_local_dist`)
+    def __init__(self, host: str, path_to_keyfile: str, user_identifier: str, registry_addr: str = None, **kwargs):
         """
-        self.connection is the fabric.Connection object that allows to run virtual terminal.
+        Args:
+            self.connection - the fabric.Connection object that allows to run virtual terminal.
+            user_identifier - is used for determination of prefix
+            registry_addr   - <registry_url>:<port> if images will be pulling from registry
         """
         self.connection: Connection = Connection(host=host, connect_kwargs={"key_filename": path_to_keyfile}, **kwargs)
         self.user_identifier = user_identifier
+        self.registry_addr = registry_addr
 
     def deploy(
         self, dist: AssistantDist, dream_root_path_remote: Union[Path, str], user_services: List[str] = None
@@ -190,7 +194,11 @@ class SwarmDeployer:
                 continue
             for service_name, _ in yml_config_object.iter_services():
                 image_name = f"{dist.name}_{service_name}" if service_name != "mongo" else service_name
-                services.update({service_name: {"image": image_name}})
+                if self.registry_addr:
+                    services.update({service_name: {"image": f"{self.registry_addr}/{service_name}"}})
+                else:
+                    services.update({service_name: {"image": image_name}})
+
         filepath = dist.dist_path / f"{self.user_identifier}_deployment.yml"
         with open(filepath, "w") as file:
             yaml.dump(dict_yml, file)
