@@ -40,8 +40,8 @@ class SwarmDeployer:
 
         """
         self._set_up_local_configs(dist=dist, user_services=user_services)
-        # self._transfer_configs_to_remote_machine(dist, dream_root_path_remote)
-        # shutil.rmtree(dist.dist_path)  # delete local files of the created distribution
+        self._transfer_configs_to_remote_machine(dist, dream_root_path_remote)
+        shutil.rmtree(dist.dist_path)  # delete local files of the created distribution
         self._build_images(dist, dream_root_path_remote)
 
         logger.info("Deploying services on the node")
