@@ -2,6 +2,7 @@ import shutil
 from pathlib import Path
 from typing import Union, List
 import logging
+import json
 
 import yaml
 from deeppavlov_dreamtools.distconfigs.assistant_dists import AssistantDist, DreamPipeline, PipelineConfService
@@ -22,6 +23,7 @@ class SwarmDeployer:
     # TODO: add getting DREAM_ROOT_PATH from os.env
     # TODO: stdout from terminal to save in log files [later]
     # TODO: add support of multiple nodes (`cls.check_for_errors_in_services`)
+    # TODO: parse `cls.check_for_errors_in_services` using `--format json` and python objects?
 
     def __init__(self, host: str, path_to_keyfile: str, user_identifier: str, **kwargs):
         """
@@ -38,15 +40,16 @@ class SwarmDeployer:
 
         """
         self._set_up_local_configs(dist=dist, user_services=user_services)
-        self._transfer_configs_to_remote_machine(dist, dream_root_path_remote)
-        shutil.rmtree(dist.dist_path)  # delete local files of the created distribution
+        # self._transfer_configs_to_remote_machine(dist, dream_root_path_remote)
+        # shutil.rmtree(dist.dist_path)  # delete local files of the created distribution
         self._build_images(dist, dream_root_path_remote)
 
         logger.info("Deploying services on the node")
         self.connection.run(self._get_swarm_deploy_command_from_dreamdist(dist, dream_root_path_remote), hide=True)
         logger.info("Services deployed")
 
-        self._check_for_errors_in_services()  # DOESN'T SUPPORT MULTIPLE NODES. Status will be displayed in logs
+        self._check_for_errors_in_node_ps()  # DOESN'T SUPPORT MULTIPLE NODES. Status will be displayed in logs
+        self._check_for_errors_in_all_services()
 
     def _set_up_local_configs(self, dist: AssistantDist, user_services: Union[List[str], None]):
         prefix = self.user_identifier + "_"
@@ -192,12 +195,12 @@ class SwarmDeployer:
         with open(filepath, "w") as file:
             yaml.dump(dict_yml, file)
 
-    def _check_for_errors_in_services(self):
+    def _check_for_errors_in_node_ps(self):
         """
         docker node ps - get running tasks on master node
         awk parameters explained:
             -F '   +' : sets the field separator to a regular expression consisting of three or more consecutive spaces.
-            -v OFS=';' : sets the output field separator to a semicolon (space isn't suitable)
+            -v OFS=';' : sets the output field separator to a semicolon (space isn't suitable in this case)
             'NR>1 && $7 != "" {print $1, $2, $4, $7}' -- excluding header, shows id, name, node, error if an error occurs
             $1, $2, $4, $7 - data in columns ID, NAME, NODE, ERROR
         """
@@ -209,6 +212,28 @@ class SwarmDeployer:
         for docker_service in result.stdout.splitlines():
             ID, NAME, NODE, ERROR_DESCRIPTION = docker_service.split(";")
             logger.error(f"The service couldn't be deployed: {ID=}, {NAME=}, {NODE=}, {ERROR_DESCRIPTION=}")
+
+    def _check_for_errors_in_all_services(self):
+        """
+        docker service ls --format json -- shows information about all services in stack. In case of `Replicas` of
+        services has value 0/n method sends log with service information
+        """
+        undeployed_services_id_list: list[str] = []
+        result = self.connection.run("docker service ls --format json", hide=True)
+        for service_str in result.stdout.splitlines():
+            service = json.loads(service_str)
+            if service["Replicas"].startswith("0"):
+                undeployed_services_id_list.append(service["ID"])
+
+        undeployed_services_id_str = " ".join(undeployed_services_id_list)
+        command_get_service_state = " ".join(
+            ["docker service ps", undeployed_services_id_str, "--no-trunc --format json"]
+        )
+        result = self.connection.run(command_get_service_state)
+        for service_str in result.stdout.splitlines():
+            service = json.loads(service_str)
+            if service.get("Error"):
+                logger.error(f"Error raised in service: {service}")
 
 
 if __name__ == "__main__":
