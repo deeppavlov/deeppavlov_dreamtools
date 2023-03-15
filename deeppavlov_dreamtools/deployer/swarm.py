@@ -255,4 +255,4 @@ if __name__ == "__main__":
         path_to_keyfile="key.pem",
         user_identifier="test",
     )
-    deployer.deploy(dream_dist, DREAM_ROOT_PATH_REMOTE)  # mutates python object(dist.name->system_name)
+    deployer.deploy(dream_dist, DREAM_ROOT_PATH_REMOTE)  # mutates python object(dist.name->user_identifier_name)
