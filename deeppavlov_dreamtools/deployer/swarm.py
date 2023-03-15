@@ -9,7 +9,7 @@ from deeppavlov_dreamtools.distconfigs.assistant_dists import AssistantDist, Dre
 from fabric import Connection
 
 # FOR LOCAL TESTS
-DREAM_ROOT_PATH_REMOTE = "/home/zzz/work/dream/"
+DREAM_ROOT_PATH_REMOTE = "/home/ubuntu/dream/"
 DREAM_ROOT_PATH = Path(__file__).parents[3] / "dream/"
 
 url_http_slice = slice(0, 7)
@@ -76,7 +76,7 @@ class SwarmDeployer:
         for file in Path(dist.dist_path).iterdir():
             if not file.is_file():
                 continue
-            self.connection.put(str(file), str())
+            self.connection.put(str(file), str(dist_path_remote))
 
     def _build_images(self, dist: AssistantDist, dream_root_path_remote: str):
         logger.info("Building images for distribution")
@@ -237,7 +237,7 @@ class SwarmDeployer:
         command_get_service_state = " ".join(
             ["docker service ps", undeployed_services_id_str, "--no-trunc --format json"]
         )
-        result = self.connection.run(command_get_service_state)
+        result = self.connection.run(command_get_service_state, hide=True)
         for service_str in result.stdout.splitlines():
             service = json.loads(service_str)
             if service.get("Error"):
@@ -245,7 +245,7 @@ class SwarmDeployer:
 
     def remove_services(self, stack_name: str):
         self.connection.run(f"docker stack rm {stack_name}")
-        logger.info(f"{stack_name} succesfully removed")
+        logger.info(f"{stack_name} successfully removed")
 
 
 if __name__ == "__main__":
@@ -255,5 +255,4 @@ if __name__ == "__main__":
         path_to_keyfile="key.pem",
         user_identifier="test",
     )
-    deployer.deploy(dream_dist, DREAM_ROOT_PATH_REMOTE)
-    deployer.remove_services(stack_name=dream_dist.name)
+    deployer.deploy(dream_dist, DREAM_ROOT_PATH_REMOTE)  # mutates python object(dist.name->system_name)
