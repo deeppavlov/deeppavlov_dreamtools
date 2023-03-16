@@ -70,7 +70,7 @@ class BaseModelNoExtra(BaseModel):
 
 class ComponentEndpoint(BaseModelNoExtra):
     group: str
-    port: int
+    # port: int
     endpoint: str
 
 
@@ -102,7 +102,8 @@ class Component(BaseModelNoExtra):
     description: str
     ram_usage: str
     gpu_usage: Optional[str]
-    execution_time: float
+    # execution_time: float
+    port: int
     endpoints: List[ComponentEndpoint]
     build_args: Optional[dict]
     date_created: datetime = Field(default_factory=datetime.utcnow)
