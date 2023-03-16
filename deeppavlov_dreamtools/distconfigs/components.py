@@ -62,9 +62,7 @@ class DreamComponent:
         pipeline_dict = None
         try:
             for pl in pipeline[container_name]:
-
                 if pl["group"] == group:
-
                     if endpoint:
                         if pl["connector"].get("url"):
                             _, _, pl_endpoint = parse_connector_url(pl["connector"]["url"])

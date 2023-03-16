@@ -149,13 +149,7 @@ def new_dff(
 )
 @click.pass_context
 @must_be_inside_dream
-def new_dist(
-    ctx: click.Context,
-    name: str,
-    display_name: str,
-    description: str,
-    overwrite: bool
-):
+def new_dist(ctx: click.Context, name: str, display_name: str, description: str, overwrite: bool):
     """Creates new distribution in ./assistant_dists"""
 
     try:
@@ -227,14 +221,7 @@ def clone(ctx: click.Context):
 )
 @click.pass_context
 @must_be_inside_dream
-def clone_dist(
-    ctx: click.Context,
-    name: str,
-    template: str,
-    display_name: str,
-    description: str,
-    overwrite: bool
-):
+def clone_dist(ctx: click.Context, name: str, template: str, display_name: str, description: str, overwrite: bool):
     """Clones distribution from a template in ./assistant_dists"""
 
     try:
