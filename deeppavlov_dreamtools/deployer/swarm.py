@@ -64,6 +64,8 @@ class SwarmDeployer:
         self._change_pipeline_conf_services_url_for_deployment(
             dream_pipeline=dist.pipeline_conf, prefix=prefix, user_services=user_services
         )
+        if dist.pipeline_conf.config.connectors:
+            self._change_pipeline_conf_connectors_url_for_deployment(dream_pipeline=dist.pipeline_conf, prefix=prefix)
         dist.save(overwrite=True)
 
         self._create_yml_file_with_explicit_images_in_local_dist(dist=dist)
@@ -160,21 +162,31 @@ class SwarmDeployer:
             if user_services is not None and service_name in user_services:
                 continue
             try:
-                new_url = SwarmDeployer.get_url_prefixed(service, prefix)
+                new_url = SwarmDeployer.get_url_prefixed(service.connector.url, prefix)
             except AttributeError:
                 continue
             service.connector.url = new_url
 
     @staticmethod
-    def get_url_prefixed(service: PipelineConfService, prefix: str) -> str:
+    def _change_pipeline_conf_connectors_url_for_deployment(dream_pipeline: DreamPipeline, prefix: str):
+        for connector_name, connector_object in dream_pipeline.config.connectors.items():
+            try:
+                url = connector_object.url
+                if not url:
+                    raise AttributeError
+            except AttributeError:
+                continue
+            connector_object.url = SwarmDeployer.get_url_prefixed(connector_object.url, prefix)
+
+    @staticmethod
+    def get_url_prefixed(url: str, prefix: str) -> str:
         """
         pipeline_conf.json
         connector.url with value `http://url:port` -> `http://{prefix}_url:port
         """
-        connector_url = service.connector.url
-        if connector_url is None:
+        if not url:
             raise AttributeError
-        return "".join([connector_url[url_http_slice], prefix, connector_url[url_address_slice]])
+        return "".join([url[url_http_slice], prefix, url[url_address_slice]])
 
     def _create_yml_file_with_explicit_images_in_local_dist(self, dist: AssistantDist) -> None:
         """
