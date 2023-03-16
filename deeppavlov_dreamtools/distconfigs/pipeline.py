@@ -8,7 +8,6 @@ from deeppavlov_dreamtools.distconfigs.generics import PipelineConfMetadata, Pip
 
 
 class Pipeline:
-
     FILE_NAME = "pipeline_conf.json"
     SERVICE_GROUPS = [
         "last_chance_service",
@@ -70,16 +69,13 @@ class Pipeline:
                         dream_root / component.source.directory,
                         component.source.container,
                         group_name,
-                        component.source.endpoint
+                        component.source.endpoint,
                     )
                     group_components[component_name] = component_obj
 
             except AttributeError:
                 component_obj = DreamComponent.from_component_dir(
-                    dream_root / group.source.directory,
-                    group.source.container,
-                    group_name,
-                    group.source.endpoint
+                    dream_root / group.source.directory, group.source.container, group_name, group.source.endpoint
                 )
                 group_components = component_obj
             finally:
