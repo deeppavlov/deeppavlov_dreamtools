@@ -10,7 +10,7 @@ from fabric import Connection
 
 # FOR LOCAL TESTS
 DREAM_ROOT_PATH_REMOTE = "/home/ubuntu/dream/"
-DREAM_ROOT_PATH = Path(__file__).parents[3] / "dream/"
+DREAM_ROOT_PATH = Path(__file__).resolve().parents[3] / "dream/"
 
 url_http_slice = slice(0, 7)
 url_address_slice = slice(7, None)
