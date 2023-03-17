@@ -1,14 +1,20 @@
+import json
+import logging
 import shutil
 from pathlib import Path
-from typing import Union, List
-import logging
-import json
+from typing import List, Union
 
+import dotenv
 import yaml
-from deeppavlov_dreamtools.distconfigs.assistant_dists import AssistantDist, DreamPipeline, PipelineConfService
+from deeppavlov_dreamtools.distconfigs.assistant_dists import (
+    AssistantDist,
+    DreamComposeDev,
+    DreamComposeOverride,
+    DreamPipeline,
+)
 from fabric import Connection
 
-from const import EXTERNAL_NETWORK_NAME
+from const import DEFAULT_PREFIX, EXTERNAL_NETWORK_NAME
 
 # FOR LOCAL TESTS
 DREAM_ROOT_PATH_REMOTE = "/home/ubuntu/dream/"
@@ -16,6 +22,7 @@ DREAM_ROOT_PATH = Path(__file__).resolve().parents[3] / "dream/"
 
 url_http_slice = slice(0, 7)
 url_address_slice = slice(7, None)
+env_var_name_slice = slice(0, -4)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s:%(levelname)s:%(name)s:%(message)s")
 logger = logging.getLogger("dreamtools.SwarmDeployer")
@@ -27,7 +34,16 @@ class SwarmDeployer:
     # TODO: add support of multiple nodes (`cls.check_for_errors_in_services`)
     # TODO: parse `cls.check_for_errors_in_services` using `--format json` and python objects?
     # TODO: deal with the versions of images(`cls._create_yml_file_with_explicit_images_in_local_dist`)
-    def __init__(self, host: str, path_to_keyfile: str, user_identifier: str, registry_addr: str = None, **kwargs):
+    # TODO: write docstring describing flow of configuring config files
+    def __init__(
+        self,
+        host: str,
+        path_to_keyfile: str,
+        user_identifier: str,
+        registry_addr: str = None,
+        user_services: List[str] = None,
+        **kwargs,
+    ):
         """
         Args:
             self.connection - the fabric.Connection object that allows to run virtual terminal.
@@ -37,15 +53,14 @@ class SwarmDeployer:
         self.connection: Connection = Connection(host=host, connect_kwargs={"key_filename": path_to_keyfile}, **kwargs)
         self.user_identifier = user_identifier
         self.registry_addr = registry_addr
+        self.user_services = user_services
 
-    def deploy(
-        self, dist: AssistantDist, dream_root_path_remote: Union[Path, str], user_services: List[str] = None
-    ) -> None:
+    def deploy(self, dist: AssistantDist, dream_root_path_remote: Union[Path, str]) -> None:
         """
         Creates local files and then transfers it to the remote machine (`dream_root_remote`)
 
         """
-        self._set_up_local_configs(dist=dist, user_services=user_services)
+        self._set_up_local_configs(dist=dist)
         self._transfer_configs_to_remote_machine(dist, dream_root_path_remote)
         shutil.rmtree(dist.dist_path)  # delete local files of the created distribution
         self._build_images(dist, dream_root_path_remote)
@@ -57,20 +72,84 @@ class SwarmDeployer:
         self._check_for_errors_in_node_ps()  # DOESN'T SUPPORT MULTIPLE NODES. Status will be displayed in logs
         self._check_for_errors_in_all_services()
 
-    def _set_up_local_configs(self, dist: AssistantDist, user_services: Union[List[str], None]):
+    def _set_up_local_configs(self, dist: AssistantDist):
         prefix = self.user_identifier + "_"
         dist.name = prefix + dist.name
+        dist.compose_proxy = None
 
         logger.info(f"Creating files for {dist.name} distribution")
 
-        self._change_pipeline_conf_services_url_for_deployment(
-            dream_pipeline=dist.pipeline_conf, prefix=prefix, user_services=user_services
-        )
+        self._change_pipeline_conf_services_url_for_deployment(dream_pipeline=dist.pipeline_conf, prefix=prefix)
         if dist.pipeline_conf.config.connectors:
-            self._change_pipeline_conf_connectors_url_for_deployment(dream_pipeline=dist.pipeline_conf, prefix=prefix)
+            self._change_pipeline_conf_connectors_url_for_deployment(
+                dream_pipeline=dist.pipeline_conf, prefix=DEFAULT_PREFIX
+            )
+
+        if self.user_services is not None:
+            self.user_services.append("agent")
+            self._remove_mongo_services_if_any(dist, DREAM_ROOT_PATH_REMOTE)
+            self._leave_only_user_services(dist)
         dist.save(overwrite=True)
 
+        self._create_dists_env_file(dist)
         self._create_yml_file_with_explicit_images_in_local_dist(dist=dist)
+
+    def _create_dists_env_file(self, dist: AssistantDist):
+        """
+        cp dream/.env dream/assistant_dists/{dist.name}/{dist.name}.env
+        DB_NAME -> stackname (dist.name)
+        url that not in self.user_services -> http://prefix_service
+        """
+        env_dict = dotenv.dotenv_values(dist.dream_root / ".env")
+        env_dict["DB_NAME"] = self.user_identifier
+
+        for env_var, env_value in env_dict.items():
+            if (
+                self.user_services
+                and env_var.endswith("URL")
+                and env_var[env_var_name_slice].lower() not in self.user_services
+            ):
+                env_dict[env_var] = self.get_url_prefixed(env_value, DEFAULT_PREFIX)
+
+        with open(dist.dist_path / f"{self.user_identifier}.env", "w") as f:
+            for var, value in env_dict.items():
+                f.write(f"{var}={value}\n")
+
+    def _leave_only_user_services(self, dist: AssistantDist):
+        """
+        Changes distribution configs - ComposeOverride and ComposeDev - by leaving specified in self.user_service
+        """
+        filtered_override, filtered_dev = None, None
+        for config in dist.iter_loaded_configs():
+            if isinstance(config, DreamPipeline):
+                continue
+            elif isinstance(config, DreamComposeOverride):
+                filtered_override = config.filter_services(self.user_services)[1]
+            elif isinstance(config, DreamComposeDev):
+                filtered_dev = config.filter_services(self.user_services)[1]
+
+        dist.compose_override = filtered_override
+        dist.compose_dev = filtered_dev
+
+    def _remove_mongo_services_if_any(self, dist: AssistantDist, dream_root_path_remote: Union[Path, str]):
+        """
+        Removes mongo service from docker-compose file and from python object of dev.yml
+
+        Args:
+            dist (AssistantDist): The distribution object to modify.
+            dream_root_path_remote (Union[Path, str]): The remote path to the root directory of the Dream project.
+        """
+        dream_root_path_remote = Path(dream_root_path_remote)
+        docker_compose_path_remote = dream_root_path_remote / "docker-compose.yml"
+        no_mongo_docker_compose_path_remote = dream_root_path_remote / "docker-compose-no-mongo.yml"
+
+        if dist.compose_dev.get_service("mongo"):
+            dist.compose_dev.remove_service("mongo")
+
+        self.connection.run(
+            f"cp {docker_compose_path_remote} {no_mongo_docker_compose_path_remote} &&"
+            f"sed -i '/mongo:/,/^$/d' {no_mongo_docker_compose_path_remote}"
+        )
 
     def _transfer_configs_to_remote_machine(self, dist: AssistantDist, dream_root_path_remote: str):
         logger.info(f"Transferring local config objects to remote machine")
@@ -149,19 +228,16 @@ class SwarmDeployer:
 
         return f"docker stack deploy {command} {dist.name}"
 
-    @staticmethod
-    def _change_pipeline_conf_services_url_for_deployment(
-        dream_pipeline: DreamPipeline, prefix: str, user_services: List[str] = None
-    ) -> None:
+    def _change_pipeline_conf_services_url_for_deployment(self, dream_pipeline: DreamPipeline, prefix: str) -> None:
         """
-        user_services -- the services not to change by this function
+        self.user_services -- the services not to change by this function
         Args:
             dream_pipeline: pipeline object from dream distribution
-            user_services: services to be banned from being prefixed
+            self.user_services: services to be banned from being prefixed
             prefix: prefix to use before address. It is something like `user_`
         """
         for service_group, service_name, service in dream_pipeline.iter_services():
-            if user_services is not None and service_name in user_services:
+            if self.user_services is not None and service_name in self.user_services:
                 continue
             try:
                 new_url = SwarmDeployer.get_url_prefixed(service.connector.url, prefix)
