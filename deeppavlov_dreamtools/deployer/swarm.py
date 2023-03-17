@@ -11,13 +11,14 @@ from deeppavlov_dreamtools.distconfigs.assistant_dists import (
     DreamComposeDev,
     DreamComposeOverride,
     DreamPipeline,
+    DreamComposeProxy,
 )
 from fabric import Connection
 
 from const import DEFAULT_PREFIX, EXTERNAL_NETWORK_NAME
 
 # FOR LOCAL TESTS
-DREAM_ROOT_PATH_REMOTE = "/home/ubuntu/dream/"
+DREAM_ROOT_PATH_REMOTE = Path("/home/ubuntu/dream/")
 DREAM_ROOT_PATH = Path(__file__).resolve().parents[3] / "dream/"
 
 url_http_slice = slice(0, 7)
@@ -175,33 +176,41 @@ class SwarmDeployer:
             list with string filenames of the existing configs. List like
             ["docker-compose.override.yml", "dev.yml", "user_deployment.yml"]
         """
-        existing_config_filenames = [
-            config.DEFAULT_FILE_NAME for config in dist.iter_loaded_configs() if not isinstance(config, DreamPipeline)
-        ]
+        existing_config_filenames = []
+        for config in dist.iter_loaded_configs():
+            if isinstance(config, (DreamPipeline, DreamComposeProxy)):
+                continue
+            existing_config_filenames.append(config.DEFAULT_FILE_NAME)
 
         deployment_filename = f"{self.user_identifier}_deployment.yml"
         existing_config_filenames.append(deployment_filename)
 
         return existing_config_filenames
 
-    def _get_docker_build_command_from_dist_configs(self, dist: AssistantDist, dream_root_remote_path: str) -> str:
+    def _get_docker_build_command_from_dist_configs(self, dist: AssistantDist, dream_root_remote_path: Union[Path, str]) -> str:
         """
         Returns:
             string like
             `docker-compose -f dream/docker-compose.yml -f dream/assistant_dists/docker-compose.override.yml build`
         """
-        config_command_list = ["-f docker-compose.yml"]
-        dist_path_str = dream_root_remote_path + f"assistant_dists/{dist.name}/"
+        if self.user_services:
+            docker_compose_command = "-f docker-compose.yml"
+        else:
+            docker_compose_command = "-f docker-compose-no-mongo.yml"
+
+        config_command_list = [docker_compose_command, ]
+
+        dist_path_str = dream_root_remote_path / "assistant_dists" / dist.name
 
         existing_configs_filenames = self._get_raw_command_with_filenames(dist)
         for command in existing_configs_filenames:
             if command:
-                config_command_list.append("".join(["-f ", dist_path_str, command]))
+                config_command_list.append("".join(["-f ", str(dist_path_str / command)]))
         command = " ".join(config_command_list)
 
         return f"docker compose {command} build"
 
-    def _get_swarm_deploy_command_from_dreamdist(self, dist: AssistantDist, dream_root_remote_path: str) -> str:
+    def _get_swarm_deploy_command_from_dreamdist(self, dist: AssistantDist, dream_root_remote_path: Union[Path, str]) -> str:
         """
         Creates docker-compose up command depending on the loaded configs in the AssistantDistribution
         Args:
@@ -216,13 +225,18 @@ class SwarmDeployer:
             ```
         """
         config_command_list = []
-        dist_path_str = dream_root_remote_path + f"assistant_dists/{dist.name}/"
-        config_command_list.append(f"-c {dream_root_remote_path}docker-compose.yml")
+
+        dist_path = Path(dream_root_remote_path) / "assistant_dists" / dist.name
+        if not self.user_services:
+            docker_compose_pathfile = dream_root_remote_path / "docker-compose.yml"
+        else:
+            docker_compose_pathfile = dream_root_remote_path / "docker-compose-no-mongo.yml"
+        config_command_list.append(f"-c {docker_compose_pathfile}")
 
         existing_configs_filenames = self._get_raw_command_with_filenames(dist)
         for command in existing_configs_filenames:
             if command:
-                config_command_list.append("".join(["-c ", dist_path_str, command]))
+                config_command_list.append("".join(["-c ", str(dist_path / command)]))
 
         command = " ".join(config_command_list)
 
@@ -238,9 +252,11 @@ class SwarmDeployer:
         """
         for service_group, service_name, service in dream_pipeline.iter_services():
             if self.user_services is not None and service_name in self.user_services:
-                continue
+                prefix_ = self.user_identifier
+            else:
+                prefix_ = prefix
             try:
-                new_url = SwarmDeployer.get_url_prefixed(service.connector.url, prefix)
+                new_url = self.get_url_prefixed(service.connector.url, prefix_)
             except AttributeError:
                 continue
             service.connector.url = new_url
