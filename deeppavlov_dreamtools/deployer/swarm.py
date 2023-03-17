@@ -8,6 +8,8 @@ import yaml
 from deeppavlov_dreamtools.distconfigs.assistant_dists import AssistantDist, DreamPipeline, PipelineConfService
 from fabric import Connection
 
+from const import EXTERNAL_NETWORK_NAME
+
 # FOR LOCAL TESTS
 DREAM_ROOT_PATH_REMOTE = "/home/ubuntu/dream/"
 DREAM_ROOT_PATH = Path(__file__).resolve().parents[3] / "dream/"
@@ -200,7 +202,9 @@ class SwarmDeployer:
         ```
         """
         services = {}
-        dict_yml = {"version": "3.7", "services": services}
+        networks = {"networks": {"default": {"external": True, "name": EXTERNAL_NETWORK_NAME}}}
+        dict_yml = {"version": "3.7", "services": services, **networks}
+
         for yml_config_object in dist.iter_loaded_configs():
             if isinstance(yml_config_object, DreamPipeline):
                 continue
