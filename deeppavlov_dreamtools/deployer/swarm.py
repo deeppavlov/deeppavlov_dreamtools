@@ -118,7 +118,7 @@ class SwarmDeployer:
                 config_command_list.append("".join(["-f ", dist_path_str, command]))
         command = " ".join(config_command_list)
 
-        return f"docker-compose {command} build"
+        return f"docker compose {command} build"
 
     def _get_swarm_deploy_command_from_dreamdist(self, dist: AssistantDist, dream_root_remote_path: str) -> str:
         """
