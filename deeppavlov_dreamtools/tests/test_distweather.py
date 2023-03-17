@@ -110,7 +110,6 @@ def test_dream_weather_dist_corresponds_ground_truth_files(file: str, dream_weat
 
     with open(ground_truth_path) as ground_truth_file:
         with open(config_path) as dist_file:
-
             ground_truth_text = ground_truth_file.readlines()
             dist_file_text = dist_file.readlines()
             differ_lines = []

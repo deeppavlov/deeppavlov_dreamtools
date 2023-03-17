@@ -508,8 +508,9 @@ class DreamComposeOverride(YmlDreamConfig):
 
         if service_port and command_port and service_port != command_port:
             raise ValueError(
-                f"In the {self.__class__.DEFAULT_FILE_NAME} file there are mismatching ports from service and command sections: "
-                f"\n{service_port=}\n{command_port=}"
+                f"In the {self.__class__.DEFAULT_FILE_NAME} file there are mismatching ports "
+                "from service and command sections: "
+                f"\nservice_port={service_port}\ncommand_port={command_port}"
             )
 
         return service_port or command_port

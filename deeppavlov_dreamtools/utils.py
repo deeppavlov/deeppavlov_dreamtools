@@ -153,7 +153,6 @@ def iter_field_keys_values(search_dict: dict, field: str):
     provided.
     """
     for key, value in search_dict.items():
-
         if key == field:
             yield key, value
 
