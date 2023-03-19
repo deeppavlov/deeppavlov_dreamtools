@@ -193,7 +193,7 @@ class SwarmDeployer:
             string like
             `docker-compose -f dream/docker-compose.yml -f dream/assistant_dists/docker-compose.override.yml build`
         """
-        if self.user_services:
+        if not self.user_services:
             docker_compose_command = "-f docker-compose.yml"
         else:
             docker_compose_command = "-f docker-compose-no-mongo.yml"
