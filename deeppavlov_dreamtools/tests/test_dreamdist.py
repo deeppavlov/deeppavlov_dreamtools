@@ -82,7 +82,6 @@ def test_dreamdist_save(list_of_dream_dist: List[AssistantDist], dream_assistant
     Changes name and dist_path of dreamdist and then compare configs of new and base distributions
     """
     for dream_dist in list_of_dream_dist:
-
         test_name = dream_dist.name + "_test"
         dream_dist.name = test_name
         dream_dist.dist_path = dream_assistant_dists_dir / test_name

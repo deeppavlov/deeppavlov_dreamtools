@@ -20,7 +20,7 @@ from pydantic import BaseModel, Extra, validator, Field
 from deeppavlov_dreamtools.utils import parse_connector_url
 
 
-def check_memory_format(value: str) -> None:
+def check_memory_format(value: Optional[str]) -> None:
     """Checks if the string has the correct memory format
 
     Args:
@@ -29,17 +29,21 @@ def check_memory_format(value: str) -> None:
     Raises:
         Value error if value is not in the correct format
     """
-    memory_unit = value[-1]
-    memory_value = value[:-1]
+    if value is not None:
+        try:
+            memory_unit = value[-1]
+            memory_value = value[:-1]
+        except IndexError:
+            raise ValueError("'memory' value must contain a float-like value and units, e.g. '2.5G' or '256M'")
 
-    if memory_unit not in ["G", "M"]:
-        raise ValueError("'memory' value must contain units, e.g. '2.5G' or '256M'")
-    try:
-        float(memory_value)
-    except ValueError:
-        raise ValueError(
-            "'memory' value must contain a float-like value before the unit substring, e.g. '2.5G' or '256M'"
-        )
+        if memory_unit not in ["G", "M"]:
+            raise ValueError("'memory' value must contain units, e.g. '2.5G' or '256M'")
+        try:
+            float(memory_value)
+        except ValueError:
+            raise ValueError(
+                "'memory' value must contain a float-like value before the unit substring, e.g. '2.5G' or '256M'"
+            )
 
 
 def convert_datetime_to_str(dt: datetime) -> str:
@@ -70,7 +74,7 @@ class BaseModelNoExtra(BaseModel):
 
 class ComponentEndpoint(BaseModelNoExtra):
     group: str
-    port: int
+    # port: int
     endpoint: str
 
 
@@ -102,7 +106,8 @@ class Component(BaseModelNoExtra):
     description: str
     ram_usage: str
     gpu_usage: Optional[str]
-    execution_time: float
+    # execution_time: float
+    port: int
     endpoints: List[ComponentEndpoint]
     build_args: Optional[dict]
     date_created: datetime = Field(default_factory=datetime.utcnow)
