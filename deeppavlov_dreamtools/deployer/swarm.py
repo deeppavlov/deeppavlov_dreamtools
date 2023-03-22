@@ -187,7 +187,9 @@ class SwarmDeployer:
 
         return existing_config_filenames
 
-    def _get_docker_build_command_from_dist_configs(self, dist: AssistantDist, dream_root_remote_path: Union[Path, str]) -> str:
+    def _get_docker_build_command_from_dist_configs(
+        self, dist: AssistantDist, dream_root_remote_path: Union[Path, str]
+    ) -> str:
         """
         Returns:
             string like
@@ -198,7 +200,9 @@ class SwarmDeployer:
         else:
             docker_compose_command = "-f docker-compose-no-mongo.yml"
 
-        config_command_list = [docker_compose_command, ]
+        config_command_list = [
+            docker_compose_command,
+        ]
 
         dist_path_str = dream_root_remote_path / "assistant_dists" / dist.name
 
@@ -210,7 +214,9 @@ class SwarmDeployer:
 
         return f"docker compose {command} build"
 
-    def _get_swarm_deploy_command_from_dreamdist(self, dist: AssistantDist, dream_root_remote_path: Union[Path, str]) -> str:
+    def _get_swarm_deploy_command_from_dreamdist(
+        self, dist: AssistantDist, dream_root_remote_path: Union[Path, str]
+    ) -> str:
         """
         Creates docker-compose up command depending on the loaded configs in the AssistantDistribution
         Args:

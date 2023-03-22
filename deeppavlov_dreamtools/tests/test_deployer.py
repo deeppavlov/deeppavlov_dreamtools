@@ -49,19 +49,17 @@ def test_swarmdeployer_commands(dream_root_dir, swarm_deployer_instance):
     dream_dist = DreamDist.from_name(dream_root=dream_root_dir, name="dream")
     command = swarm_deployer_instance._get_swarm_deploy_command_from_dreamdist(dream_dist, "/home/ubuntu/dream")
     assert (
-        command
-        == "docker stack deploy "
-           "-c /home/ubuntu/dream/docker-compose.yml "
-           "-c /home/ubuntu/dream/assistant_dists/dream/docker-compose.override.yml "
-           "-c /home/ubuntu/dream/assistant_dists/dream/proxy.yml -c /home/ubuntu/dream/assistant_dists/dream/dev.yml "
-           "-c /home/ubuntu/dream/assistant_dists/dream/test_deployment.yml  dream"
+        command == "docker stack deploy "
+        "-c /home/ubuntu/dream/docker-compose.yml "
+        "-c /home/ubuntu/dream/assistant_dists/dream/docker-compose.override.yml "
+        "-c /home/ubuntu/dream/assistant_dists/dream/proxy.yml -c /home/ubuntu/dream/assistant_dists/dream/dev.yml "
+        "-c /home/ubuntu/dream/assistant_dists/dream/test_deployment.yml  dream"
     )
     assert (
-        swarm_deployer_instance._get_docker_build_command_from_dist_configs
-        == "docker-compose  "
-           "-f /home/ubuntu/dream/docker-compose.yml "
-           "-f /home/ubuntu/dream/assistant_dists/dream/docker-compose.override.yml "
-           "-f /home/ubuntu/dream/assistant_dists/dream/proxy.yml "
-           "-f /home/ubuntu/dream/assistant_dists/dream/dev.yml "
-           "-f /home/ubuntu/dream/assistant_dists/dream/test_deployment.yml build"
+        swarm_deployer_instance._get_docker_build_command_from_dist_configs == "docker-compose  "
+        "-f /home/ubuntu/dream/docker-compose.yml "
+        "-f /home/ubuntu/dream/assistant_dists/dream/docker-compose.override.yml "
+        "-f /home/ubuntu/dream/assistant_dists/dream/proxy.yml "
+        "-f /home/ubuntu/dream/assistant_dists/dream/dev.yml "
+        "-f /home/ubuntu/dream/assistant_dists/dream/test_deployment.yml build"
     )
