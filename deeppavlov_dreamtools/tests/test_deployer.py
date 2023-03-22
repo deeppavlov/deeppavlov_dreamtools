@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import List
 
 import pytest
 
@@ -9,7 +10,7 @@ from deeppavlov_dreamtools.deployer.swarm import SwarmDeployer
 
 @pytest.fixture
 def swarm_deployer_instance():
-    swarm_deployer = SwarmDeployer(host="0", path_to_keyfile="0", connection=1, user_identifier="test")
+    swarm_deployer = SwarmDeployer(host="0", path_to_keyfile="0", user_identifier="test")
     yield swarm_deployer
 
 
@@ -22,7 +23,7 @@ def test_get_url_prefixed(dream_root_dir):
 
 
 def test_change_pipeline_conf_services_url_for_deployment(
-    swarm_deployer_instance, list_of_dream_dist: list[AssistantDist]
+    swarm_deployer_instance, list_of_dream_dist: List[AssistantDist]
 ):
     for dream_dist in list_of_dream_dist:
         swarm_deployer_instance._change_pipeline_conf_services_url_for_deployment(dream_dist.pipeline_conf, "test_")
@@ -49,17 +50,18 @@ def test_create_yml_file_with_explicit_images_in_local_dist(dream_root_dir, swar
 
 def test_swarmdeployer_commands(dream_root_dir, swarm_deployer_instance):
     dream_dist = AssistantDist.from_name(dream_root=dream_root_dir, name="dream")
-    command = swarm_deployer_instance._get_swarm_deploy_command_from_dreamdist(dream_dist, "/home/ubuntu/dream")
+    command = swarm_deployer_instance._get_swarm_deploy_command_from_dreamdist(dream_dist, Path("/home/ubuntu/dream"))
     assert (
         command == "docker stack deploy "
         "-c /home/ubuntu/dream/docker-compose.yml "
         "-c /home/ubuntu/dream/assistant_dists/dream/docker-compose.override.yml "
         "-c /home/ubuntu/dream/assistant_dists/dream/dev.yml "
-        "-c /home/ubuntu/dream/assistant_dists/dream/test_deployment.yml  dream"
+        "-c /home/ubuntu/dream/assistant_dists/dream/test_deployment.yml dream"
     )
+    command = swarm_deployer_instance._get_docker_build_command_from_dist_configs(dream_dist, Path("/home/ubuntu/dream"))
     assert (
-        swarm_deployer_instance._get_docker_build_command_from_dist_configs == "docker-compose  "
-        "-f /home/ubuntu/dream/docker-compose.yml "
+        command == "docker compose "
+        "-f docker-compose.yml "
         "-f /home/ubuntu/dream/assistant_dists/dream/docker-compose.override.yml "
         "-f /home/ubuntu/dream/assistant_dists/dream/dev.yml "
         "-f /home/ubuntu/dream/assistant_dists/dream/test_deployment.yml build"
