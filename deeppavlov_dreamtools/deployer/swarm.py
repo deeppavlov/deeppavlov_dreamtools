@@ -15,7 +15,7 @@ from deeppavlov_dreamtools.distconfigs.assistant_dists import (
 )
 from fabric import Connection
 
-from const import DEFAULT_PREFIX, EXTERNAL_NETWORK_NAME
+from .const import DEFAULT_PREFIX, EXTERNAL_NETWORK_NAME
 
 # FOR LOCAL TESTS
 DREAM_ROOT_PATH_REMOTE = Path("/home/ubuntu/dream/")
