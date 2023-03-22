@@ -34,7 +34,7 @@ class SwarmDeployer:
     # TODO: stdout from terminal to save in log files [later]
     # TODO: add support of multiple nodes (`cls.check_for_errors_in_services`)
     # TODO: parse `cls.check_for_errors_in_services` using `--format json` and python objects?
-    # TODO: deal with the versions of images(`cls._create_yml_file_with_explicit_images_in_local_dist`)
+    # TODO: deal with versions of images(`cls._create_yml_file_with_explicit_images_in_local_dist`)
     # TODO: write docstring describing flow of configuring config files
     def __init__(
         self,
@@ -58,8 +58,11 @@ class SwarmDeployer:
 
     def deploy(self, dist: AssistantDist, dream_root_path_remote: Union[Path, str]) -> None:
         """
-        Creates local files and then transfers it to the remote machine (`dream_root_remote`)
-
+        Problem to be solved: deploy dream assistant distributions remotely.
+        General steps:
+        1) create configuration files on the host machine
+        2) build & push images described in those configs from the host machine
+        3) on the remote machine pull and deploy services from those images onto the docker stack
         """
         self._set_up_local_configs(dist=dist)
         self._transfer_configs_to_remote_machine(dist, dream_root_path_remote)
