@@ -8,7 +8,6 @@ import boto3
 import docker
 import dotenv
 import yaml
-from boto3_type_annotations.ecr import Client as ECRClient
 from deeppavlov_dreamtools.deployer.const import DEFAULT_PREFIX, EXTERNAL_NETWORK_NAME
 from deeppavlov_dreamtools.distconfigs.assistant_dists import (
     AssistantDist,
@@ -396,7 +395,7 @@ class SwarmDeployer:
         repository_name == stack_name == self.user_identifier
         docker login must be configured
         """
-        ecr_client: ECRClient = boto3.client("ecr")
+        ecr_client = boto3.client("ecr")
         docker_client = docker.from_env()
 
         for image_name in image_names:
@@ -423,7 +422,7 @@ class SwarmDeployer:
             except docker.errors.APIError as e:
                 logger.error(f"While pushing image raised error: {e}")
 
-    def _check_if_repository_exists(self, ecr_client: ECRClient, repository_name):
+    def _check_if_repository_exists(self, ecr_client, repository_name):
         try:
             ecr_client.describe_repositories(
                 repositoryNames=[
