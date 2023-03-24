@@ -35,7 +35,7 @@ def test_change_pipeline_conf_services_url_for_deployment(
             if url is None or service_name == "mongo":
                 continue
 
-            assert url.startswith("http://test_")
+            assert url.startswith("http://main_")
 
 
 def test_create_yml_file_with_explicit_images_in_local_dist(dream_root_dir, swarm_deployer_instance):
