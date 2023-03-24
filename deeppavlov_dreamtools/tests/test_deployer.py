@@ -58,7 +58,9 @@ def test_swarmdeployer_commands(dream_root_dir, swarm_deployer_instance):
         "-c /home/ubuntu/dream/assistant_dists/dream/dev.yml "
         "-c /home/ubuntu/dream/assistant_dists/dream/test_deployment.yml dream"
     )
-    command = swarm_deployer_instance._get_docker_build_command_from_dist_configs(dream_dist, Path("/home/ubuntu/dream"))
+    command = swarm_deployer_instance._get_docker_build_command_from_dist_configs(
+        dream_dist, Path("/home/ubuntu/dream")
+    )
     assert (
         command == "docker compose "
         "-f docker-compose.yml "
