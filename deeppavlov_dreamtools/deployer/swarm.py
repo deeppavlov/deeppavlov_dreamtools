@@ -4,18 +4,20 @@ import shutil
 from pathlib import Path
 from typing import List, Union
 
+import boto3
+import docker
 import dotenv
 import yaml
+from boto3_type_annotations.ecr import Client as ECRClient
+from deeppavlov_dreamtools.deployer.const import DEFAULT_PREFIX, EXTERNAL_NETWORK_NAME
 from deeppavlov_dreamtools.distconfigs.assistant_dists import (
     AssistantDist,
     DreamComposeDev,
     DreamComposeOverride,
-    DreamPipeline,
     DreamComposeProxy,
+    DreamPipeline,
 )
 from fabric import Connection
-
-from deeppavlov_dreamtools.deployer.const import DEFAULT_PREFIX, EXTERNAL_NETWORK_NAME
 
 # FOR LOCAL TESTS
 DREAM_ROOT_PATH_REMOTE = Path("/home/ubuntu/dream/")
@@ -38,6 +40,7 @@ class SwarmDeployer:
     # TODO: write docstring describing flow of configuring config files
     # TODO: issue with name mismatch (spelling-preprocessing sep to underscore)
     # TODO: refactor general logic of choosing prefix (main or stackname)
+    # TODO: refactor: implement Single Responsibility principle (Work with Host machine and Remote machine)
     def __init__(
         self,
         host: str,
@@ -386,6 +389,52 @@ class SwarmDeployer:
     def remove_services(self, stack_name: str):
         self.connection.run(f"docker stack rm {stack_name}")
         logger.info(f"{stack_name} successfully removed")
+
+    def push_images(self, image_names: List[str]):
+        """
+        HOST MACHINE
+        repository_name == stack_name == self.user_identifier
+        docker login must be configured
+        """
+        ecr_client: ECRClient = boto3.client("ecr")
+        docker_client = docker.from_env()
+
+        for image_name in image_names:
+            image_name_, tag = image_name.split(":")
+            if self._check_if_repository_exists(ecr_client=ecr_client, repository_name=image_name_):
+                response = ecr_client.describe_repositories(
+                    repositoryNames=[
+                        image_name_,
+                    ]
+                )
+                repository_description = response["repositories"][0]
+            else:
+                repository_description = ecr_client.create_repository(repositoryName=image_name_)["repository"]
+            repository_uri = repository_description["repositoryUri"]
+
+            image = docker_client.images.get(image_name)
+            image.tag(repository_uri, "test")
+            # image.tags doesn't guarantee that tags in python objects  match with docker tags in system, so then
+            # composing string is required
+            image_tag = f"{repository_uri}:{self.user_identifier}"
+
+            try:
+                docker_client.images.push(image_tag)
+            except docker.errors.APIError as e:
+                logger.error(f"While pushing image raised error: {e}")
+
+    def _check_if_repository_exists(self, ecr_client: ECRClient, repository_name):
+        try:
+            ecr_client.describe_repositories(
+                repositoryNames=[
+                    repository_name,
+                ]
+            )
+            return True
+
+        except ecr_client.exceptions.RepositoryNotFoundException as e:
+            logger.info(f"{repository_name} repository wasn't found. It will be created")
+            return False
 
 
 if __name__ == "__main__":
