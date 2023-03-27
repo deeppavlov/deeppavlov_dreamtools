@@ -73,7 +73,8 @@ class SwarmDeployer:
         self._transfer_configs_to_remote_machine(dist, dream_root_path_remote)
         self._set_up_remote_configs(dist, dream_root_path_remote)
         shutil.rmtree(dist.dist_path)  # delete local files of the created distribution
-        self._build_images(dist, dream_root_path_remote)
+        self.build_and_push_to_registry(dist=dist)
+        # self._build_images(dist, dream_root_path_remote)
 
         logger.info("Deploying services on the node")
         self.connection.run(self._get_swarm_deploy_command_from_dreamdist(dist, dream_root_path_remote), hide=True)
@@ -163,7 +164,8 @@ class SwarmDeployer:
         dream_root_path_remote = Path(dream_root_path_remote)
         docker_compose_path_remote = dream_root_path_remote / "docker-compose.yml"
         no_mongo_docker_compose_path_remote = dream_root_path_remote / "docker-compose-no-mongo.yml"
-        command = f"cp {docker_compose_path_remote} {no_mongo_docker_compose_path_remote} && sed -i '/mongo:/,/^$/d' {no_mongo_docker_compose_path_remote}"
+        command = f"cp {docker_compose_path_remote} {no_mongo_docker_compose_path_remote} &&" \
+                  f" sed -i '/mongo:/,/^$/d' {no_mongo_docker_compose_path_remote}"
 
         if remote:
             self.connection.run(command)
@@ -274,7 +276,7 @@ class SwarmDeployer:
         Args:
             dream_pipeline: pipeline object from dream distribution
             self.user_services: services to be banned from being prefixed
-            prefix: prefix to use before address. It is something like `user_`
+            user_prefix: prefix to use before address. It is something like `user_`
         """
         for service_group, service_name, service in dream_pipeline.iter_services():
             pipeline_conf_service_name = service_name.replace("_", "-")
@@ -465,25 +467,23 @@ class SwarmDeployer:
             ]
         return image_names
 
-    def build_and_push(self, dist: AssistantDist):
+    def build_and_push_to_registry(self, dist: AssistantDist):
         """
         HOST MACHINE
         """
-
-        self._set_up_local_configs(dist)
-        self._remove_mongo_from_root_docker_compose(dist.dream_root, remote=False)
+        if self.user_services:
+            self._remove_mongo_from_root_docker_compose(dist.dream_root, remote=False)
         self._build_image_on_local(dist)
-        image_names = self._get_image_names_of_the_dist(dist)
+        image_names: List[str] = self._get_image_names_of_the_dist(dist)
         self.push_images(image_names)
 
 
 if __name__ == "__main__":
     dream_dist = AssistantDist.from_name(name="deepy_faq", dream_root=DREAM_ROOT_PATH)
     deployer = SwarmDeployer(
-        host="ubuntu@aws.com",
-        path_to_keyfile="key.pem",
+        host="ubuntu@ec2-3-219-30-176.compute-1.amazonaws.com",
+        path_to_keyfile="/home/zzz/work/deployment-test-image-key.pem",
         user_identifier="test",
         user_services=["faq-skill"],
     )
-    deployer.build_and_push(dream_dist)
-    # deployer.deploy(dream_dist, DREAM_ROOT_PATH_REMOTE)  # mutates python object(dist.name->user_identifier_name)
+    deployer.deploy(dream_dist, DREAM_ROOT_PATH_REMOTE)  # mutates python object(dist.name->user_identifier_name)
