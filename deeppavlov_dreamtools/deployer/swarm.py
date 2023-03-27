@@ -341,7 +341,7 @@ class SwarmDeployer:
             for service_name, _ in yml_config_object.iter_services():
                 image_name = f"{dist.name}_{service_name}" if service_name != "mongo" else service_name
                 if self.registry_addr:
-                    services.update({service_name: {"image": f"{self.registry_addr}/{service_name}"}})
+                    services.update({service_name: {"image": f"{self.registry_addr}/{image_name}"}})
                 else:
                     services.update({service_name: {"image": image_name}})
 
