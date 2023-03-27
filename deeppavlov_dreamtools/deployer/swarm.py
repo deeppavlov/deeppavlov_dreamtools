@@ -106,10 +106,14 @@ class SwarmDeployer:
         self._create_dists_env_file(dist, user_prefix=prefix)
         self._create_yml_file_with_explicit_images_in_local_dist(dist=dist)
         logger.info("Configs been created")
+        if self.registry_addr:
+            self._login_local()
 
     def _set_up_remote_configs(self, dist: AssistantDist, dream_root_path_remote: Union[Path, str]):
         if self.user_services:
             self._remove_mongo_from_root_docker_compose(dream_root_path_remote)
+        if self.registry_addr:
+            self._login_remote()
 
     def _create_dists_env_file(self, dist: AssistantDist, user_prefix: str):
         """
@@ -164,8 +168,10 @@ class SwarmDeployer:
         dream_root_path_remote = Path(dream_root_path_remote)
         docker_compose_path_remote = dream_root_path_remote / "docker-compose.yml"
         no_mongo_docker_compose_path_remote = dream_root_path_remote / "docker-compose-no-mongo.yml"
-        command = f"cp {docker_compose_path_remote} {no_mongo_docker_compose_path_remote} &&" \
-                  f" sed -i '/mongo:/,/^$/d' {no_mongo_docker_compose_path_remote}"
+        command = (
+            f"cp {docker_compose_path_remote} {no_mongo_docker_compose_path_remote} &&"
+            f" sed -i '/mongo:/,/^$/d' {no_mongo_docker_compose_path_remote}"
+        )
 
         if remote:
             self.connection.run(command)
@@ -476,6 +482,21 @@ class SwarmDeployer:
         self._build_image_on_local(dist)
         image_names: List[str] = self._get_image_names_of_the_dist(dist)
         self.push_images(image_names)
+
+    def _login_local(self):
+        subprocess.run(
+            f"aws ecr get-login-password --region us-east-1|"
+            f"docker login --username AWS --password-stdin {self.registry_addr}",
+            shell=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.STDOUT,
+        )
+
+    def _login_remote(self):
+        self.connection.run(
+            f"aws ecr get-login-password --region us-east-1|"
+            f"docker login --username AWS --password-stdin {self.registry_addr}"
+        )
 
 
 if __name__ == "__main__":
