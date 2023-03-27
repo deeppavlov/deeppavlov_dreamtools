@@ -300,7 +300,7 @@ class SwarmDeployer:
         wait_hosts = compose_override.config.services["agent"].environment["WAIT_HOSTS"].split(", ")
         for i in range(len(wait_hosts)):
             service_name = wait_hosts[i].split(":")[0]
-            if service_name in self.user_services:
+            if self.user_services and service_name in self.user_services:
                 wait_hosts[i] = "".join([user_prefix, wait_hosts[i]])
             else:
                 wait_hosts[i] = "".join([DEFAULT_PREFIX, wait_hosts[i]])
