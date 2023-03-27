@@ -1,6 +1,7 @@
 import json
 import logging
 import shutil
+import subprocess
 from pathlib import Path
 from typing import List, Union
 
@@ -103,6 +104,7 @@ class SwarmDeployer:
 
         self._create_dists_env_file(dist, user_prefix=prefix)
         self._create_yml_file_with_explicit_images_in_local_dist(dist=dist)
+        logger.info("Configs been created")
 
     def _set_up_remote_configs(self, dist: AssistantDist, dream_root_path_remote: Union[Path, str]):
         if self.user_services:
@@ -150,21 +152,23 @@ class SwarmDeployer:
         if dist.compose_dev and dist.compose_dev.get_service("mongo"):
             dist.compose_dev.remove_service("mongo")
 
-    def _remove_mongo_from_root_docker_compose(self, dream_root_path_remote: Union[Path, str]):
+    def _remove_mongo_from_root_docker_compose(self, dream_root_path_remote: Union[Path, str], remote: bool = True):
         """
         Removes mongo service from docker-compose file
 
         Args:
             dream_root_path_remote (Union[Path, str]): The remote path to the root directory of the Dream project.
+            remote: if True changes files on the remote machine, False on the local
         """
         dream_root_path_remote = Path(dream_root_path_remote)
         docker_compose_path_remote = dream_root_path_remote / "docker-compose.yml"
         no_mongo_docker_compose_path_remote = dream_root_path_remote / "docker-compose-no-mongo.yml"
+        command = f"cp {docker_compose_path_remote} {no_mongo_docker_compose_path_remote} && sed -i '/mongo:/,/^$/d' {no_mongo_docker_compose_path_remote}"
 
-        self.connection.run(
-            f"cp {docker_compose_path_remote} {no_mongo_docker_compose_path_remote} &&"
-            f"sed -i '/mongo:/,/^$/d' {no_mongo_docker_compose_path_remote}"
-        )
+        if remote:
+            self.connection.run(command)
+        else:
+            subprocess.run(command, shell=True)
 
     def _transfer_configs_to_remote_machine(self, dist: AssistantDist, dream_root_path_remote: str):
         logger.info(f"Transferring local config objects to remote machine")
@@ -399,7 +403,10 @@ class SwarmDeployer:
         docker_client = docker.from_env()
 
         for image_name in image_names:
-            image_name_, tag = image_name.split(":")
+            image_name_ = image_name
+            if ":" in image_name:
+                image_name_, tag = image_name.split(":")
+
             if self._check_if_repository_exists(ecr_client=ecr_client, repository_name=image_name_):
                 response = ecr_client.describe_repositories(
                     repositoryNames=[
@@ -418,7 +425,8 @@ class SwarmDeployer:
             image_tag = f"{repository_uri}:{self.user_identifier}"
 
             try:
-                docker_client.images.push(image_tag)
+                logger.info(f"Pushing image {image_name_}")
+                print(docker_client.images.push(image_tag))
             except docker.errors.APIError as e:
                 logger.error(f"While pushing image raised error: {e}")
 
@@ -435,12 +443,47 @@ class SwarmDeployer:
             logger.info(f"{repository_name} repository wasn't found. It will be created")
             return False
 
+    def _build_image_on_local(self, dist: AssistantDist):
+        logger.info("Building images on local machine")
+        logger.error(
+            subprocess.run(
+                self._get_docker_build_command_from_dist_configs(dist, dist.dream_root),
+                cwd=dist.dream_root,
+                shell=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.STDOUT,
+            )
+        )
+        logger.info("Images built")
+
+    def _get_image_names_of_the_dist(self, dist: AssistantDist):
+        if self.user_services:
+            image_names = ["".join([dist.name, "_", user_service]) for user_service in self.user_services]
+        else:
+            image_names = [
+                "".join([dist.name, "_", service_name]) for service_name, _ in dist.compose_override.iter_services()
+            ]
+        return image_names
+
+    def build_and_push(self, dist: AssistantDist):
+        """
+        HOST MACHINE
+        """
+
+        self._set_up_local_configs(dist)
+        self._remove_mongo_from_root_docker_compose(dist.dream_root, remote=False)
+        self._build_image_on_local(dist)
+        image_names = self._get_image_names_of_the_dist(dist)
+        self.push_images(image_names)
+
 
 if __name__ == "__main__":
-    dream_dist = AssistantDist.from_name(name="dream", dream_root=DREAM_ROOT_PATH)
+    dream_dist = AssistantDist.from_name(name="deepy_faq", dream_root=DREAM_ROOT_PATH)
     deployer = SwarmDeployer(
         host="ubuntu@aws.com",
         path_to_keyfile="key.pem",
         user_identifier="test",
+        user_services=["faq-skill"],
     )
-    deployer.deploy(dream_dist, DREAM_ROOT_PATH_REMOTE)  # mutates python object(dist.name->user_identifier_name)
+    deployer.build_and_push(dream_dist)
+    # deployer.deploy(dream_dist, DREAM_ROOT_PATH_REMOTE)  # mutates python object(dist.name->user_identifier_name)
