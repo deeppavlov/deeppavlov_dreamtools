@@ -4,11 +4,14 @@ import shutil
 import subprocess
 from pathlib import Path
 from typing import List, Union
+from urllib.parse import urlparse
 
 import boto3
 import docker
 import dotenv
 import yaml
+from fabric import Connection
+
 from deeppavlov_dreamtools.deployer.const import DEFAULT_PREFIX, EXTERNAL_NETWORK_NAME
 from deeppavlov_dreamtools.distconfigs.assistant_dists import (
     AssistantDist,
@@ -17,7 +20,6 @@ from deeppavlov_dreamtools.distconfigs.assistant_dists import (
     DreamComposeProxy,
     DreamPipeline,
 )
-from fabric import Connection
 
 # FOR LOCAL TESTS
 DREAM_ROOT_PATH_REMOTE = Path("/home/ubuntu/dream/")
@@ -93,9 +95,11 @@ class SwarmDeployer:
         self._change_pipeline_conf_services_url_for_deployment(dream_pipeline=dist.pipeline_conf, user_prefix=prefix)
         if dist.pipeline_conf.config.connectors:
             self._change_pipeline_conf_connectors_url_for_deployment(
-                dream_pipeline=dist.pipeline_conf, prefix=DEFAULT_PREFIX
+                dream_pipeline=dist.pipeline_conf, prefix=prefix
             )
         self._change_waithosts_url(compose_override=dream_dist.compose_override, user_prefix=prefix)
+        # TODO: remove env path duplication
+        dist.update_env_path(Path("assistant_dists") / dist.name / f"{self.user_identifier}.env")
 
         if self.user_services is not None:
             self.user_services.append("agent")
@@ -127,7 +131,7 @@ class SwarmDeployer:
         for env_var, env_value in env_dict.items():
             if env_var.endswith("URL"):
                 if self.user_services:
-                    if env_var[env_var_name_slice].lower().replace("_", "-") in self.user_services:
+                    if urlparse(env_value).hostname in self.user_services:
                         env_dict[env_var] = self.get_url_prefixed(env_value, user_prefix)
                     else:
                         env_dict[env_var] = self.get_url_prefixed(env_value, DEFAULT_PREFIX)
@@ -272,7 +276,7 @@ class SwarmDeployer:
 
         command = " ".join(config_command_list)
 
-        return f"docker stack deploy {command} {dist.name}"
+        return f"docker stack deploy {command} {self.user_identifier}"
 
     def _change_pipeline_conf_services_url_for_deployment(
         self, dream_pipeline: DreamPipeline, user_prefix: str
@@ -285,7 +289,7 @@ class SwarmDeployer:
             user_prefix: prefix to use before address. It is something like `user_`
         """
         for service_group, service_name, service in dream_pipeline.iter_services():
-            pipeline_conf_service_name = service_name.replace("_", "-")
+            pipeline_conf_service_name = urlparse(service.connector.url).hostname
             if self.user_services is not None and pipeline_conf_service_name in self.user_services:
                 prefix_ = user_prefix
             else:

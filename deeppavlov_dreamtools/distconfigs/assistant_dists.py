@@ -841,6 +841,12 @@ class AssistantDist:
         """
         return Path(dream_root) / const.ASSISTANT_DISTS_DIR_NAME / name
 
+    def update_env_path(self, new_env_path):
+        services = self.compose_override.config.services
+        for service_name in services:
+            if services[service_name].env_file is not None:
+                services[service_name].env_file = new_env_path
+
     @staticmethod
     def resolve_name_and_dream_root(path: Union[str, Path]):
         """
