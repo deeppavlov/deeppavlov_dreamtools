@@ -298,8 +298,7 @@ class SwarmDeployer:
                 continue
             service.connector.url = new_url
 
-    @staticmethod
-    def _change_pipeline_conf_connectors_url_for_deployment(dream_pipeline: DreamPipeline, prefix: str):
+    def _change_pipeline_conf_connectors_url_for_deployment(self, dream_pipeline: DreamPipeline, prefix: str):
         for connector_name, connector_object in dream_pipeline.config.connectors.items():
             try:
                 url = connector_object.url
@@ -307,8 +306,12 @@ class SwarmDeployer:
                     raise AttributeError
             except AttributeError:
                 continue
-
-            connector_object.url = SwarmDeployer.get_url_prefixed(connector_object.url, prefix)
+            service_name = urlparse(url).hostname
+            if self.user_services is not None and service_name in self.user_services:
+                prefix_ = prefix
+            else:
+                prefix_ = DEFAULT_PREFIX
+            connector_object.url = SwarmDeployer.get_url_prefixed(connector_object.url, prefix_)
 
     def _change_waithosts_url(self, compose_override: DreamComposeOverride, user_prefix: str):
         wait_hosts = compose_override.config.services["agent"].environment["WAIT_HOSTS"].split(", ")
@@ -343,7 +346,6 @@ class SwarmDeployer:
         """
         services = {}
         networks = {"networks": {"default": {"external": True, "name": EXTERNAL_NETWORK_NAME}}}
-        dict_yml = {"version": "3.7", "services": services, **networks}
 
         for yml_config_object in dist.iter_loaded_configs():
             if isinstance(yml_config_object, DreamPipeline):
@@ -354,6 +356,8 @@ class SwarmDeployer:
                     services.update({service_name: {"image": f"{self.registry_addr}/{image_name}"}})
                 else:
                     services.update({service_name: {"image": image_name}})
+        services = deep_update(services, {'agent': {'command': f"sh -c 'bin/wait && python -m deeppavlov_agent.run agent.pipeline_config=assistant_dists/{dist.dist_path.name}/pipeline_conf.json'"}})
+        dict_yml = {"version": "3.7", "services": services, **networks}
         if self.deployment_dict is not None:
             dict_yml = deep_update(dict_yml, self.deployment_dict)
         filepath = dist.dist_path / f"{self.user_identifier}_deployment.yml"
