@@ -1315,6 +1315,13 @@ class AssistantDist:
         if mismatching_ports_info:
             raise ValueError("\n".join(mismatching_ports_info))
 
+    def del_ports_and_volumes(self):
+        for compose in self.compose_override, self.compose_dev, self.compose_proxy, self.compose_local:
+            if compose is None:
+                continue
+            for service in compose.config.services.values():
+                service.ports, service.volumes = None, None
+
     def delete(self):
         shutil.rmtree(self.dist_path, ignore_errors=True)
 
