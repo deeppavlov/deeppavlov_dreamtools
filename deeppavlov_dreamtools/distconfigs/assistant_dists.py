@@ -841,6 +841,12 @@ class AssistantDist:
         """
         return Path(dream_root) / const.ASSISTANT_DISTS_DIR_NAME / name
 
+    def update_env_path(self, new_env_path):
+        services = self.compose_override.config.services
+        for service_name in services:
+            if services[service_name].env_file is not None:
+                services[service_name].env_file = new_env_path
+
     @staticmethod
     def resolve_name_and_dream_root(path: Union[str, Path]):
         """
@@ -1308,6 +1314,13 @@ class AssistantDist:
                         mismatching_ports_info.append(f"{service_name}: {str(e)}")
         if mismatching_ports_info:
             raise ValueError("\n".join(mismatching_ports_info))
+
+    def del_ports_and_volumes(self):
+        for compose in self.compose_override, self.compose_dev, self.compose_proxy, self.compose_local:
+            if compose is None:
+                continue
+            for service in compose.config.services.values():
+                service.ports, service.volumes = None, None
 
     def delete(self):
         shutil.rmtree(self.dist_path, ignore_errors=True)

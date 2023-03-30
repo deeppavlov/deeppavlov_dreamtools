@@ -4,11 +4,15 @@ import shutil
 import subprocess
 from pathlib import Path
 from typing import List, Union
+from urllib.parse import urlparse
 
 import boto3
 import docker
 import dotenv
 import yaml
+from fabric import Connection
+from pydantic.utils import deep_update
+
 from deeppavlov_dreamtools.deployer.const import DEFAULT_PREFIX, EXTERNAL_NETWORK_NAME
 from deeppavlov_dreamtools.distconfigs.assistant_dists import (
     AssistantDist,
@@ -17,7 +21,6 @@ from deeppavlov_dreamtools.distconfigs.assistant_dists import (
     DreamComposeProxy,
     DreamPipeline,
 )
-from fabric import Connection
 
 # FOR LOCAL TESTS
 DREAM_ROOT_PATH_REMOTE = Path("/home/ubuntu/dream/")
@@ -48,6 +51,7 @@ class SwarmDeployer:
         user_identifier: str,
         registry_addr: str = None,
         user_services: List[str] = None,
+        deployment_dict: dict = None,
         **kwargs,
     ):
         """
@@ -55,11 +59,13 @@ class SwarmDeployer:
             self.connection - the fabric.Connection object that allows to run virtual terminal.
             user_identifier - is used for determination of prefix
             registry_addr   - <registry_url>:<port> if images will be pulling from registry
+            deployment_dict: values to update *deployment.yml file.
         """
         self.connection: Connection = Connection(host=host, connect_kwargs={"key_filename": path_to_keyfile}, **kwargs)
         self.user_identifier = user_identifier
         self.registry_addr = registry_addr
         self.user_services = user_services
+        self.deployment_dict = deployment_dict
 
     def deploy(self, dist: AssistantDist, dream_root_path_remote: Union[Path, str]) -> None:
         """
@@ -72,8 +78,8 @@ class SwarmDeployer:
         self._set_up_local_configs(dist=dist)
         self._transfer_configs_to_remote_machine(dist, dream_root_path_remote)
         self._set_up_remote_configs(dist, dream_root_path_remote)
-        shutil.rmtree(dist.dist_path)  # delete local files of the created distribution
         self.build_and_push_to_registry(dist=dist)
+        shutil.rmtree(dist.dist_path)  # delete local files of the created distribution
         # self._build_images(dist, dream_root_path_remote)
 
         logger.info("Deploying services on the node")
@@ -93,9 +99,12 @@ class SwarmDeployer:
         self._change_pipeline_conf_services_url_for_deployment(dream_pipeline=dist.pipeline_conf, user_prefix=prefix)
         if dist.pipeline_conf.config.connectors:
             self._change_pipeline_conf_connectors_url_for_deployment(
-                dream_pipeline=dist.pipeline_conf, prefix=DEFAULT_PREFIX
+                dream_pipeline=dist.pipeline_conf, prefix=prefix
             )
-        self._change_waithosts_url(compose_override=dream_dist.compose_override, user_prefix=prefix)
+        self._change_waithosts_url(compose_override=dist.compose_override, user_prefix=prefix)
+        # TODO: remove env path duplication
+        dist.update_env_path(Path("assistant_dists") / dist.name / f"{self.user_identifier}.env")
+        dist.del_ports_and_volumes()
 
         if self.user_services is not None:
             self.user_services.append("agent")
@@ -127,7 +136,7 @@ class SwarmDeployer:
         for env_var, env_value in env_dict.items():
             if env_var.endswith("URL"):
                 if self.user_services:
-                    if env_var[env_var_name_slice].lower().replace("_", "-") in self.user_services:
+                    if urlparse(env_value).hostname in self.user_services:
                         env_dict[env_var] = self.get_url_prefixed(env_value, user_prefix)
                     else:
                         env_dict[env_var] = self.get_url_prefixed(env_value, DEFAULT_PREFIX)
@@ -221,14 +230,7 @@ class SwarmDeployer:
             string like
             `docker-compose -f dream/docker-compose.yml -f dream/assistant_dists/docker-compose.override.yml build`
         """
-        if not self.user_services:
-            docker_compose_command = "-f docker-compose.yml"
-        else:
-            docker_compose_command = "-f docker-compose-no-mongo.yml"
-
-        config_command_list = [
-            docker_compose_command,
-        ]
+        config_command_list = [f"-f {dream_root_remote_path / 'docker-compose.yml'}"]
 
         dist_path_str = dream_root_remote_path / "assistant_dists" / dist.name
 
@@ -272,7 +274,7 @@ class SwarmDeployer:
 
         command = " ".join(config_command_list)
 
-        return f"docker stack deploy {command} {dist.name}"
+        return f"docker stack deploy --with-registry-auth {command} {self.user_identifier}"
 
     def _change_pipeline_conf_services_url_for_deployment(
         self, dream_pipeline: DreamPipeline, user_prefix: str
@@ -285,7 +287,7 @@ class SwarmDeployer:
             user_prefix: prefix to use before address. It is something like `user_`
         """
         for service_group, service_name, service in dream_pipeline.iter_services():
-            pipeline_conf_service_name = service_name.replace("_", "-")
+            pipeline_conf_service_name = urlparse(service.connector.url).hostname
             if self.user_services is not None and pipeline_conf_service_name in self.user_services:
                 prefix_ = user_prefix
             else:
@@ -296,8 +298,7 @@ class SwarmDeployer:
                 continue
             service.connector.url = new_url
 
-    @staticmethod
-    def _change_pipeline_conf_connectors_url_for_deployment(dream_pipeline: DreamPipeline, prefix: str):
+    def _change_pipeline_conf_connectors_url_for_deployment(self, dream_pipeline: DreamPipeline, prefix: str):
         for connector_name, connector_object in dream_pipeline.config.connectors.items():
             try:
                 url = connector_object.url
@@ -305,8 +306,12 @@ class SwarmDeployer:
                     raise AttributeError
             except AttributeError:
                 continue
-
-            connector_object.url = SwarmDeployer.get_url_prefixed(connector_object.url, prefix)
+            service_name = urlparse(url).hostname
+            if self.user_services is not None and service_name in self.user_services:
+                prefix_ = prefix
+            else:
+                prefix_ = DEFAULT_PREFIX
+            connector_object.url = SwarmDeployer.get_url_prefixed(connector_object.url, prefix_)
 
     def _change_waithosts_url(self, compose_override: DreamComposeOverride, user_prefix: str):
         wait_hosts = compose_override.config.services["agent"].environment["WAIT_HOSTS"].split(", ")
@@ -341,7 +346,6 @@ class SwarmDeployer:
         """
         services = {}
         networks = {"networks": {"default": {"external": True, "name": EXTERNAL_NETWORK_NAME}}}
-        dict_yml = {"version": "3.7", "services": services, **networks}
 
         for yml_config_object in dist.iter_loaded_configs():
             if isinstance(yml_config_object, DreamPipeline):
@@ -352,7 +356,10 @@ class SwarmDeployer:
                     services.update({service_name: {"image": f"{self.registry_addr}/{image_name}"}})
                 else:
                     services.update({service_name: {"image": image_name}})
-
+        services = deep_update(services, {'agent': {'command': f"sh -c 'bin/wait && python -m deeppavlov_agent.run agent.pipeline_config=assistant_dists/{dist.dist_path.name}/pipeline_conf.json'"}})
+        dict_yml = {"version": "3.7", "services": services, **networks}
+        if self.deployment_dict is not None:
+            dict_yml = deep_update(dict_yml, self.deployment_dict)
         filepath = dist.dist_path / f"{self.user_identifier}_deployment.yml"
         with open(filepath, "w") as file:
             yaml.dump(dict_yml, file)
@@ -426,15 +433,15 @@ class SwarmDeployer:
                 repository_description = ecr_client.create_repository(repositoryName=image_name_)["repository"]
             repository_uri = repository_description["repositoryUri"]
 
-            image = docker_client.images.get(image_name)
-            image.tag(repository_uri, "test")
+            # image = docker_client.images.get(image_name)
+            # image.tag(repository_uri, "test")
             # image.tags doesn't guarantee that tags in python objects  match with docker tags in system, so then
             # composing string is required
             image_tag = f"{repository_uri}:{self.user_identifier}"
 
             try:
                 logger.info(f"Pushing image {image_name_}")
-                print(docker_client.images.push(image_tag))
+                print(docker_client.images.push(repository_uri))
             except docker.errors.APIError as e:
                 logger.error(f"While pushing image raised error: {e}")
 
@@ -453,15 +460,16 @@ class SwarmDeployer:
 
     def _build_image_on_local(self, dist: AssistantDist):
         logger.info("Building images on local machine")
-        logger.error(
-            subprocess.run(
-                self._get_docker_build_command_from_dist_configs(dist, dist.dream_root),
-                cwd=dist.dream_root,
-                shell=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.STDOUT,
-            )
+        process = subprocess.Popen(
+            self._get_docker_build_command_from_dist_configs(dist, dist.dream_root),
+            cwd=dist.dream_root,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
+        output, error = process.communicate()
+        if process.returncode != 0:
+            raise ChildProcessError(f'Failed to build images: {error.decode()}.')
         logger.info("Images built")
 
     def _get_image_names_of_the_dist(self, dist: AssistantDist):
