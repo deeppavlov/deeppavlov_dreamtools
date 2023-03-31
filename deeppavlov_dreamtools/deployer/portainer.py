@@ -1,10 +1,15 @@
 from urllib.parse import urljoin
 
 import requests
+import urllib3
+
+# TODO: remove when insecure request cause will be eliminated
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 class SwarmClient:
     # TODO: refactor requests methods calls to get rid of arguments duplication
+    # TODO: add ecr login through api
     def __init__(self, portainer_url: str, api_key: str):
         # TODO: consider adding `app` path to portainer url
         self.portainer_url = portainer_url
@@ -55,7 +60,7 @@ class SwarmClient:
         # TODO: add/replace with creating stack with string
         return self._post(
             '/api/stacks',
-            params={'type': 2, 'method': 'file', 'SwarmID': self.swarm_id,
+            params={'type': 1, 'method': 'file', 'SwarmID': self.swarm_id,
                     'endpointId': self.endpoint_id, 'Name': stack_name},
             files={'file': open(file, 'rb')}
         )
