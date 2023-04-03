@@ -14,6 +14,7 @@ from fabric import Connection
 from pydantic.utils import deep_update
 
 from deeppavlov_dreamtools.deployer.const import DEFAULT_PREFIX, EXTERNAL_NETWORK_NAME
+from deeppavlov_dreamtools.deployer.portainer import SwarmClient
 from deeppavlov_dreamtools.distconfigs.assistant_dists import (
     AssistantDist,
     DreamComposeDev,
@@ -49,6 +50,8 @@ class SwarmDeployer:
         host: str,
         path_to_keyfile: str,
         user_identifier: str,
+        portainer_url: str,
+        portainer_key: str,
         registry_addr: str = None,
         user_services: List[str] = None,
         deployment_dict: dict = None,
@@ -62,6 +65,7 @@ class SwarmDeployer:
             deployment_dict: values to update *deployment.yml file.
         """
         self.connection: Connection = Connection(host=host, connect_kwargs={"key_filename": path_to_keyfile}, **kwargs)
+        self.swarm_client = SwarmClient(portainer_url, portainer_key)
         self.user_identifier = user_identifier
         self.registry_addr = registry_addr
         self.user_services = user_services
@@ -76,18 +80,15 @@ class SwarmDeployer:
         3) on the remote machine pull and deploy services from those images onto the docker stack
         """
         self._set_up_local_configs(dist=dist)
-        self._transfer_configs_to_remote_machine(dist, dream_root_path_remote)
-        self._set_up_remote_configs(dist, dream_root_path_remote)
         self.build_and_push_to_registry(dist=dist)
-        shutil.rmtree(dist.dist_path)  # delete local files of the created distribution
-        # self._build_images(dist, dream_root_path_remote)
 
         logger.info("Deploying services on the node")
-        self.connection.run(self._get_swarm_deploy_command_from_dreamdist(dist, dream_root_path_remote), hide=True)
+        self.swarm_client.create_stack(dist.dist_path/f'{self.user_identifier}_deployment.yml', self.user_identifier)
+        shutil.rmtree(dist.dist_path)  # delete local files of the created distribution
         logger.info("Services deployed")
 
-        self._check_for_errors_in_node_ps()  # DOESN'T SUPPORT MULTIPLE NODES. Status will be displayed in logs
-        self._check_for_errors_in_all_services()
+        # self._check_for_errors_in_node_ps()  # DOESN'T SUPPORT MULTIPLE NODES. Status will be displayed in logs
+        # self._check_for_errors_in_all_services()
 
     def _set_up_local_configs(self, dist: AssistantDist):
         prefix = self.user_identifier + "_"
@@ -117,12 +118,6 @@ class SwarmDeployer:
         logger.info("Configs been created")
         if self.registry_addr:
             self._login_local()
-
-    def _set_up_remote_configs(self, dist: AssistantDist, dream_root_path_remote: Union[Path, str]):
-        if self.user_services:
-            self._remove_mongo_from_root_docker_compose(dream_root_path_remote)
-        if self.registry_addr:
-            self._login_remote()
 
     def _create_dists_env_file(self, dist: AssistantDist, user_prefix: str):
         """
@@ -166,44 +161,22 @@ class SwarmDeployer:
         if dist.compose_dev and dist.compose_dev.get_service("mongo"):
             dist.compose_dev.remove_service("mongo")
 
-    def _remove_mongo_from_root_docker_compose(self, dream_root_path_remote: Union[Path, str], remote: bool = True):
+    def _remove_mongo_from_root_docker_compose(self, dream_root_path: Union[Path, str]):
         """
         Removes mongo service from docker-compose file
 
         Args:
-            dream_root_path_remote (Union[Path, str]): The remote path to the root directory of the Dream project.
-            remote: if True changes files on the remote machine, False on the local
+            dream_root_path (Union[Path, str]): The remote path to the root directory of the Dream project.
         """
-        dream_root_path_remote = Path(dream_root_path_remote)
-        docker_compose_path_remote = dream_root_path_remote / "docker-compose.yml"
-        no_mongo_docker_compose_path_remote = dream_root_path_remote / "docker-compose-no-mongo.yml"
+        dream_root_path = Path(dream_root_path)
+        docker_compose_path_remote = dream_root_path / "docker-compose.yml"
+        no_mongo_docker_compose_path_remote = dream_root_path / "docker-compose-no-mongo.yml"
         command = (
             f"cp {docker_compose_path_remote} {no_mongo_docker_compose_path_remote} &&"
             f" sed -i '/mongo:/,/^$/d' {no_mongo_docker_compose_path_remote}"
         )
 
-        if remote:
-            self.connection.run(command)
-        else:
-            subprocess.run(command, shell=True)
-
-    def _transfer_configs_to_remote_machine(self, dist: AssistantDist, dream_root_path_remote: str):
-        logger.info(f"Transferring local config objects to remote machine")
-
-        dist_path_remote = Path(dream_root_path_remote) / "assistant_dists" / dist.name
-        self.connection.run(f"mkdir -p {dist_path_remote}")
-        for file in Path(dist.dist_path).iterdir():
-            if not file.is_file():
-                continue
-            self.connection.put(str(file), str(dist_path_remote))
-
-    def _build_images(self, dist: AssistantDist, dream_root_path_remote: str):
-        logger.info("Building images for distribution")
-        with self.connection.cd(dream_root_path_remote):
-            self.connection.run(
-                self._get_docker_build_command_from_dist_configs(dist, dream_root_path_remote), hide=True
-            )
-        logger.info("Images built")
+        subprocess.run(command, shell=True)
 
     def _get_raw_command_with_filenames(self, dist: AssistantDist) -> List[str]:
         """
@@ -241,40 +214,6 @@ class SwarmDeployer:
         command = " ".join(config_command_list)
 
         return f"docker compose {command} build"
-
-    def _get_swarm_deploy_command_from_dreamdist(
-        self, dist: AssistantDist, dream_root_remote_path: Union[Path, str]
-    ) -> str:
-        """
-        Creates docker-compose up command depending on the loaded configs in the AssistantDistribution
-        Args:
-             dist: AssistantDistribution instance
-             dream_root_remote_path: REMOTE path to root of dream repository
-        Returns:
-
-            string like
-            ```
-            docker stack deploy -c /home/user/dream/docker-compose.yml
-            -c /home/user/dream/assistant_dists/dream/docker-compose.override.yml [and other configs] [dist.name]
-            ```
-        """
-        config_command_list = []
-
-        dist_path = Path(dream_root_remote_path) / "assistant_dists" / dist.name
-        if not self.user_services:
-            docker_compose_pathfile = dream_root_remote_path / "docker-compose.yml"
-        else:
-            docker_compose_pathfile = dream_root_remote_path / "docker-compose-no-mongo.yml"
-        config_command_list.append(f"-c {docker_compose_pathfile}")
-
-        existing_configs_filenames = self._get_raw_command_with_filenames(dist)
-        for command in existing_configs_filenames:
-            if command:
-                config_command_list.append("".join(["-c ", str(dist_path / command)]))
-
-        command = " ".join(config_command_list)
-
-        return f"docker stack deploy --with-registry-auth {command} {self.user_identifier}"
 
     def _change_pipeline_conf_services_url_for_deployment(
         self, dream_pipeline: DreamPipeline, user_prefix: str
@@ -356,13 +295,30 @@ class SwarmDeployer:
                     services.update({service_name: {"image": f"{self.registry_addr}/{image_name}"}})
                 else:
                     services.update({service_name: {"image": image_name}})
-        services = deep_update(services, {'agent': {'command': f"sh -c 'bin/wait && python -m deeppavlov_agent.run agent.pipeline_config=assistant_dists/{dist.dist_path.name}/pipeline_conf.json'"}})
+        services = deep_update(services, {'agent': {'command': f"sh -c 'bin/wait && python -m deeppavlov_agent.run agent.pipeline_config=assistant_dists/{dist.dist_path.name}/pipeline_conf.json'",
+                                                    'env_file': f'assistant_dists/{dist.name}/{self.user_identifier}.env'}})
         dict_yml = {"version": "3.7", "services": services, **networks}
         if self.deployment_dict is not None:
             dict_yml = deep_update(dict_yml, self.deployment_dict)
-        filepath = dist.dist_path / f"{self.user_identifier}_deployment.yml"
-        with open(filepath, "w") as file:
+        deployer_filepath = dist.dist_path / f"{self.user_identifier}_deployment.yml"
+        with open(deployer_filepath, "w") as file:
             yaml.dump(dict_yml, file)
+        dist_path = dist.dream_root / "assistant_dists" / dist.name
+        if not self.user_services:
+            docker_compose_pathfile = dist.dream_root / "docker-compose.yml"
+        else:
+            docker_compose_pathfile = dist.dream_root / "docker-compose-no-mongo.yml"
+        configs_list = [docker_compose_pathfile]
+
+        existing_configs_filenames = self._get_raw_command_with_filenames(dist)
+        for command in existing_configs_filenames:
+            if command:
+                configs_list.append(dist_path / command)
+        if not configs_list[-1].name.endswith('_deployment.yml'):
+            raise ValueError(f'Expected *deployment.yml to be the last file.')
+        cmd = ' '.join(f'-f {config}' for config in configs_list)
+        subprocess.run(f'docker compose {cmd} config  > {str(configs_list[-1])[:-1]} && mv {str(configs_list[-1])[:-1]} {configs_list[-1]}', shell=True)
+        subprocess.run(f'sed -i "/published:/s/\\"//g" {configs_list[-1]} && echo "version: \'3.7\'" >> {configs_list[-1]} && sed -i "/^name:/d" {configs_list[-1]}', shell=True)
 
     def _check_for_errors_in_node_ps(self):
         """
@@ -485,8 +441,8 @@ class SwarmDeployer:
         """
         HOST MACHINE
         """
-        if self.user_services:
-            self._remove_mongo_from_root_docker_compose(dist.dream_root, remote=False)
+        if self.user_services or True:
+            self._remove_mongo_from_root_docker_compose(dist.dream_root)
         self._build_image_on_local(dist)
         image_names: List[str] = self._get_image_names_of_the_dist(dist)
         self.push_images(image_names)
@@ -498,12 +454,6 @@ class SwarmDeployer:
             shell=True,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.STDOUT,
-        )
-
-    def _login_remote(self):
-        self.connection.run(
-            f"aws ecr get-login-password --region us-east-1|"
-            f"docker login --username AWS --password-stdin {self.registry_addr}"
         )
 
 
