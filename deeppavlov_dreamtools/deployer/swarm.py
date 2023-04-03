@@ -65,7 +65,7 @@ class SwarmDeployer:
             deployment_dict: values to update *deployment.yml file.
         """
         self.connection: Connection = Connection(host=host, connect_kwargs={"key_filename": path_to_keyfile}, **kwargs)
-        self.swarm_client = SwarmClient(portainer_url, portainer_key)
+        self.swarm_client = SwarmClient(portainer_url, portainer_key) if portainer_url else None
         self.user_identifier = user_identifier
         self.registry_addr = registry_addr
         self.user_services = user_services
