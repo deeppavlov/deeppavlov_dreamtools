@@ -112,7 +112,7 @@ class SwarmDeployer:
         dist.save(overwrite=True)
 
         self._create_dists_env_file(dist, user_prefix=prefix)
-        self._create_yml_file_with_explicit_images_in_local_dist(dist=dist)
+        self._create_deployment_yml_file(dist=dist)
         logger.info("Configs been created")
         if self.registry_addr:
             self._login_local()
@@ -270,7 +270,7 @@ class SwarmDeployer:
             raise AttributeError
         return "".join([url[url_http_slice], prefix, url[url_address_slice]])
 
-    def _create_yml_file_with_explicit_images_in_local_dist(self, dist: AssistantDist) -> None:
+    def _create_deployment_yml_file(self, dist: AssistantDist) -> None:
         """
         Creates yml file in dist.dist_path directory with name `{user_id}_deployment.yaml` with structure like
         ```
@@ -281,8 +281,16 @@ class SwarmDeployer:
                 image: {dist.name}_asr
         ```
         """
+        deployment_dict = self._create_deployment_dict(dist)
+        self._save_deployment_dict_in_dist_path(deployment_dict, dist.dist_path)
+        self._configure_deployment_file(dist)
+
+    def _create_services_dict(self, dist: AssistantDist) -> dict:
+        """
+        Creates description of the services to be dumped in *_deployment.yml.
+        Description based on distribution object
+        """
         services = {}
-        networks = {"networks": {"default": {"external": True, "name": EXTERNAL_NETWORK_NAME}}}
 
         for yml_config_object in dist.iter_loaded_configs():
             if isinstance(yml_config_object, DreamPipeline):
@@ -302,34 +310,72 @@ class SwarmDeployer:
                 }
             },
         )
+        return services
+
+    def _create_deployment_dict(self, dist: AssistantDist) -> dict:
+        """
+        Creates a python dict representing *_deployment.yml file
+        Deployment describes network, services and version
+        """
+        networks = {"networks": {"default": {"external": True, "name": EXTERNAL_NETWORK_NAME}}}
+
+        services = self._create_services_dict(dist)
         dict_yml = {"version": "3.7", "services": services, **networks}
         if self.deployment_dict is not None:
             dict_yml = deep_update(dict_yml, self.deployment_dict)
-        deployer_filepath = dist.dist_path / f"{self.user_identifier}_deployment.yml"
+        return dict_yml
+
+    def _save_deployment_dict_in_dist_path(self, dict_yml: dict, dist_path: Path) -> None:
+        deployer_filepath = dist_path / f"{self.user_identifier}_deployment.yml"
         with open(deployer_filepath, "w") as file:
             yaml.dump(dict_yml, file)
-        dist_path = dist.dream_root / "assistant_dists" / dist.name
+
+    def _configure_deployment_file(self, dist: AssistantDist) -> None:
+        """
+        Creates final deployment file based on config compose files of an assistant distribution
+        """
+        configs_list = self._get_existing_configs_list(dist)
+
+        deployment_file_path: Path = configs_list[-1]
+        temporary_deployment_file_path: str = str(deployment_file_path)[:-1]
+
+        if not deployment_file_path.name.endswith("_deployment.yml"):
+            raise ValueError(f"Expected *deployment.yml to be the last file.")
+        cmd = " ".join(f"-f {config}" for config in configs_list)
+        subprocess.run(
+            f"docker compose {cmd} config  > {temporary_deployment_file_path} && mv {temporary_deployment_file_path} "
+            f"{deployment_file_path}",
+            shell=True,
+        )
+        subprocess.run(
+            f'sed -i "/published:/s/\\"//g" {deployment_file_path} && echo "version: \'3.7\'" >> '
+            f'{deployment_file_path} && sed -i "/^name:/d" {deployment_file_path}',
+            shell=True,
+        )
+
+    def _get_existing_configs_list(self, dist: AssistantDist) -> List[Path]:
+        """
+        Returns:
+            list like [
+            PosixPath('.../dream/docker-compose-no-mongo.yml'),
+            PosixPath('.../dream/assistant_dists/deepy_faq/docker-compose.override.yml'),
+            PosixPath('.../dream/assistant_dists/deepy_faq/test_deployment.yml')
+            ]
+        """
         if not self.user_services:
             docker_compose_pathfile = dist.dream_root / "docker-compose.yml"
         else:
             docker_compose_pathfile = dist.dream_root / "docker-compose-no-mongo.yml"
-        configs_list = [docker_compose_pathfile]
+        configs_list = [
+            docker_compose_pathfile,
+        ]
 
         existing_configs_filenames = self._get_raw_command_with_filenames(dist)
         for command in existing_configs_filenames:
             if command:
-                configs_list.append(dist_path / command)
-        if not configs_list[-1].name.endswith("_deployment.yml"):
-            raise ValueError(f"Expected *deployment.yml to be the last file.")
-        cmd = " ".join(f"-f {config}" for config in configs_list)
-        subprocess.run(
-            f"docker compose {cmd} config  > {str(configs_list[-1])[:-1]} && mv {str(configs_list[-1])[:-1]} {configs_list[-1]}",
-            shell=True,
-        )
-        subprocess.run(
-            f'sed -i "/published:/s/\\"//g" {configs_list[-1]} && echo "version: \'3.7\'" >> {configs_list[-1]} && sed -i "/^name:/d" {configs_list[-1]}',
-            shell=True,
-        )
+                configs_list.append(dist.dist_path / command)
+
+        return configs_list
 
     def _check_for_errors_in_node_ps(self):
         """
@@ -475,5 +521,7 @@ if __name__ == "__main__":
         path_to_keyfile="/home/zzz/work/deployment-test-image-key.pem",
         user_identifier="test",
         user_services=["faq-skill"],
+        portainer_key=None,
+        portainer_url=None,
     )
     deployer.deploy(dream_dist, DREAM_ROOT_PATH_REMOTE)  # mutates python object(dist.name->user_identifier_name)

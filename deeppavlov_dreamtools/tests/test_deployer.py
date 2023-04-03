@@ -42,7 +42,7 @@ def test_change_pipeline_conf_services_url_for_deployment(
 
 def test_create_yml_file_with_explicit_images_in_local_dist(dream_root_dir, swarm_deployer_instance):
     dream_dist = AssistantDist.from_name(dream_root=dream_root_dir, name="dream")
-    swarm_deployer_instance._create_yml_file_with_explicit_images_in_local_dist(dream_dist)
+    swarm_deployer_instance._create_deployment_yml_file(dream_dist)
     dream_dist_path = dream_dist.dist_path
     filepath = dream_dist_path / "test_deployment.yml"
     assert filepath.exists()
