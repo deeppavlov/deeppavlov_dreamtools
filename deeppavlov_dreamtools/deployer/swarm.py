@@ -83,7 +83,7 @@ class SwarmDeployer:
         self.build_and_push_to_registry(dist=dist)
 
         logger.info("Deploying services on the node")
-        self.swarm_client.create_stack(dist.dist_path/f'{self.user_identifier}_deployment.yml', self.user_identifier)
+        self.swarm_client.create_stack(dist.dist_path / f"{self.user_identifier}_deployment.yml", self.user_identifier)
         shutil.rmtree(dist.dist_path)  # delete local files of the created distribution
         logger.info("Services deployed")
 
@@ -99,9 +99,7 @@ class SwarmDeployer:
 
         self._change_pipeline_conf_services_url_for_deployment(dream_pipeline=dist.pipeline_conf, user_prefix=prefix)
         if dist.pipeline_conf.config.connectors:
-            self._change_pipeline_conf_connectors_url_for_deployment(
-                dream_pipeline=dist.pipeline_conf, prefix=prefix
-            )
+            self._change_pipeline_conf_connectors_url_for_deployment(dream_pipeline=dist.pipeline_conf, prefix=prefix)
         self._change_waithosts_url(compose_override=dist.compose_override, user_prefix=prefix)
         # TODO: remove env path duplication
         dist.update_env_path(Path("assistant_dists") / dist.name / f"{self.user_identifier}.env")
@@ -295,8 +293,15 @@ class SwarmDeployer:
                     services.update({service_name: {"image": f"{self.registry_addr}/{image_name}"}})
                 else:
                     services.update({service_name: {"image": image_name}})
-        services = deep_update(services, {'agent': {'command': f"sh -c 'bin/wait && python -m deeppavlov_agent.run agent.pipeline_config=assistant_dists/{dist.dist_path.name}/pipeline_conf.json'",
-                                                    'env_file': f'assistant_dists/{dist.name}/{self.user_identifier}.env'}})
+        services = deep_update(
+            services,
+            {
+                "agent": {
+                    "command": f"sh -c 'bin/wait && python -m deeppavlov_agent.run agent.pipeline_config=assistant_dists/{dist.dist_path.name}/pipeline_conf.json'",
+                    "env_file": f"assistant_dists/{dist.name}/{self.user_identifier}.env",
+                }
+            },
+        )
         dict_yml = {"version": "3.7", "services": services, **networks}
         if self.deployment_dict is not None:
             dict_yml = deep_update(dict_yml, self.deployment_dict)
@@ -314,11 +319,17 @@ class SwarmDeployer:
         for command in existing_configs_filenames:
             if command:
                 configs_list.append(dist_path / command)
-        if not configs_list[-1].name.endswith('_deployment.yml'):
-            raise ValueError(f'Expected *deployment.yml to be the last file.')
-        cmd = ' '.join(f'-f {config}' for config in configs_list)
-        subprocess.run(f'docker compose {cmd} config  > {str(configs_list[-1])[:-1]} && mv {str(configs_list[-1])[:-1]} {configs_list[-1]}', shell=True)
-        subprocess.run(f'sed -i "/published:/s/\\"//g" {configs_list[-1]} && echo "version: \'3.7\'" >> {configs_list[-1]} && sed -i "/^name:/d" {configs_list[-1]}', shell=True)
+        if not configs_list[-1].name.endswith("_deployment.yml"):
+            raise ValueError(f"Expected *deployment.yml to be the last file.")
+        cmd = " ".join(f"-f {config}" for config in configs_list)
+        subprocess.run(
+            f"docker compose {cmd} config  > {str(configs_list[-1])[:-1]} && mv {str(configs_list[-1])[:-1]} {configs_list[-1]}",
+            shell=True,
+        )
+        subprocess.run(
+            f'sed -i "/published:/s/\\"//g" {configs_list[-1]} && echo "version: \'3.7\'" >> {configs_list[-1]} && sed -i "/^name:/d" {configs_list[-1]}',
+            shell=True,
+        )
 
     def _check_for_errors_in_node_ps(self):
         """
@@ -425,7 +436,7 @@ class SwarmDeployer:
         )
         output, error = process.communicate()
         if process.returncode != 0:
-            raise ChildProcessError(f'Failed to build images: {error.decode()}.')
+            raise ChildProcessError(f"Failed to build images: {error.decode()}.")
         logger.info("Images built")
 
     def _get_image_names_of_the_dist(self, dist: AssistantDist):

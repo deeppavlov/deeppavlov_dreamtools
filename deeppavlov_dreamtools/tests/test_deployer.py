@@ -10,7 +10,9 @@ from deeppavlov_dreamtools.deployer.swarm import SwarmDeployer
 
 @pytest.fixture
 def swarm_deployer_instance():
-    swarm_deployer = SwarmDeployer(host="0", path_to_keyfile="0", user_identifier="test", portainer_key=None, portainer_url=None)
+    swarm_deployer = SwarmDeployer(
+        host="0", path_to_keyfile="0", user_identifier="test", portainer_key=None, portainer_url=None
+    )
     yield swarm_deployer
 
 
@@ -64,18 +66,23 @@ def test_swarmdeployer_commands(dream_root_dir, swarm_deployer_instance):
 
 def test_get_image_names_of_the_dist(dream_root_dir, swarm_deployer_instance):
     deepy_base_dist = AssistantDist.from_name("deepy_base", dream_root_dir)
-    _, deepy_base_dist.compose_override = \
-        deepy_base_dist.compose_override.filter_services(["agent", "harvesters-maintenance-skill"])
-    assert swarm_deployer_instance._get_image_names_of_the_dist(deepy_base_dist) == ['deepy_base_agent',
-                                                                                     'deepy_base_harvesters-maintenance-skill']
+    _, deepy_base_dist.compose_override = deepy_base_dist.compose_override.filter_services(
+        ["agent", "harvesters-maintenance-skill"]
+    )
+    assert swarm_deployer_instance._get_image_names_of_the_dist(deepy_base_dist) == [
+        "deepy_base_agent",
+        "deepy_base_harvesters-maintenance-skill",
+    ]
 
 
 def test_change_waithosts_url(swarm_deployer_instance, dream_root_dir):
     deepy_base_dist = AssistantDist.from_name("deepy_base", dream_root_dir)
     swarm_deployer_instance._change_waithosts_url(deepy_base_dist.compose_override, "")
-    answer = "main_spelling-preprocessing:8074, main_harvesters-maintenance-skill:3662, " \
-             "main_rule-based-response-selector:8005, main_emotion-classification-deepy:8015, " \
-             "main_dff-program-y-skill:8008"
+    answer = (
+        "main_spelling-preprocessing:8074, main_harvesters-maintenance-skill:3662, "
+        "main_rule-based-response-selector:8005, main_emotion-classification-deepy:8015, "
+        "main_dff-program-y-skill:8008"
+    )
     assert deepy_base_dist.compose_override.config.services["agent"].environment["WAIT_HOSTS"] == answer
 
 
