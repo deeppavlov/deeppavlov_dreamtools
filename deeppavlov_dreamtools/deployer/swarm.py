@@ -2,7 +2,7 @@ import logging
 import shutil
 import subprocess
 from pathlib import Path
-from typing import List, Union
+from typing import List
 from urllib.parse import urlparse
 
 import boto3
@@ -15,9 +15,7 @@ from deeppavlov_dreamtools.deployer.const import DEFAULT_PREFIX, EXTERNAL_NETWOR
 from deeppavlov_dreamtools.deployer.portainer import SwarmClient
 from deeppavlov_dreamtools.distconfigs.assistant_dists import (
     AssistantDist,
-    DreamComposeDev,
     DreamComposeOverride,
-    DreamComposeProxy,
     DreamPipeline,
 )
 
@@ -40,6 +38,7 @@ class SwarmDeployer:
     # TODO: issue with name mismatch (spelling-preprocessing sep to underscore)
     # TODO: refactor general logic of choosing prefix (main or stackname)
     # TODO: refactor: implement Single Responsibility principle (Work with Host machine and Remote machine)
+    # TODO: add check that stack already doesn't exist. Add free resources check
     def __init__(
         self,
         user_identifier: str,
@@ -69,18 +68,18 @@ class SwarmDeployer:
         2) build & push images described in those configs from the host machine
         3) on the remote machine pull and deploy services from those images onto the docker stack
         """
-        self._set_up_local_configs(dist=dist)
+        self._set_up_user_dist(dist=dist)
         self.build_and_push_to_registry(dist=dist)
 
         logger.info("Deploying services on the node")
-        self.swarm_client.create_stack(dist.dist_path / f"{self.user_identifier}_deployment.yml", self.user_identifier)
+        self.swarm_client.create_stack(self._get_deployment_path(dist), self.user_identifier)
         shutil.rmtree(dist.dist_path)  # delete local files of the created distribution
         logger.info("Services deployed")
 
-    def _set_up_local_configs(self, dist: AssistantDist):
+    def _set_up_user_dist(self, dist: AssistantDist):
         prefix = self.user_identifier + "_"
         dist.name = prefix + dist.name
-        dist.compose_proxy = None
+        dist.compose_dev, dist.compose_proxy, dist.compose_local = None, None, None
 
         logger.info(f"Creating files for {dist.name} distribution")
 
@@ -89,13 +88,15 @@ class SwarmDeployer:
             self._change_pipeline_conf_connectors_url_for_deployment(dream_pipeline=dist.pipeline_conf, prefix=prefix)
         self._change_waithosts_url(compose_override=dist.compose_override, user_prefix=prefix)
         # TODO: remove env path duplication
-        dist.update_env_path(Path("assistant_dists") / dist.name / f"{self.user_identifier}.env")
+        services = dist.compose_override.config.services
+        for service_name in services:
+            if services[service_name].env_file is not None:
+                services[service_name].env_file = dist.dist_path / ".env"
         dist.del_ports_and_volumes()
 
         if self.user_services is not None:
             self.user_services.append("agent")
-            self._remove_mongo_service_in_dev(dist)
-            self._leave_only_user_services(dist)
+            dist.compose_override = dist.compose_override.filter_services(self.user_services)[1]
         dist.save(overwrite=True)
 
         self._create_dists_env_file(dist, user_prefix=prefix)
@@ -123,82 +124,9 @@ class SwarmDeployer:
                 else:
                     env_dict[env_var] = self.get_url_prefixed(env_value, DEFAULT_PREFIX)
 
-        with open(dist.dist_path / f"{self.user_identifier}.env", "w") as f:
+        with open(dist.dist_path / ".env", "w") as f:
             for var, value in env_dict.items():
                 f.write(f"{var}={value}\n")
-
-    def _leave_only_user_services(self, dist: AssistantDist):
-        """
-        Changes distribution configs - ComposeOverride and ComposeDev - by leaving specified in self.user_service
-        """
-        filtered_override, filtered_dev = None, None
-        for config in dist.iter_loaded_configs():
-            if isinstance(config, DreamPipeline):
-                continue
-            elif isinstance(config, DreamComposeOverride):
-                filtered_override = config.filter_services(self.user_services)[1]
-            elif isinstance(config, DreamComposeDev):
-                filtered_dev = config.filter_services(self.user_services)[1]
-        dist.compose_override = filtered_override
-        dist.compose_dev = filtered_dev
-
-    def _remove_mongo_service_in_dev(self, dist: AssistantDist):
-        if dist.compose_dev and dist.compose_dev.get_service("mongo"):
-            dist.compose_dev.remove_service("mongo")
-
-    def _remove_mongo_from_root_docker_compose(self, dream_root_path: Union[Path, str]):
-        """
-        Removes mongo service from docker-compose file
-
-        Args:
-            dream_root_path (Union[Path, str]): The remote path to the root directory of the Dream project.
-        """
-        dream_root_path = Path(dream_root_path)
-        docker_compose_path_remote = dream_root_path / "docker-compose.yml"
-        no_mongo_docker_compose_path_remote = dream_root_path / "docker-compose-no-mongo.yml"
-        command = (
-            f"cp {docker_compose_path_remote} {no_mongo_docker_compose_path_remote} &&"
-            f" sed -i '/mongo:/,/^$/d' {no_mongo_docker_compose_path_remote}"
-        )
-
-        subprocess.run(command, shell=True)
-
-    def _get_raw_command_with_filenames(self, dist: AssistantDist) -> List[str]:
-        """
-        Return:
-            list with string filenames of the existing configs. List like
-            ["docker-compose.override.yml", "dev.yml", "user_deployment.yml"]
-        """
-        existing_config_filenames = []
-        for config in dist.iter_loaded_configs():
-            if isinstance(config, (DreamPipeline, DreamComposeProxy)):
-                continue
-            existing_config_filenames.append(config.DEFAULT_FILE_NAME)
-
-        deployment_filename = f"{self.user_identifier}_deployment.yml"
-        existing_config_filenames.append(deployment_filename)
-
-        return existing_config_filenames
-
-    def _get_docker_build_command_from_dist_configs(
-        self, dist: AssistantDist, dream_root_remote_path: Union[Path, str]
-    ) -> str:
-        """
-        Returns:
-            string like
-            `docker-compose -f dream/docker-compose.yml -f dream/assistant_dists/docker-compose.override.yml build`
-        """
-        config_command_list = [f"-f {dream_root_remote_path / 'docker-compose.yml'}"]
-
-        dist_path_str = dream_root_remote_path / "assistant_dists" / dist.name
-
-        existing_configs_filenames = self._get_raw_command_with_filenames(dist)
-        for command in existing_configs_filenames:
-            if command:
-                config_command_list.append("".join(["-f ", str(dist_path_str / command)]))
-        command = " ".join(config_command_list)
-
-        return f"docker compose {command} build"
 
     def _change_pipeline_conf_services_url_for_deployment(
         self, dream_pipeline: DreamPipeline, user_prefix: str
@@ -269,7 +197,7 @@ class SwarmDeployer:
         ```
         """
         deployment_dict = self._create_deployment_dict(dist)
-        self._save_deployment_dict_in_dist_path(deployment_dict, dist.dist_path)
+        self._save_deployment_dict_in_dist_path(deployment_dict, dist)
         self._configure_deployment_file(dist)
 
     def _create_services_dict(self, dist: AssistantDist) -> dict:
@@ -293,7 +221,7 @@ class SwarmDeployer:
             {
                 "agent": {
                     "command": f"sh -c 'bin/wait && python -m deeppavlov_agent.run agent.pipeline_config=assistant_dists/{dist.dist_path.name}/pipeline_conf.json'",
-                    "env_file": f"assistant_dists/{dist.name}/{self.user_identifier}.env",
+                    "env_file": f"assistant_dists/{dist.name}/.env",
                 }
             },
         )
@@ -312,8 +240,12 @@ class SwarmDeployer:
             dict_yml = deep_update(dict_yml, self.deployment_dict)
         return dict_yml
 
-    def _save_deployment_dict_in_dist_path(self, dict_yml: dict, dist_path: Path) -> None:
-        deployer_filepath = dist_path / f"{self.user_identifier}_deployment.yml"
+    # TODO: consider moving deployment_path to AssistantDist as property
+    def _get_deployment_path(self, dist: AssistantDist) -> Path:
+        return dist.dist_path / f"{self.user_identifier}_deployment.yml"
+
+    def _save_deployment_dict_in_dist_path(self, dict_yml: dict, dist: AssistantDist) -> None:
+        deployer_filepath = self._get_deployment_path(dist)
         with open(deployer_filepath, "w") as file:
             yaml.dump(dict_yml, file)
 
@@ -321,14 +253,12 @@ class SwarmDeployer:
         """
         Creates final deployment file based on config compose files of an assistant distribution
         """
-        configs_list = self._get_existing_configs_list(dist)
+        docker_compose_pathfile = dist.dream_root / "docker-compose.yml"
+        override_path = dist.dist_path / dist.compose_override.DEFAULT_FILE_NAME
+        deployment_file_path = self._get_deployment_path(dist)
+        temporary_deployment_file_path = str(deployment_file_path)[:-1]
+        cmd = " ".join(f"-f {config}" for config in (docker_compose_pathfile, override_path, deployment_file_path))
 
-        deployment_file_path: Path = configs_list[-1]
-        temporary_deployment_file_path: str = str(deployment_file_path)[:-1]
-
-        if not deployment_file_path.name.endswith("_deployment.yml"):
-            raise ValueError(f"Expected *deployment.yml to be the last file.")
-        cmd = " ".join(f"-f {config}" for config in configs_list)
         subprocess.run(
             f"docker compose {cmd} config  > {temporary_deployment_file_path} && mv {temporary_deployment_file_path} "
             f"{deployment_file_path}",
@@ -339,30 +269,12 @@ class SwarmDeployer:
             f'{deployment_file_path} && sed -i "/^name:/d" {deployment_file_path}',
             shell=True,
         )
-
-    def _get_existing_configs_list(self, dist: AssistantDist) -> List[Path]:
-        """
-        Returns:
-            list like [
-            PosixPath('.../dream/docker-compose-no-mongo.yml'),
-            PosixPath('.../dream/assistant_dists/deepy_faq/docker-compose.override.yml'),
-            PosixPath('.../dream/assistant_dists/deepy_faq/test_deployment.yml')
-            ]
-        """
-        if not self.user_services:
-            docker_compose_pathfile = dist.dream_root / "docker-compose.yml"
-        else:
-            docker_compose_pathfile = dist.dream_root / "docker-compose-no-mongo.yml"
-        configs_list = [
-            docker_compose_pathfile,
-        ]
-
-        existing_configs_filenames = self._get_raw_command_with_filenames(dist)
-        for command in existing_configs_filenames:
-            if command:
-                configs_list.append(dist.dist_path / command)
-
-        return configs_list
+        if self.user_services:  # remove mongo
+            with open(deployment_file_path) as fin:
+                data = yaml.safe_load(fin)
+                del data['services']['mongo']
+            with open(deployment_file_path, 'w') as fout:
+                yaml.dump(data, fout)
 
     def remove_services(self, stack_name: str):
         self.swarm_client.delete_stack(stack_name)
@@ -419,10 +331,10 @@ class SwarmDeployer:
             return False
 
     def _build_image_on_local(self, dist: AssistantDist):
+        build_cmd = f'docker compose -f {self._get_deployment_path(dist)} --project-directory {dist.dream_root} build'
         logger.info("Building images on local machine")
         process = subprocess.Popen(
-            self._get_docker_build_command_from_dist_configs(dist, dist.dream_root),
-            cwd=dist.dream_root,
+            build_cmd,
             shell=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -445,8 +357,6 @@ class SwarmDeployer:
         """
         HOST MACHINE
         """
-        if self.user_services or True:
-            self._remove_mongo_from_root_docker_compose(dist.dream_root)
         self._build_image_on_local(dist)
         image_names: List[str] = self._get_image_names_of_the_dist(dist)
         self.push_images(image_names)

@@ -1,3 +1,5 @@
+from pathlib import Path
+from typing import Union
 from urllib.parse import urljoin
 
 import requests
@@ -49,7 +51,7 @@ class SwarmClient:
             raise ValueError(f"Expected only one Portainer endpoint, got {len(endpoints)}:\n{endpoints}")
         return endpoints[0]["Id"]
 
-    def create_stack(self, file: str, stack_name: str):
+    def create_stack(self, file: Union[str, Path], stack_name: str):
         # TODO: add/replace with creating stack with string
         return self._post(
             "/api/stacks",
