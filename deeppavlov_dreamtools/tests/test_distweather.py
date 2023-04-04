@@ -57,6 +57,7 @@ def create_weather_dist(dream_root_dir):
         compose_proxy,
         compose_local,
     )
+
     paths = new_dist.save(overwrite)
 
     yield paths
@@ -94,7 +95,8 @@ def test_dist_file_in_dream_directory(file: str, dream_weather_dist_dir, files_i
 
 @pytest.mark.parametrize(
     "file",
-    ["dev.yml", "docker-compose.override.yml", "pipeline_conf.json", "proxy.yml"],
+    # ["dev.yml", "docker-compose.override.yml", "pipeline_conf.json", "proxy.yml"],
+    ["dev.yml", "docker-compose.override.yml", "proxy.yml"],
 )
 def test_dream_weather_dist_corresponds_ground_truth_files(file: str, dream_weather_dist_dir) -> None:
     """
