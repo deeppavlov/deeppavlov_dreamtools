@@ -6,7 +6,7 @@ from deeppavlov_dreamtools.tests.fixtures import (
     dream_assistant_dists_dir,
     dream_root_dir,
     list_of_dream_dist,
-    list_dists
+    list_dists,
 )
 
 
