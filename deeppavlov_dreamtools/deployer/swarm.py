@@ -1,4 +1,3 @@
-import json
 import logging
 import shutil
 import subprocess
@@ -10,7 +9,6 @@ import boto3
 import docker
 import dotenv
 import yaml
-from fabric import Connection
 from pydantic.utils import deep_update
 
 from deeppavlov_dreamtools.deployer.const import DEFAULT_PREFIX, EXTERNAL_NETWORK_NAME
@@ -24,7 +22,6 @@ from deeppavlov_dreamtools.distconfigs.assistant_dists import (
 )
 
 # FOR LOCAL TESTS
-DREAM_ROOT_PATH_REMOTE = Path("/home/ubuntu/dream/")
 DREAM_ROOT_PATH = Path(__file__).resolve().parents[3] / "dream/"
 
 url_http_slice = slice(0, 7)
@@ -38,8 +35,6 @@ logger = logging.getLogger("dreamtools.SwarmDeployer")
 class SwarmDeployer:
     # TODO: add getting DREAM_ROOT_PATH from os.env
     # TODO: stdout from terminal to save in log files [later]
-    # TODO: add support of multiple nodes (`cls.check_for_errors_in_services`)
-    # TODO: parse `cls.check_for_errors_in_services` using `--format json` and python objects?
     # TODO: deal with versions of images(`cls._create_yml_file_with_explicit_images_in_local_dist`)
     # TODO: write docstring describing flow of configuring config files
     # TODO: issue with name mismatch (spelling-preprocessing sep to underscore)
@@ -47,31 +42,26 @@ class SwarmDeployer:
     # TODO: refactor: implement Single Responsibility principle (Work with Host machine and Remote machine)
     def __init__(
         self,
-        host: str,
-        path_to_keyfile: str,
         user_identifier: str,
         portainer_url: str,
         portainer_key: str,
         registry_addr: str = None,
         user_services: List[str] = None,
-        deployment_dict: dict = None,
-        **kwargs,
+        deployment_dict: dict = None
     ):
         """
         Args:
-            self.connection - the fabric.Connection object that allows to run virtual terminal.
             user_identifier - is used for determination of prefix
             registry_addr   - <registry_url>:<port> if images will be pulling from registry
             deployment_dict: values to update *deployment.yml file.
         """
-        self.connection: Connection = Connection(host=host, connect_kwargs={"key_filename": path_to_keyfile}, **kwargs)
         self.swarm_client = SwarmClient(portainer_url, portainer_key) if portainer_url else None
         self.user_identifier = user_identifier
         self.registry_addr = registry_addr
         self.user_services = user_services
         self.deployment_dict = deployment_dict
 
-    def deploy(self, dist: AssistantDist, dream_root_path_remote: Union[Path, str]) -> None:
+    def deploy(self, dist: AssistantDist) -> None:
         """
         Problem to be solved: deploy dream assistant distributions remotely.
         General steps:
@@ -86,9 +76,6 @@ class SwarmDeployer:
         self.swarm_client.create_stack(dist.dist_path / f"{self.user_identifier}_deployment.yml", self.user_identifier)
         shutil.rmtree(dist.dist_path)  # delete local files of the created distribution
         logger.info("Services deployed")
-
-        # self._check_for_errors_in_node_ps()  # DOESN'T SUPPORT MULTIPLE NODES. Status will be displayed in logs
-        # self._check_for_errors_in_all_services()
 
     def _set_up_local_configs(self, dist: AssistantDist):
         prefix = self.user_identifier + "_"
@@ -377,48 +364,8 @@ class SwarmDeployer:
 
         return configs_list
 
-    def _check_for_errors_in_node_ps(self):
-        """
-        docker node ps - get running tasks on master node
-        awk parameters explained:
-            -F '   +' : sets the field separator to a regular expression consisting of three or more consecutive spaces.
-            -v OFS=';' : sets the output field separator to a semicolon (space isn't suitable in this case)
-            'NR>1 && $7 != "" {print $1, $2, $4, $7}' -- excluding header, shows id, name, node, error if an error occurs
-            $1, $2, $4, $7 - data in columns ID, NAME, NODE, ERROR
-        """
-        result = self.connection.run(
-            "docker node ps | awk -F '   +' -v OFS=';' 'NR>1 && $7 != \"\" {print $1, $2, $4, $7}'", hide=True
-        )
-        if not result.stdout:
-            logger.info(f"No errors found using `docker node ps`")
-        for docker_service in result.stdout.splitlines():
-            ID, NAME, NODE, ERROR_DESCRIPTION = docker_service.split(";")
-            logger.error(f"The service couldn't be deployed: {ID=}, {NAME=}, {NODE=}, {ERROR_DESCRIPTION=}")
-
-    def _check_for_errors_in_all_services(self):
-        """
-        docker service ls --format json -- shows information about all services in stack. In case of `Replicas` of
-        services has value 0/n method sends log with service information
-        """
-        undeployed_services_id_list: list[str] = []
-        result = self.connection.run("docker service ls --format json", hide=True)
-        for service_str in result.stdout.splitlines():
-            service = json.loads(service_str)
-            if service["Replicas"].startswith("0"):
-                undeployed_services_id_list.append(service["ID"])
-
-        undeployed_services_id_str = " ".join(undeployed_services_id_list)
-        command_get_service_state = " ".join(
-            ["docker service ps", undeployed_services_id_str, "--no-trunc --format json"]
-        )
-        result = self.connection.run(command_get_service_state, hide=True)
-        for service_str in result.stdout.splitlines():
-            service = json.loads(service_str)
-            if service.get("Error"):
-                logger.error(f"Error raised in service: {service}")
-
     def remove_services(self, stack_name: str):
-        self.connection.run(f"docker stack rm {stack_name}")
+        self.swarm_client.delete_stack(stack_name)
         logger.info(f"{stack_name} successfully removed")
 
     def push_images(self, image_names: List[str]):
@@ -517,11 +464,9 @@ class SwarmDeployer:
 if __name__ == "__main__":
     dream_dist = AssistantDist.from_name(name="deepy_faq", dream_root=DREAM_ROOT_PATH)
     deployer = SwarmDeployer(
-        host="ubuntu@ec2-3-219-30-176.compute-1.amazonaws.com",
-        path_to_keyfile="/home/zzz/work/deployment-test-image-key.pem",
         user_identifier="test",
         user_services=["faq-skill"],
         portainer_key=None,
         portainer_url=None,
     )
-    deployer.deploy(dream_dist, DREAM_ROOT_PATH_REMOTE)  # mutates python object(dist.name->user_identifier_name)
+    deployer.deploy(dream_dist)  # mutates python object(dist.name->user_identifier_name)
