@@ -124,9 +124,7 @@ def test_add_dff_skill(dream_root_dir: Path):
 
 
 def test_namesetter(dream_root_dir: Path):
-    dream_dist_test_object = AssistantDist.from_name(
-        name="deepy_baseg", dream_root=dream_root_dir
-    )
+    dream_dist_test_object = AssistantDist.from_name(name="deepy_baseg", dream_root=dream_root_dir)
     test_name = dream_dist_test_object.name + "_test_namesetter"
     dream_dist_test_object.name = test_name
     assert dream_dist_test_object.name == test_name, f"Name wasn't changed"
