@@ -357,7 +357,7 @@ class ComposeDev(BaseComposeConfigModel):
     Implements dev.yml config structure
     """
 
-    services: Dict[str, ComposeDevContainer]
+    services: Dict[str, ComposeContainer]
 
 
 class ComposeProxy(BaseComposeConfigModel):

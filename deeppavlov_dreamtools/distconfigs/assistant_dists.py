@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import re
 import shutil
@@ -263,6 +265,115 @@ class YmlDreamConfig(BaseDreamConfig):
 
     def discover_port(self, service: Union[ComposeContainer, str]):
         raise NotImplementedError("Override this function")
+
+    @staticmethod
+    def _yml_list_to_dict(lst: Union[List[str], None], separator: str) -> dict:
+        """
+        Turns list from yml python object into dict
+        Example: ['4242{separator}4242'] = ['4242:4242'] -> {'4242': '4242'}
+        """
+        result = dict()
+        if lst is None:
+            return result
+        for item in lst:
+            key, value = item.split(separator)
+            result.update(
+                {
+                    key: value,
+                }
+            )
+        return result
+
+    @staticmethod
+    def _dict_to_yml_list(dct: Union[dict, None], separator: str) -> List[str]:
+        """
+        Turns list from yml python object into dict
+        Example: {'4242': '4242'} -> ['4242{separator}4242'] == ['4242:4242']
+        """
+        result = list()
+        if dct is None:
+            return result
+        for key, value in dct.items():
+            result.append("".join([key, separator, str(value)]))
+        return result
+
+    def __add__(self, other: YmlDreamConfig):
+        """
+        Merge fields ["environment", "volumes", "ports", "env_file"] values saving priority over other's values
+        DreamComposeDev with ports value  + DreamComposeOverride with None ports and environment values ->
+        -> DreamComposeDev with ports and environment values saving priority over DreamComposeOverride
+        """
+        field_separator_dict = {"environment": "=", "volumes": ":", "ports": ":"}
+        for service_name, service in self.iter_services():
+            other_service = other.get_service(service_name)
+            if not other_service:
+                continue
+            service_ = self.config.services[service_name]
+
+            for field_name, sep in field_separator_dict.items():
+                if not getattr(other_service, field_name):
+                    setattr(other_service, field_name, dict())
+                if service_name == "agent" and field_name == "environment":
+                    if not getattr(service, field_name):
+                        setattr(service, field_name, dict())
+                    base_field_dict = getattr(service, field_name)
+                    other_field_dict = getattr(other_service, field_name)
+                    base_field_dict.update(other_field_dict)
+                    service_ = self.config.services[service_name]
+                    setattr(service_, field_name, base_field_dict)
+                    continue
+
+                base_field_list = getattr(service, field_name)
+                base_field_dict = self._yml_list_to_dict(base_field_list, sep)
+
+                other_field_list = getattr(other_service, field_name)
+                other_field_dict = self._yml_list_to_dict(other_field_list, sep)
+
+                base_field_dict.update(other_field_dict)
+
+                setattr(service_, field_name, self._dict_to_yml_list(base_field_dict, sep))
+
+            if other_service.env_file:
+                if service.env_file:
+                    self.config.services[service_name].env_file = self._merge_env_fields(
+                        service.env_file, other_service.env_file
+                    )
+                else:
+                    service.env_file = other_service.env_file
+
+            self.config.services[service_name] = service_
+        return self
+
+    @staticmethod
+    def _merge_env_fields(base_env: list, other_env: list) -> list:
+        """
+        dist.compose_override._merge_env_fields([1, 2], [3, 2]) == [1, 3, 2]
+        """
+        result = list()
+        for filename in base_env:
+            if filename not in other_env:
+                result.append(filename)
+        result.extend(other_env)
+        return result
+
+    def move_content_of_env_file_to_environment_field(self):
+        """
+        Aggregates content of env files from service.env_file field and writes it to environment field
+        See flow at `deeppavlov_dreamtools.tests.test_config.py::test_move_content_of_env_file_to_environment_field`
+        """
+        for service_name, service in self.iter_services():
+            env_files_list: list = service.env_file
+            env_dict = dict()
+            environment_separator = "="
+            for env_filename in env_files_list:
+                with open(env_filename, "r") as f:
+                    env_vars = [var.strip() for var in f]
+                    env_dict.update(self._yml_list_to_dict(env_vars, environment_separator))
+            environment = self.config.services[service_name].environment
+            if not environment:
+                environment = list()
+            environment.extend(self._dict_to_yml_list(env_dict, environment_separator))
+            self.config.services[service_name].environment = environment
 
 
 class DreamPipeline(JsonDreamConfig):
