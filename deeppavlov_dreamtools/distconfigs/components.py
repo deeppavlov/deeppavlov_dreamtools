@@ -104,7 +104,7 @@ class ComponentRepository:
             },
             compose_proxy={}
         )
-        utils.dump_json({"prompt": prompt}, prompt_file)
+        utils.dump_json({"prompt": prompt}, self.dream_root / prompt_file)
         return self.add_component_config("skills", "dff_template_prompted_skill", component)
 
 
