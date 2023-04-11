@@ -80,5 +80,6 @@ def test_move_content_of_env_file_to_environment_field(dream_root_dir):
             "ENV3=3",
         ]
     except AssertionError as e:
-        shutil.rmtree(dist.dist_path)
         raise e
+    finally:
+        shutil.rmtree(dist.dist_path)
