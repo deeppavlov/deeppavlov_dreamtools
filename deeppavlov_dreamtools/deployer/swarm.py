@@ -46,7 +46,7 @@ class SwarmDeployer:
         portainer_key: str,
         registry_addr: str = None,
         user_services: List[str] = None,
-        deployment_dict: dict = None
+        deployment_dict: dict = None,
     ):
         """
         Args:
@@ -272,8 +272,8 @@ class SwarmDeployer:
         if self.user_services:  # remove mongo
             with open(deployment_file_path) as fin:
                 data = yaml.safe_load(fin)
-                del data['services']['mongo']
-            with open(deployment_file_path, 'w') as fout:
+                del data["services"]["mongo"]
+            with open(deployment_file_path, "w") as fout:
                 yaml.dump(data, fout)
 
     def remove_services(self, stack_name: str):
@@ -331,7 +331,7 @@ class SwarmDeployer:
             return False
 
     def _build_image_on_local(self, dist: AssistantDist):
-        build_cmd = f'docker compose -f {self._get_deployment_path(dist)} --project-directory {dist.dream_root} build'
+        build_cmd = f"docker compose -f {self._get_deployment_path(dist)} --project-directory {dist.dream_root} build"
         logger.info("Building images on local machine")
         process = subprocess.Popen(
             build_cmd,
