@@ -91,7 +91,7 @@ class SwarmDeployer:
         services = dist.compose_override.config.services
         for service_name in services:
             if services[service_name].env_file is not None:
-                services[service_name].env_file = dist.dist_path / ".env"
+                services[service_name].env_file = dist.dist_path / f"{self.user_identifier}.env"
         dist.del_ports_and_volumes()
 
         if self.user_services is not None:
