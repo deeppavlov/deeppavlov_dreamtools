@@ -32,8 +32,11 @@ class ComponentRepository:
         ram_usage: str,
         port: int,
         lm_service: str,
+        prompt: str,
         gpu_usage: Optional[str] = None,
     ):
+        prompt_file = f"common/prompts/{name}.json"
+
         component = Component(
             name=name,
             display_name=display_name,
@@ -69,7 +72,7 @@ class ComponentRepository:
                     "args": {
                         "SERVICE_PORT": port,
                         "SERVICE_NAME": name,
-                        "PROMPT_FILE": f"common/prompts/{name}.json",
+                        "PROMPT_FILE": prompt_file,
                         "GENERATIVE_SERVICE_URL": f"http://{lm_service}:8130/respond",
                         "GENERATIVE_SERVICE_CONFIG": "default_generative_config.json",
                         "GENERATIVE_TIMEOUT": 5,
@@ -101,6 +104,7 @@ class ComponentRepository:
             },
             compose_proxy={}
         )
+        utils.dump_json({"prompt": prompt}, prompt_file)
         return self.add_component_config("skills", "dff_template_prompted_skill", component)
 
 
