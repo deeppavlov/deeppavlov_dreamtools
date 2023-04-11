@@ -20,6 +20,8 @@ class ComponentRepository:
         component_card[config.container_name] = json.loads(config.json(exclude_none=True))
         utils.dump_yml(component_card, component_card_path, overwrite=True)
 
+        return config
+
     def add_generative_prompted_skill(
         self,
         name: str,
@@ -99,7 +101,7 @@ class ComponentRepository:
             },
             compose_proxy={}
         )
-        self.add_component_config("skills", "dff_template_prompted_skill", component)
+        return self.add_component_config("skills", "dff_template_prompted_skill", component)
 
 
 class DreamComponent:
