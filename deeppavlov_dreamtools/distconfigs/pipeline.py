@@ -171,3 +171,16 @@ class Pipeline:
             "skills": {name: item.config for name, item in self.skills.items()},
             "response_selectors": {name: item.config for name, item in self.response_selectors.items()},
         }
+
+    def get_component(self, group: str, name: str) -> DreamComponent:
+        return getattr(self, group)[name]
+
+    def add_component(self, component: DreamComponent):
+        component_group = getattr(self, component.group)
+        component_group[component.config.name] = component.pipeline
+        setattr(self, component.group, component_group)
+
+    def remove_component(self, group: str, name: str):
+        component_group = getattr(self, group)
+        del component_group[name]
+        setattr(self, group, component_group)

@@ -15,9 +15,9 @@ def test_add_service_to_dreampipeline(dream_root_dir: Path):
     dream_dist_dream = AssistantDist.from_name(name="dream", dream_root=dream_root_dir, compose_local=False)
 
     pipeline_conf_service_ner = dream_dist_dream.pipeline_conf.config.services.annotators["ner"]
-    dream_dist_deepy.pipeline_conf.add_service(
+    dream_dist_deepy.pipeline_conf.add_component(
         name="ner",
-        service_type="annotators",
+        component_group="annotators",
         definition=pipeline_conf_service_ner,
         inplace=True,
     )
