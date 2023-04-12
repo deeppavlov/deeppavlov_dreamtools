@@ -1,4 +1,6 @@
 from pathlib import Path
+import filecmp
+import shutil
 
 import pytest
 from deeppavlov_dreamtools.tests.fixtures import (
@@ -39,3 +41,33 @@ def test_discover_ports(dream_root_dir):
     assert dream_dist.compose_dev.discover_port("sentseg") == 8011
 
     assert dream_dist.compose_proxy.discover_port("sentrewrite") == 8017
+
+
+def test_clone_dist(dream_root_dir):
+    dream_dist = AssistantDist.from_name("dream", dream_root_dir)
+    new_dist = dream_dist.clone(
+        name="test_cloned_dream",
+        display_name="test_clowned",
+        description="Hell, purgatory, and heaven seem to differ the same as despair, fear, and assurance of salvation.",
+    )
+    config_files = [config.DEFAULT_FILE_NAME for config in dream_dist.iter_loaded_configs()]
+    new_dist.save(overwrite=True)
+
+    assert new_dist.dist_path.exists()
+
+    mismatching_lines = []
+    for config_filename in config_files:
+        base_dist_config_filepath = dream_dist.dist_path / config_filename
+        new_dist_config_filepath = new_dist.dist_path / config_filename
+
+        with open(base_dist_config_filepath, "r") as base_f, open(new_dist_config_filepath, "r") as new_f:
+            base_lines = base_f.readlines()
+            new_lines = new_f.readlines()
+            for i in range(len(new_lines)):
+                base_line = base_lines[i].strip()
+                new_line = new_lines[i].strip()
+                if base_line.startswith('"display_name"') or base_line.startswith('"description"'):
+                    continue
+                if base_line != new_line:
+                    mismatching_lines.append(f"{config_filename}: line {i}, {base_lines=}, {new_line=}")
+        assert not mismatching_lines, mismatching_lines
