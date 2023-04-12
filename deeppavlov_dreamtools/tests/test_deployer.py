@@ -10,9 +10,7 @@ from deeppavlov_dreamtools.deployer.swarm import SwarmDeployer
 
 @pytest.fixture
 def swarm_deployer_instance():
-    swarm_deployer = SwarmDeployer(
-        user_identifier="test", portainer_key=None, portainer_url=None
-    )
+    swarm_deployer = SwarmDeployer(user_identifier="test", portainer_key=None, portainer_url=None)
     yield swarm_deployer
 
 
