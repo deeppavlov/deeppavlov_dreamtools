@@ -205,7 +205,7 @@ class YmlDreamConfig(BaseDreamConfig):
         config = self.GENERIC_MODEL.parse_obj(model_dict)
         return names, self.__class__(config)
 
-    def add_service(self, name: str, definition: AnyContainer, inplace: bool = False):
+    def add_component(self, name: str, definition: AnyContainer, inplace: bool = False):
         """
         Adds service to config
 
@@ -232,7 +232,7 @@ class YmlDreamConfig(BaseDreamConfig):
             value = self.__class__(config)
         return value
 
-    def remove_service(self, name: str, inplace: bool = False):
+    def remove_component(self, name: str, inplace: bool = False):
         """
         Removes service from config.
 
@@ -396,10 +396,10 @@ class DreamPipeline(JsonDreamConfig):
         config = self.GENERIC_MODEL(**model_dict)
         return include_names_extended, self.__class__(config)
 
-    def add_service(
+    def add_component(
         self,
         name: str,
-        service_type: str,
+        component_group: str,
         definition: PipelineConfService,
         inplace: bool = False,
     ):
@@ -408,7 +408,7 @@ class DreamPipeline(JsonDreamConfig):
 
         Args:
             name: service name
-            service_type: service type in pipeline
+            component_group: service type in pipeline
             definition: generic service object
             inplace: if True, updates the config instance, returns a new copy of config instance otherwise
 
@@ -416,7 +416,7 @@ class DreamPipeline(JsonDreamConfig):
             config instance
         """
         services = self.config.copy().services
-        getattr(services, service_type)[name] = definition
+        getattr(services, component_group)[name] = definition
 
         model_dict = {
             "connectors": self.config.connectors,
@@ -430,12 +430,12 @@ class DreamPipeline(JsonDreamConfig):
             value = self.__class__(config)
         return value
 
-    def remove_service(self, service_type: str, name: str, inplace: bool = False):
+    def remove_component(self, component_group: str, name: str, inplace: bool = False):
         """
         Removes service from config.
 
         Args:
-            service_type: service type in pipeline
+            component_group: service type in pipeline
             name: service name
             inplace: if True, updates the config instance, returns a new copy of config instance otherwise
         Returns:
@@ -444,9 +444,9 @@ class DreamPipeline(JsonDreamConfig):
         # TODO implement recursive removal of dependent services
         services = self.config.copy().services
         try:
-            del getattr(services, service_type)[name]
+            del getattr(services, component_group)[name]
         except AttributeError:
-            raise KeyError(f"{service_type} is not a valid service group")
+            raise KeyError(f"{component_group} is not a valid service group")
         except KeyError:
             raise KeyError(f"{name} is not in the service list")
 
@@ -1074,6 +1074,29 @@ class AssistantDist:
 
             yield self._extract_component_from_service(service_group, service_name, service)
 
+    def add_component(self, component: DreamComponent):
+        self.pipeline.add_component(component)
+
+        self.compose_override.add_component(component.config.name, component.config.compose_override, inplace=True)
+
+        if self.compose_dev:
+            self.compose_dev.add_component(component.config.name, component.config.compose_dev, inplace=True)
+
+        if self.compose_proxy:
+            self.compose_proxy.add_component(component.config.name, component.config.compose_proxy, inplace=True)
+
+    def remove_component(self, group: str, name: str):
+        component = self.pipeline.get_component(group, name)
+        self.pipeline.remove_component(group, name)
+
+        self.compose_override.remove_component(component.container_name, inplace=True)
+
+        if self.compose_dev:
+            self.compose_dev.remove_component(component.container_name, inplace=True)
+
+        if self.compose_proxy:
+            self.compose_proxy.remove_component(component.container_name, inplace=True)
+
     def save(self, overwrite: bool = False):
         """
         Dumps current config objects to files.
@@ -1127,7 +1150,7 @@ class AssistantDist:
                 previous_services=["skill_selectors"],
                 state_manager_method="add_hypothesis",
             )
-            self.pipeline_conf.add_service(name_with_underscores, "skills", pl_service, inplace=True)
+            self.pipeline_conf.add_component(name_with_underscores, "skills", pl_service, inplace=True)
 
         if self.compose_override:
             override_service = ComposeContainer(
@@ -1145,14 +1168,14 @@ class AssistantDist:
                     )
                 ),
             )
-            self.compose_override.add_service(name_with_dashes, override_service, inplace=True)
+            self.compose_override.add_component(name_with_dashes, override_service, inplace=True)
 
         if self.compose_dev:
             dev_service = ComposeDevContainer(
                 volumes=[f"./skills/{name}:/src", "./common:/src/common"],
                 ports=[f"{port}:{port}"],
             )
-            self.compose_dev.add_service(name_with_dashes, dev_service, inplace=True)
+            self.compose_dev.add_component(name_with_dashes, dev_service, inplace=True)
 
         if self.compose_proxy:
             proxy_service = ComposeContainer(
@@ -1160,7 +1183,7 @@ class AssistantDist:
                 build=ContainerBuildDefinition(context=Path("dp/proxy"), dockerfile=Path("Dockerfile")),
                 environment=[f"PROXY_PASS=dream.deeppavlov.ai:{port}", f"PORT={port}"],
             )
-            self.compose_proxy.add_service(name_with_dashes, proxy_service, inplace=True)
+            self.compose_proxy.add_component(name_with_dashes, proxy_service, inplace=True)
 
         self.save(True)
 
@@ -1209,7 +1232,7 @@ class AssistantDist:
             if single_replica:
                 service.deploy = DeploymentDefinition(mode="replicated", replicas=1)
 
-            local_config.add_service(name, service, inplace=True)
+            local_config.add_component(name, service, inplace=True)
         return local_config.to_dist(self.dist_path)
 
     def enable_service(
@@ -1229,7 +1252,7 @@ class AssistantDist:
             service_name: name of the service to be added to config, e.g. `ner`
         """
         dream_temp_config = self._fetch_dream_temp_config(config_type)
-        dream_temp_config.add_service(name=service_name, service_type=service_type, definition=definition, inplace=True)
+        dream_temp_config.add_component(name=service_name, component_group=service_type, definition=definition, inplace=True)
 
         self.temp_configs[config_type] = dream_temp_config
 
@@ -1239,12 +1262,12 @@ class AssistantDist:
 
         Args:
             config_type: Literal["pipeline_conf", "compose_override", "compose_dev", "compose_proxy"]
-            service_type: name of the service_type
+            service_type: name of the component_group
             service_name: name of the service to be added to config
         """
         dream_temp_config = self._fetch_dream_temp_config(config_type)  # DreamDist.pipeline_conf, for example
 
-        dream_temp_config.remove_service(service_type=service_type, name=service_name, inplace=True)
+        dream_temp_config.remove_component(component_group=service_type, name=service_name, inplace=True)
         self.temp_configs[config_type] = dream_temp_config
 
     def _fetch_dream_temp_config(self, config_type: DreamConfigLiteral):

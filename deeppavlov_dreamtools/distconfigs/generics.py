@@ -95,29 +95,6 @@ MODEL_TYPES = Literal[
 ]
 
 
-class Component(BaseModelNoExtra):
-    name: str
-    display_name: str
-    container_name: str
-    component_type: Optional[COMPONENT_TYPES]
-    model_type: Optional[MODEL_TYPES]
-    is_customizable: bool
-    author: str
-    description: str
-    ram_usage: str
-    gpu_usage: Optional[str]
-    # execution_time: float
-    port: int
-    endpoints: List[ComponentEndpoint]
-    build_args: Optional[dict]
-    date_created: datetime = Field(default_factory=datetime.utcnow)
-
-    @validator("ram_usage", "gpu_usage")
-    def check_memory_format(cls, v):
-        check_memory_format(v)
-        return v
-
-
 class PipelineConfConnector(BaseModelNoExtra):
     protocol: str
     timeout: Optional[float]
@@ -374,6 +351,32 @@ class ComposeLocal(BaseComposeConfigModel):
     """
 
     services: Dict[str, ComposeLocalContainer]
+
+
+class Component(BaseModelNoExtra):
+    name: str
+    display_name: str
+    container_name: str
+    component_type: Optional[COMPONENT_TYPES]
+    model_type: Optional[MODEL_TYPES]
+    is_customizable: bool
+    author: str
+    description: str
+    ram_usage: str
+    gpu_usage: Optional[str]
+    # execution_time: float
+    port: int
+    endpoints: List[ComponentEndpoint]
+    build_args: Optional[dict]
+    compose_dev: ComposeContainer
+    compose_override: ComposeContainer
+    compose_proxy: ComposeContainer
+    date_created: datetime = Field(default_factory=datetime.utcnow)
+
+    @validator("ram_usage", "gpu_usage")
+    def check_memory_format(cls, v):
+        check_memory_format(v)
+        return v
 
 
 AnyContainer = Union[ComposeContainer, ComposeDevContainer, ComposeLocalContainer]

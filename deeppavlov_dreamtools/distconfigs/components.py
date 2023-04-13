@@ -1,5 +1,6 @@
+import json
 from pathlib import Path
-from typing import Union, Type, Optional
+from typing import Union, Type, Optional, List
 
 from pydantic import parse_obj_as
 
@@ -7,6 +8,104 @@ from deeppavlov_dreamtools import utils
 from deeppavlov_dreamtools.constants import COMPONENT_CARD_FILENAME, COMPONENT_PIPELINE_FILENAME
 from deeppavlov_dreamtools.distconfigs.generics import Component, PipelineConfServiceComponent
 from deeppavlov_dreamtools.utils import parse_connector_url
+
+
+class ComponentRepository:
+    def __init__(self, dream_root: Union[Path, str]):
+        self.dream_root = Path(dream_root)
+
+    def add_component_config(self, group: str, name: str, config: Component):
+        component_card_path = self.dream_root / group / name / "component.yml"
+        component_card = utils.load_yml(component_card_path)
+        component_card[config.container_name] = json.loads(config.json(exclude_none=True))
+        utils.dump_yml(component_card, component_card_path, overwrite=True)
+
+        return config
+
+    def add_generative_prompted_skill(
+        self,
+        name: str,
+        display_name: str,
+        container_name: str,
+        author: str,
+        description: str,
+        ram_usage: str,
+        port: int,
+        lm_service: str,
+        prompt: str,
+        gpu_usage: Optional[str] = None,
+    ):
+        prompt_file = f"common/prompts/{name}.json"
+
+        component = Component(
+            name=name,
+            display_name=display_name,
+            container_name=container_name,
+            component_type="Generative",
+            model_type="NN-based",
+            is_customizable=True,
+            author=author,
+            description=description,
+            ram_usage=ram_usage,
+            gpu_usage=gpu_usage,
+            port=port,
+            endpoints=[
+                {
+                    "group": "skills",
+                    "endpoint": "respond"
+                }
+            ],
+            build_args={
+                "SERVICE_PORT": port,
+                "SERVICE_NAME": name,
+                "PROMPT_FILE": f"common/prompts/{name}.json",
+                "GENERATIVE_SERVICE_URL": f"http://{lm_service}:8130/respond",
+                "GENERATIVE_SERVICE_CONFIG": "default_generative_config.json",
+                "GENERATIVE_TIMEOUT": 5,
+                "N_UTTERANCES_CONTEXT": 3
+            },
+            compose_override={
+                "env_file": [
+                    ".env"
+                ],
+                "build": {
+                    "args": {
+                        "SERVICE_PORT": port,
+                        "SERVICE_NAME": name,
+                        "PROMPT_FILE": prompt_file,
+                        "GENERATIVE_SERVICE_URL": f"http://{lm_service}:8130/respond",
+                        "GENERATIVE_SERVICE_CONFIG": "default_generative_config.json",
+                        "GENERATIVE_TIMEOUT": 5,
+                        "N_UTTERANCES_CONTEXT": 3
+                    },
+                    "context": ".",
+                    "dockerfile": "./skills/dff_template_prompted_skill/Dockerfile"
+                },
+                "command": f"gunicorn --workers=1 server:app -b 0.0.0.0:{port} --reload",
+                "deploy": {
+                    "resources": {
+                        "limits": {
+                            "memory": "128M"
+                        },
+                        "reservations": {
+                            "memory": "128M"
+                        }
+                    }
+                }
+            },
+            compose_dev={
+                "volumes": [
+                    "./skills/dff_template_prompted_skill:/src",
+                    "./common:/src/common"
+                ],
+                "ports": [
+                    f"{port}:{port}"
+                ]
+            },
+            compose_proxy={}
+        )
+        utils.dump_json({"prompt": prompt}, self.dream_root / prompt_file)
+        return self.add_component_config("skills", "dff_template_prompted_skill", component)
 
 
 class DreamComponent:
