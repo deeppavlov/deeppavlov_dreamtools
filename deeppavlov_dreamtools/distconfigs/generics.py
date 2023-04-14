@@ -17,6 +17,7 @@ from typing import Dict, Union, Optional, Any, List, Type, Literal
 
 from pydantic import BaseModel, Extra, validator, Field
 
+import deeppavlov_dreamtools.deployer.const
 from deeppavlov_dreamtools.utils import parse_connector_url
 
 
@@ -376,7 +377,17 @@ class ComposeLocal(BaseComposeConfigModel):
     services: Dict[str, ComposeLocalContainer]
 
 
+class Network(BaseModel):
+    external: bool = True
+    name: str = deeppavlov_dreamtools.deployer.const.EXTERNAL_NETWORK_NAME
+
+
+class DeploymentConfig(BaseComposeConfigModel):
+    services: Dict[str, ComposeContainer]
+    networks: Dict[str, Network] = {"default": Network()}
+
+
 AnyContainer = Union[ComposeContainer, ComposeDevContainer, ComposeLocalContainer]
 AnyComposeConfig = Union[ComposeOverride, ComposeDev, ComposeProxy, ComposeLocal]
-AnyConfig = Union[PipelineConfModel, ComposeOverride, ComposeDev, ComposeProxy, ComposeLocal]
+AnyConfig = Union[PipelineConfModel, ComposeOverride, ComposeDev, ComposeProxy, ComposeLocal, DeploymentConfig]
 AnyConfigType = Type[Union[PipelineConfModel, ComposeOverride, ComposeDev, ComposeProxy, ComposeLocal]]

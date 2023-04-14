@@ -34,6 +34,7 @@ from deeppavlov_dreamtools.distconfigs.generics import (
     DeploymentDefinitionResourcesArg,
     Component,
     PipelineConfMetadata,
+    DeploymentConfig,
 )
 from deeppavlov_dreamtools.distconfigs.pipeline import Pipeline
 from deeppavlov_dreamtools.utils import parse_connector_url
@@ -323,11 +324,17 @@ class YmlDreamConfig(BaseDreamConfig):
                     setattr(service_, field_name, base_field_dict)
                     continue
 
-                base_field_list = getattr(service, field_name)
-                base_field_dict = self._yml_list_to_dict(base_field_list, sep)
+                base_field = getattr(service, field_name)
+                if field_name == "volumes" and isinstance(base_field, dict):
+                    base_field_dict = base_field
+                else:
+                    base_field_dict = self._yml_list_to_dict(base_field, sep)
 
-                other_field_list = getattr(other_service, field_name)
-                other_field_dict = self._yml_list_to_dict(other_field_list, sep)
+                other_field = getattr(other_service, field_name)
+                if field_name == "volumes" and isinstance(other_field, dict):
+                    other_field_dict = other_field
+                else:
+                    other_field_dict = self._yml_list_to_dict(other_field, sep)
 
                 base_field_dict.update(other_field_dict)
 
@@ -342,7 +349,13 @@ class YmlDreamConfig(BaseDreamConfig):
                     service.env_file = other_service.env_file
 
             self.config.services[service_name] = service_
-        return self
+
+        if isinstance(self, type(other)):
+            dream_config = self
+        else:
+            deployment = DreamDeploymentConfig(config=DeploymentConfig(**self.config.dict()))
+            dream_config = deployment
+        return dream_config
 
     @staticmethod
     def _merge_env_fields(base_env: list, other_env: list) -> list:
@@ -759,6 +772,14 @@ class DreamComposeLocal(YmlDreamConfig):
 
     DEFAULT_FILE_NAME = "local.yml"
     GENERIC_MODEL = ComposeLocal
+
+
+class DreamDeploymentConfig(YmlDreamConfig):
+    """
+    Main class which wraps a ``*_deployment.yml`` config model
+    """
+
+    GENERIC_MODEL = DeploymentConfig
 
 
 AnyConfigClass = Union[
