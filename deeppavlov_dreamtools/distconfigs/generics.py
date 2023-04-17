@@ -15,7 +15,7 @@ from pathlib import Path
 import re
 from typing import Dict, Union, Optional, Any, List, Type, Literal
 
-from pydantic import BaseModel, Extra, validator, Field
+from pydantic import BaseModel, Extra, validator, Field, EmailStr
 
 from deeppavlov_dreamtools.utils import parse_connector_url
 
@@ -72,11 +72,14 @@ class BaseModelNoExtra(BaseModel):
         }
 
 
-class ComponentEndpoint(BaseModelNoExtra):
-    group: str
-    # port: int
-    endpoint: str
-
+COMPONENT_GROUPS = Literal[
+    "Script-based with NNs",
+    "Script-based w/o NNs",
+    "Fallback",
+    "Generative",
+    "FAQ",
+    "Retrieval",
+]
 
 COMPONENT_TYPES = Literal[
     "Script-based with NNs",
@@ -120,6 +123,9 @@ class PipelineConfServiceComponent(BaseModelNoExtra):
     required_previous_services: Optional[List[str]]
     state_manager_method: Optional[str]
     tags: Optional[List[str]]
+    host: Optional[str]
+    port: Optional[int]
+    endpoint: Optional[str]
 
     @property
     def container_name(self):
@@ -353,16 +359,32 @@ class ComposeLocal(BaseComposeConfigModel):
     services: Dict[str, ComposeLocalContainer]
 
 
+# NEW
+class ComponentEndpoint(BaseModelNoExtra):
+    group: str
+    endpoint: str
+
+
+class ComponentTemplate(BaseModelNoExtra):
+    name: str
+    display_name: str
+    author: EmailStr
+    description: str
+    endpoints: List[ComponentEndpoint]
+    config_keys: Optional[dict]
+
+
 class Component(BaseModelNoExtra):
+    template: Optional[ComponentTemplate]
     name: str
     display_name: str
     container_name: str
     component_type: Optional[COMPONENT_TYPES]
     model_type: Optional[MODEL_TYPES]
     is_customizable: bool
-    author: str
+    author: EmailStr
     description: str
-    ram_usage: str
+    ram_usage: Optional[str]
     gpu_usage: Optional[str]
     # execution_time: float
     port: int
@@ -373,10 +395,10 @@ class Component(BaseModelNoExtra):
     compose_proxy: ComposeContainer
     date_created: datetime = Field(default_factory=datetime.utcnow)
 
-    @validator("ram_usage", "gpu_usage")
-    def check_memory_format(cls, v):
-        check_memory_format(v)
-        return v
+    # @validator("ram_usage", "gpu_usage")
+    # def check_memory_format(cls, v):
+    #     check_memory_format(v)
+    #     return v
 
 
 AnyContainer = Union[ComposeContainer, ComposeDevContainer, ComposeLocalContainer]
