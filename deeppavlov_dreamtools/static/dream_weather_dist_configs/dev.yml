@@ -1,73 +1,72 @@
 services:
   agent:
-    ports:
-    - 4242:4242
     volumes:
     - .:/dp-agent
-  convers-evaluator-annotator:
     ports:
-    - 8004:8004
+    - 4242:4242
+  convers-evaluator-annotator:
     volumes:
     - ./annotators/ConversationEvaluator:/src
     - ~/.deeppavlov:/root/.deeppavlov
-  dff-intent-responder-skill:
     ports:
-    - 8012:8012
+    - 8004:8004
+  spacy-nounphrases:
+    volumes:
+    - ./annotators/spacy_nounphrases:/src
+    - ./common:/src/common
+    ports:
+    - 8006:8006
+  sentseg:
+    volumes:
+    - ./annotators/SentSeg:/src
+    ports:
+    - 8011:8011
+  dff-intent-responder-skill:
     volumes:
     - ./skills/dff_intent_responder_skill:/src
     - ./common:/src/common
-  dff-weather-skill:
     ports:
-    - 8037:8037
-    volumes:
-    - ./skills/dff_weather_skill:/src
-    - ./common:/src/common
-  dialogpt:
-    ports:
-    - 8125:8125
-    volumes:
-    - ./services/dialogpt:/src
-    - ./common:/src/common
-    - ~/.deeppavlov/cache:/root/.cache
-  entity-detection:
-    ports:
-    - 8103:8103
-    volumes:
-    - ./annotators/entity_detection:/src
-    - ~/.deeppavlov:/root/.deeppavlov
-    - ~/.deeppavlov/cache:/root/.cache
+    - 8012:8012
   intent-catcher:
-    ports:
-    - 8014:8014
     volumes:
     - ./annotators/IntentCatcherTransformers:/src
     - ./common:/src/common
     - ~/.deeppavlov:/root/.deeppavlov
     - ~/.deeppavlov/cache:/root/.cache
-  mongo:
     ports:
-    - 27017:27017
+    - 8014:8014
   ner:
-    ports:
-    - 8021:8021
     volumes:
     - ./annotators/NER_deeppavlov:/src
     - ~/.deeppavlov:/root/.deeppavlov
-  sentseg:
     ports:
-    - 8011:8011
-    volumes:
-    - ./annotators/SentSeg:/src
-  spacy-nounphrases:
+    - 8021:8021
+  mongo:
     ports:
-    - 8006:8006
-    volumes:
-    - ./annotators/spacy_nounphrases:/src
-    - ./common:/src/common
+    - 27017:27017
   spelling-preprocessing:
+    volumes:
+    - ./annotators/spelling_preprocessing:/src
     ports:
     - 8074:8074
+  entity-detection:
     volumes:
-    - ./annotators/spelling_preprocessing_dp:/src
+    - ./annotators/entity_detection:/src
     - ~/.deeppavlov:/root/.deeppavlov
+    - ~/.deeppavlov/cache:/root/.cache
+    ports:
+    - 8103:8103
+  dff-weather-skill:
+    volumes:
+    - ./skills/dff_weather_skill:/src
+    - ./common:/src/common
+    ports:
+    - 8037:8037
+  dialogpt:
+    volumes:
+    - ./services/dialogpt:/src
+    - ./common:/src/common
+    - ~/.deeppavlov/cache:/root/.cache
+    ports:
+    - 8125:8125
 version: '3.7'

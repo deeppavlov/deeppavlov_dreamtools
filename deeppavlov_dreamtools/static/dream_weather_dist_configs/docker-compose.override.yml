@@ -4,14 +4,22 @@ services:
     environment:
       WAIT_HOSTS: ''
       WAIT_HOSTS_TIMEOUT: ${WAIT_TIMEOUT:-480}
+      HIGH_PRIORITY_INTENTS: 1
+      RESTRICTION_FOR_SENSITIVE_CASE: 1
+      ALWAYS_TURN_ON_ALL_SKILLS: 0
+      LANGUAGE: EN
   convers-evaluator-annotator:
+    env_file:
+    - .env
     build:
       args:
         CONFIG: conveval.json
+        SERVICE_PORT: 8004
         DATA_URL: https://files.deeppavlov.ai/alexaprize_data/cobot_conveval2.tar.gz
-        PORT: 8004
       context: .
       dockerfile: annotators/ConversationEvaluator/Dockerfile
+    environment:
+    - CUDA_VISIBLE_DEVICES=0
     deploy:
       mode: replicated
       replicas: 1
@@ -20,16 +28,46 @@ services:
           memory: 2G
         reservations:
           memory: 2G
+  spacy-nounphrases:
     env_file:
     - .env
-    environment:
-    - CUDA_VISIBLE_DEVICES=0
-  dff-intent-responder-skill:
     build:
       args:
-        INTENT_RESPONSE_PHRASES_FNAME: intent_response_phrases.json
-        SERVICE_NAME: dff_intent_responder_skill
+        SERVICE_PORT: 8006
+        SERVICE_NAME: spacy_nounphrases
+      context: .
+      dockerfile: annotators/spacy_nounphrases/Dockerfile
+    command: flask run -h 0.0.0.0 -p 8006
+    environment:
+    - FLASK_APP=server
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 256M
+  sentseg:
+    env_file:
+    - .env
+    build:
+      context: annotators/SentSeg
+    command: flask run -h 0.0.0.0 -p 8011
+    environment:
+    - FLASK_APP=server
+    deploy:
+      resources:
+        limits:
+          memory: 1.5G
+        reservations:
+          memory: 1.5G
+  dff-intent-responder-skill:
+    env_file:
+    - .env
+    build:
+      args:
         SERVICE_PORT: 8012
+        SERVICE_NAME: dff_intent_responder_skill
+        INTENT_RESPONSE_PHRASES_FNAME: intent_response_phrases.json
       context: .
       dockerfile: skills/dff_intent_responder_skill/Dockerfile
     command: gunicorn --workers=1 server:app -b 0.0.0.0:8012 --reload
@@ -39,13 +77,96 @@ services:
           memory: 128M
         reservations:
           memory: 128M
+  intent-catcher:
     env_file:
     - .env
-  dff-weather-skill:
     build:
       args:
-        SERVICE_NAME: dff_weather_skill
+        SERVICE_PORT: 8014
+        CONFIG_NAME: intents_model_dp_config.json
+        INTENT_PHRASES_PATH: intent_phrases.json
+      context: .
+      dockerfile: annotators/IntentCatcherTransformers/Dockerfile
+    command: python -m flask run -h 0.0.0.0 -p 8014
+    environment:
+    - FLASK_APP=server
+    - CUDA_VISIBLE_DEVICES=0
+    deploy:
+      resources:
+        limits:
+          memory: 3.5G
+        reservations:
+          memory: 3.5G
+  ner:
+    env_file:
+    - .env
+    build:
+      args:
+        CONFIG: ner_case_agnostic_multilingual_bert_base_extended.json
+        SERVICE_PORT: 8021
+        SRC_DIR: annotators/NER_deeppavlov
+        COMMIT: f5117cd9ad1e64f6c2d970ecaa42fc09ccb23144
+      context: .
+      dockerfile: annotators/NER_deeppavlov/Dockerfile
+    command: flask run -h 0.0.0.0 -p 8021
+    environment:
+    - FLASK_APP=server
+    - CUDA_VISIBLE_DEVICES=0
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 2G
+    tty: true
+  spelling-preprocessing:
+    env_file:
+    - .env
+    build:
+      args:
+        SERVICE_PORT: 8074
+        SERVICE_NAME: spelling_preprocessing
+      context: annotators/spelling_preprocessing
+    command: flask run -h 0.0.0.0 -p 8074
+    environment:
+    - FLASK_APP=server
+    deploy:
+      resources:
+        limits:
+          memory: 100M
+        reservations:
+          memory: 100M
+  entity-detection:
+    env_file:
+    - .env
+    build:
+      args:
+        SERVICE_NAME: entity_detection
+        SEQ_TAG_CONFIG: wikipedia_entity_detection_distilbert.json
+        CONFIG: entity_detection_eng.json
+        LOWERCASE: 1
+        SERVICE_PORT: 8103
+        SRC_DIR: annotators/entity_detection/
+        FINEGRAINED: 0
+      context: .
+      dockerfile: annotators/entity_detection/Dockerfile
+    command: flask run -h 0.0.0.0 -p 8103
+    environment:
+    - FLASK_APP=server
+    - CUDA_VISIBLE_DEVICES=0
+    deploy:
+      resources:
+        limits:
+          memory: 2.5G
+        reservations:
+          memory: 2.5G
+  dff-weather-skill:
+    env_file:
+    - .env
+    build:
+      args:
         SERVICE_PORT: 8037
+        SERVICE_NAME: dff_weather_skill
       context: .
       dockerfile: skills/dff_weather_skill/Dockerfile
     command: gunicorn --workers=1 server:app -b 0.0.0.0:8037 --reload --timeout 500
@@ -55,144 +176,27 @@ services:
           memory: 1G
         reservations:
           memory: 1G
+  dialogpt:
     env_file:
     - .env
-  dialogpt:
     build:
       args:
-        CONFIG_NAME: dialogpt_en.json
-        N_HYPOTHESES_TO_GENERATE: 5
-        PRETRAINED_MODEL_NAME_OR_PATH: microsoft/DialoGPT-medium
-        SERVICE_NAME: dialogpt
         SERVICE_PORT: 8125
+        SERVICE_NAME: dialogpt
+        PRETRAINED_MODEL_NAME_OR_PATH: microsoft/DialoGPT-medium
+        N_HYPOTHESES_TO_GENERATE: 5
+        CONFIG_NAME: dialogpt_en.json
+        MAX_HISTORY_DEPTH: 2
       context: .
       dockerfile: services/dialogpt/Dockerfile
     command: flask run -h 0.0.0.0 -p 8125
+    environment:
+    - CUDA_VISIBLE_DEVICES=0
+    - FLASK_APP=server
     deploy:
       resources:
         limits:
           memory: 2G
         reservations:
           memory: 2G
-    env_file:
-    - .env
-    environment:
-    - CUDA_VISIBLE_DEVICES=0
-    - FLASK_APP=server
-  entity-detection:
-    build:
-      args:
-        CONFIG: entity_detection_eng.json
-        EL_TAG_CONFIG: src/el_tags_infer.json
-        FINEGRAINED: 0
-        LOWERCASE: 1
-        PORT: 8103
-        SEQ_TAG_CONFIG: src/wikipedia_entity_detection_distilbert.json
-        SRC_DIR: annotators/entity_detection/
-      context: .
-      dockerfile: annotators/entity_detection/Dockerfile
-    command: flask run -h 0.0.0.0 -p 8103
-    deploy:
-      resources:
-        limits:
-          memory: 2.5G
-        reservations:
-          memory: 2.5G
-    env_file:
-    - .env
-    environment:
-    - FLASK_APP=server
-    - CUDA_VISIBLE_DEVICES=0
-  intent-catcher:
-    build:
-      args:
-        CONFIG_NAME: intents_model_dp_config.json
-        INTENT_PHRASES_PATH: intent_phrases.json
-        SERVICE_PORT: 8014
-      context: .
-      dockerfile: annotators/IntentCatcherTransformers/Dockerfile
-    command: python -m flask run -h 0.0.0.0 -p 8014
-    deploy:
-      resources:
-        limits:
-          memory: 3.5G
-        reservations:
-          memory: 3.5G
-    env_file:
-    - .env
-    environment:
-    - FLASK_APP=server
-    - CUDA_VISIBLE_DEVICES=0
-  ner:
-    build:
-      args:
-        COMMIT: f5117cd9ad1e64f6c2d970ecaa42fc09ccb23144
-        CONFIG: ner_case_agnostic_multilingual_bert_base_extended.json
-        PORT: 8021
-        SRC_DIR: annotators/NER_deeppavlov
-      context: .
-      dockerfile: annotators/NER_deeppavlov/Dockerfile
-    command: flask run -h 0.0.0.0 -p 8021
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-        reservations:
-          memory: 2G
-    env_file:
-    - .env
-    environment:
-    - FLASK_APP=server
-    - CUDA_VISIBLE_DEVICES=0
-    tty: true
-  sentseg:
-    build:
-      context: annotators/SentSeg
-    command: flask run -h 0.0.0.0 -p 8011
-    deploy:
-      resources:
-        limits:
-          memory: 1.5G
-        reservations:
-          memory: 1.5G
-    env_file:
-    - .env
-    environment:
-    - FLASK_APP=server
-  spacy-nounphrases:
-    build:
-      context: .
-      dockerfile: annotators/spacy_nounphrases/Dockerfile
-    command: flask run -h 0.0.0.0 -p 8006
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-        reservations:
-          memory: 256M
-    env_file:
-    - .env
-    environment:
-    - FLASK_APP=server
-  spelling-preprocessing:
-    build:
-      args:
-        COMMIT: f5117cd9ad1e64f6c2d970ecaa42fc09ccb23144
-        CONFIG: brillmoore_wikitypos_en.json
-        LANGUAGE: EN
-        PORT: 8074
-        SRC_DIR: annotators/spelling_preprocessing_dp
-      context: .
-      dockerfile: annotators/spelling_preprocessing_dp/Dockerfile
-    command: flask run -h 0.0.0.0 -p 8074
-    deploy:
-      resources:
-        limits:
-          memory: 6.5G
-        reservations:
-          memory: 6.5G
-    env_file:
-    - .env
-    environment:
-    - FLASK_APP=server
 version: '3.7'
