@@ -360,6 +360,13 @@ class ComposeLocal(BaseComposeConfigModel):
 
 
 # NEW
+class Service(BaseModelNoExtra):
+    name: str
+    endpoints: list
+    compose: ComposeContainer
+    proxy: ComposeContainer
+
+
 class ComponentEndpoint(BaseModelNoExtra):
     group: str
     endpoint: str

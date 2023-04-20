@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Tuple, Union, Any
 
 import yaml
+from pydantic import BaseModel
 
 from deeppavlov_dreamtools.distconfigs import const
 
@@ -49,6 +50,10 @@ def parse_connector_url(url: str) -> Tuple[str, str, str]:
         endpoint = url_parts[1]
 
     return host, port, endpoint
+
+
+def pydantic_to_dict(data: BaseModel, exclude_none: bool = False):
+    return json.loads(data.json(exclude_none=exclude_none))
 
 
 def load_json(path: Union[Path, str]):
