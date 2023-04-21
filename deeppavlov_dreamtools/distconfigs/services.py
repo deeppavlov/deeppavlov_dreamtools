@@ -5,6 +5,97 @@ from deeppavlov_dreamtools import utils
 from deeppavlov_dreamtools.distconfigs import generics
 
 
+def _resolve_default_service_config_paths(
+    config_dir: Union[Path, str] = None, source_dir: Union[Path, str] = None, config_name: str = None
+):
+    if config_dir:
+        config_dir = Path(config_dir)
+        source_dir = config_dir.parents[1]
+    elif source_dir and config_name:
+        source_dir = Path(source_dir)
+        config_dir = source_dir / "service_configs" / config_name
+    else:
+        raise ValueError(f"Provide either 'config_dir' or 'source_dir' and 'name'")
+
+    service_file = config_dir / "service.yml"
+    environment_file = config_dir / "environment.yml"
+
+    return source_dir, config_dir, service_file, environment_file
+
+
+def create_agent_service(
+    config_dir: Union[Path, str], service_name: str, assistant_dist_pipeline_file: Union[Path, str]
+):
+    source_dir, config_dir, service_file, environment_file = _resolve_default_service_config_paths(
+        config_dir=config_dir
+    )
+    return DreamService(
+        source_dir,
+        config_dir,
+        service_file,
+        environment_file,
+        service=generics.Service(
+            name=service_name,
+            endpoints=["respond"],
+            compose=generics.ComposeContainer(
+                # env_file=[".env"],
+                command=(
+                    f"sh -c 'bin/wait && python -m deeppavlov_agent.run "
+                    f"agent.pipeline_config={assistant_dist_pipeline_file}'"
+                ),
+                volumes=[".:/dp-agent"],
+            ),
+        ),
+        environment={
+            "WAIT_HOSTS": "",
+            "WAIT_HOSTS_TIMEOUT": "${WAIT_TIMEOUT:-480}",
+            "HIGH_PRIORITY_INTENTS": "1",
+            "RESTRICTION_FOR_SENSITIVE_CASE": "1",
+            "ALWAYS_TURN_ON_ALL_SKILLS": "0",
+            "LANGUAGE": "EN",
+        },
+    )
+
+
+def create_generative_prompted_skill_service(
+    config_dir: Union[Path, str], service_name: str, generative_service_model: str
+):
+    source_dir, config_dir, service_file, environment_file = _resolve_default_service_config_paths(
+        config_dir=config_dir
+    )
+    return DreamService(
+        source_dir,
+        config_dir,
+        service_file,
+        environment_file,
+        service=generics.Service(
+            name=service_name,
+            endpoints=["respond"],
+            compose=generics.ComposeContainer(
+                env_file=[".env"],
+                build=generics.ContainerBuildDefinition(
+                    context=".", dockerfile="./skills/dff_template_prompted_skill/Dockerfile"
+                ),
+                deploy=generics.DeploymentDefinition(
+                    resources=generics.DeploymentDefinitionResources(
+                        limits=generics.DeploymentDefinitionResourcesArg(memory="128M"),
+                        reservations=generics.DeploymentDefinitionResourcesArg(memory="128M"),
+                    )
+                ),
+                volumes=["./skills/dff_template_prompted_skill:/src", "./common:/src/common"],
+            ),
+        ),
+        environment={
+            "SERVICE_NAME": service_name,
+            "PROMPT_FILE": f"common/prompts/{service_name}.json",
+            "GENERATIVE_SERVICE_URL": f"http://{generative_service_model}:8146/respond",
+            "GENERATIVE_SERVICE_CONFIG": "default_generative_config.json",
+            "GENERATIVE_TIMEOUT": 5,
+            "N_UTTERANCES_CONTEXT": 3,
+        },
+    )
+
+
 class DreamService:
     def __init__(
         self,
@@ -26,11 +117,18 @@ class DreamService:
 
     @classmethod
     def from_source_dir(cls, path: Union[Path, str], config_name: str):
-        source_dir = Path(path)
-        config_dir = source_dir / "service_configs" / config_name
+        source_dir, config_dir, service_file, environment_file = _resolve_default_service_config_paths(
+            source_dir=path, config_name=config_name
+        )
 
-        service_file = config_dir / "service.yml"
-        environment_file = config_dir / "environment.yml"
+        service = generics.Service(**utils.load_yml(service_file))
+        environment = utils.load_yml(environment_file)
+
+        return cls(source_dir, config_dir, service_file, environment_file, service, environment)
+
+    @classmethod
+    def from_config_dir(cls, path: Union[Path, str]):
+        source_dir, config_dir, service_file, environment_file = _resolve_default_service_config_paths(config_dir=path)
 
         service = generics.Service(**utils.load_yml(service_file))
         environment = utils.load_yml(environment_file)

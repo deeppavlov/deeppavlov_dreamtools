@@ -363,8 +363,8 @@ class ComposeLocal(BaseComposeConfigModel):
 class Service(BaseModelNoExtra):
     name: str
     endpoints: list
-    compose: ComposeContainer
-    proxy: ComposeContainer
+    compose: Optional[ComposeContainer]
+    proxy: Optional[ComposeContainer]
 
 
 class ComponentEndpoint(BaseModelNoExtra):
@@ -382,10 +382,9 @@ class ComponentTemplate(BaseModelNoExtra):
 
 
 class Component(BaseModelNoExtra):
-    template: Optional[ComponentTemplate]
+    # template: Optional[ComponentTemplate]
     name: str
     display_name: str
-    container_name: str
     component_type: Optional[COMPONENT_TYPES]
     model_type: Optional[MODEL_TYPES]
     is_customizable: bool
@@ -393,19 +392,24 @@ class Component(BaseModelNoExtra):
     description: str
     ram_usage: Optional[str]
     gpu_usage: Optional[str]
-    # execution_time: float
-    port: int
-    endpoints: List[ComponentEndpoint]
-    build_args: Optional[dict]
-    compose_dev: ComposeContainer
-    compose_override: ComposeContainer
-    compose_proxy: ComposeContainer
+
+    group: Optional[str]
+    connector: Union[str, PipelineConfConnector]
+    dialog_formatter: Optional[str]
+    response_formatter: Optional[str]
+    previous_services: Optional[List[str]]
+    required_previous_services: Optional[List[str]]
+    state_manager_method: Optional[str]
+    tags: Optional[List[str]]
+    endpoint: Optional[str]
+
+    service: Path
     date_created: datetime = Field(default_factory=datetime.utcnow)
 
-    # @validator("ram_usage", "gpu_usage")
-    # def check_memory_format(cls, v):
-    #     check_memory_format(v)
-    #     return v
+    @validator("ram_usage", "gpu_usage")
+    def check_memory_format(cls, v):
+        check_memory_format(v)
+        return v
 
 
 AnyContainer = Union[ComposeContainer, ComposeDevContainer, ComposeLocalContainer]
