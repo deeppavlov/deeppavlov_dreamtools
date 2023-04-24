@@ -968,7 +968,7 @@ class AssistantDist:
         prompted_component = components.create_generative_prompted_skill_component(
             self.dream_root,
             prompted_service,
-            f"components/{prompted_component_name}",
+            f"components/{prompted_component_name}.yml",
             prompted_component_name,
             f"Prompted Component {prompted_component_name}",
             author,
@@ -987,7 +987,7 @@ class AssistantDist:
         agent_last_chance_component = components.create_agent_component(
             self.dream_root,
             agent_service,
-            f"components/{agent_last_chance_component_name}",
+            f"components/{agent_last_chance_component_name}.yml",
             agent_last_chance_component_name,
             f"Agent Component {agent_last_chance_component_name}",
             author,
@@ -1001,7 +1001,7 @@ class AssistantDist:
         agent_timeout_component = components.create_agent_component(
             self.dream_root,
             agent_service,
-            f"components/{agent_timeout_component_name}",
+            f"components/{agent_timeout_component_name}.yml",
             agent_timeout_component_name,
             f"Agent Component {agent_timeout_component_name}",
             author,
