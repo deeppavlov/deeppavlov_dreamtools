@@ -1,15 +1,29 @@
 import json
 from pathlib import Path
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Union, Iterable
 
 from deeppavlov_dreamtools import utils
+from deeppavlov_dreamtools.distconfigs import generics
 from deeppavlov_dreamtools.distconfigs.components import DreamComponent
-from deeppavlov_dreamtools.distconfigs.generics import PipelineConfMetadata, PipelineConfModel, Component
+from deeppavlov_dreamtools.distconfigs.generics import PipelineConfMetadata, PipelineConf, Component
 
 
 class Pipeline:
     FILE_NAME = "pipeline_conf.json"
-    SERVICE_GROUPS = [
+    SINGLE_COMPONENT_GROUPS = [
+        "last_chance_service",
+        "timeout_service",
+        "response_annotator_selectors",
+    ]
+    MULTIPLE_COMPONENT_GROUPS = [
+        "annotators",
+        "response_annotators",
+        "candidate_annotators",
+        "skill_selectors",
+        "skills",
+        "response_selectors",
+    ]
+    COMPONENT_GROUPS = [
         "last_chance_service",
         "timeout_service",
         "annotators",
@@ -23,7 +37,7 @@ class Pipeline:
 
     def __init__(
         self,
-        config,
+        config: generics.PipelineConf,
         metadata: PipelineConfMetadata,
         annotators: Dict[str, DreamComponent],
         skills: Dict[str, DreamComponent],
@@ -48,15 +62,38 @@ class Pipeline:
         self.skills = skills
         self.response_selectors = response_selectors
 
+    def iter_component_group(self, group: str):
+        if group in self.SINGLE_COMPONENT_GROUPS:
+            yield None, getattr(self, group)
+        elif group in self.MULTIPLE_COMPONENT_GROUPS:
+            for name, component in getattr(self, group).items():
+                yield name, component
+
+    def iter_components(self):
+        for group in self.COMPONENT_GROUPS:
+            for name, component in self.iter_component_group(group):
+                yield group, name, component
+
+    # def assign_ports(self, available_ports: Iterable):
+    #     for group, name, component in self.iter_components():
+    #         if name:
+    #             getattr(self, group)["name"].
+
+    def generate_pipeline_conf(self) -> generics.PipelineConf:
+        pipeline_conf = generics.PipelineConf(services=self.components, metadata=self.metadata)
+        self._config = pipeline_conf
+
+        return pipeline_conf
+
     @classmethod
     def from_file(cls, path: Union[Path, str]):
         dream_root = Path(path).parents[2]
         data = utils.load_json(path)
 
-        config = PipelineConfModel.parse_obj(data)
+        config = generics.PipelineConf.parse_obj(data)
         kwargs = {}
 
-        for group_name in cls.SERVICE_GROUPS:
+        for group_name in cls.COMPONENT_GROUPS:
             group = getattr(config.services, group_name, None)
 
             if group is None:
@@ -65,18 +102,11 @@ class Pipeline:
             group_components = {}
             try:
                 for component_name, component in group.items():
-                    component_obj = DreamComponent.from_component_dir(
-                        dream_root / component.source.directory,
-                        component.source.container,
-                        group_name,
-                        component.source.endpoint,
-                    )
+                    component_obj = DreamComponent.from_file(dream_root / component.source.component, dream_root)
                     group_components[component_name] = component_obj
 
             except AttributeError:
-                component_obj = DreamComponent.from_component_dir(
-                    dream_root / group.source.directory, group.source.container, group_name, group.source.endpoint
-                )
+                component_obj = DreamComponent.from_file(dream_root / group.source.component, dream_root)
                 group_components = component_obj
             finally:
                 kwargs[group_name] = group_components
@@ -88,10 +118,7 @@ class Pipeline:
         )
 
     def to_file(self, path: Union[Path, str], overwrite: bool = False):
-        # Until .dict() with jsonable type serialization is implemented
-        # we will have to use this workaround
-        # https://github.com/samuelcolvin/pydantic/issues/1409
-        config = json.loads(self._config.json(exclude_none=True))
+        config = utils.pydantic_to_dict(self._config, exclude_none=True)
         return utils.dump_json(config, path, overwrite)
 
     @classmethod
@@ -159,26 +186,26 @@ class Pipeline:
         return self.to_file(dist_path / self.FILE_NAME)
 
     @property
-    def components(self) -> Dict[str, Union[Dict[str, Component], Component]]:
+    def components(self) -> Dict[str, Union[Dict[str, generics.Component], generics.Component]]:
         return {
-            "last_chance_service": getattr(self.last_chance_service, "config", {}),
-            "timeout_service": getattr(self.timeout_service, "config", {}),
-            "annotators": {name: item.config for name, item in self.annotators.items()},
-            "response_annotators": {name: item.config for name, item in self.response_annotators.items()},
-            "response_annotator_selectors": getattr(self.response_annotator_selectors, "config", {}),
-            "candidate_annotators": {name: item.config for name, item in self.candidate_annotators.items()},
-            "skill_selectors": {name: item.config for name, item in self.skill_selectors.items()},
-            "skills": {name: item.config for name, item in self.skills.items()},
-            "response_selectors": {name: item.config for name, item in self.response_selectors.items()},
+            "last_chance_service": getattr(self.last_chance_service, "pipeline", {}),
+            "timeout_service": getattr(self.timeout_service, "pipeline", {}),
+            "annotators": {name: item.pipeline for name, item in self.annotators.items()},
+            "response_annotators": {name: item.pipeline for name, item in self.response_annotators.items()},
+            "response_annotator_selectors": getattr(self.response_annotator_selectors, "pipeline", {}),
+            "candidate_annotators": {name: item.pipeline for name, item in self.candidate_annotators.items()},
+            "skill_selectors": {name: item.pipeline for name, item in self.skill_selectors.items()},
+            "skills": {name: item.pipeline for name, item in self.skills.items()},
+            "response_selectors": {name: item.pipeline for name, item in self.response_selectors.items()},
         }
 
     def get_component(self, group: str, name: str) -> DreamComponent:
         return getattr(self, group)[name]
 
     def add_component(self, component: DreamComponent):
-        component_group = getattr(self, component.group)
-        component_group[component.config.name] = component.pipeline
-        setattr(self, component.group, component_group)
+        component_group = getattr(self, component.component.group)
+        component_group[component.component.name] = component.pipeline
+        setattr(self, component.component.group, component_group)
 
     def remove_component(self, group: str, name: str):
         component_group = getattr(self, group)

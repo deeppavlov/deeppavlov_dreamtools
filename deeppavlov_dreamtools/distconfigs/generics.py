@@ -109,12 +109,11 @@ class PipelineConfConnector(BaseModelNoExtra):
 
 
 class PipelineConfComponentSource(BaseModelNoExtra):
-    directory: Path
-    container: str
-    endpoint: Optional[str]
+    component: Path
+    service: Path
 
 
-class PipelineConfServiceComponent(BaseModelNoExtra):
+class PipelineConfServiceComponent(BaseModel):
     group: Optional[str]
     connector: Union[str, PipelineConfConnector]
     dialog_formatter: Optional[str]
@@ -127,47 +126,10 @@ class PipelineConfServiceComponent(BaseModelNoExtra):
     port: Optional[int]
     endpoint: Optional[str]
 
-    @property
-    def container_name(self):
-        try:
-            url = self.connector.url
-        except AttributeError:
-            name = None
-        else:
-            host, port, endpoint = parse_connector_url(url)
-            name = host
-
-        return name
-
-    @property
-    def container_port(self):
-        try:
-            url = self.connector.url
-        except AttributeError:
-            port = None
-        else:
-            host, port, endpoint = parse_connector_url(url)
-
-        return port
-
-    @property
-    def container_endpoint(self):
-        try:
-            url = self.connector.url
-        except AttributeError:
-            endpoint = None
-        else:
-            host, port, endpoint = parse_connector_url(url)
-
-        return endpoint
-
 
 class PipelineConfService(PipelineConfServiceComponent):
     is_enabled: Optional[bool] = True
-    source: Optional[PipelineConfComponentSource] = PipelineConfComponentSource(
-        directory=Path(),
-        container="",
-    )
+    source: PipelineConfComponentSource
 
 
 class PipelineConfServiceList(BaseModelNoExtra):
@@ -210,7 +172,7 @@ class PipelineConfMetadata(BaseModelNoExtra):
     disk_usage: str
 
 
-class PipelineConfModel(BaseModelNoExtra):
+class PipelineConf(BaseModelNoExtra):
     """
     Implements pipeline.json config structure
     """
@@ -414,5 +376,5 @@ class Component(BaseModelNoExtra):
 
 AnyContainer = Union[ComposeContainer, ComposeDevContainer, ComposeLocalContainer]
 AnyComposeConfig = Union[ComposeOverride, ComposeDev, ComposeProxy, ComposeLocal]
-AnyConfig = Union[PipelineConfModel, ComposeOverride, ComposeDev, ComposeProxy, ComposeLocal]
-AnyConfigType = Type[Union[PipelineConfModel, ComposeOverride, ComposeDev, ComposeProxy, ComposeLocal]]
+AnyConfig = Union[PipelineConf, ComposeOverride, ComposeDev, ComposeProxy, ComposeLocal]
+AnyConfigType = Type[Union[PipelineConf, ComposeOverride, ComposeDev, ComposeProxy, ComposeLocal]]

@@ -119,11 +119,7 @@ def create_generative_prompted_skill_component(
         description=description,
         ram_usage="150M",
         group="skills",
-        connector=generics.PipelineConfConnector(
-            protocol="http",
-            timeout="5.0",
-            url=""
-        ),
+        connector=generics.PipelineConfConnector(protocol="http", timeout="5.0", url=""),
         dialog_formatter="state_formatters.dp_formatters:dff_empathetic_marketing_prompted_skill_formatter",
         response_formatter="state_formatters.dp_formatters:skill_with_attributes_formatter_service",
         previous_services=["skill_selectors"],
@@ -169,6 +165,17 @@ class DreamComponent:
     def save_configs(self):
         utils.dump_yml(utils.pydantic_to_dict(self.component), self.component_file)
         self.service.save_configs()
+
+    @property
+    def pipeline(self):
+        return generics.PipelineConfService(
+            is_enabled=True,
+            source=generics.PipelineConfComponentSource(
+                component=self.component_file,
+                service=self.component.service,
+            ),
+            **self.component.dict(exclude_none=True),
+        )
 
 
 # def list_components()

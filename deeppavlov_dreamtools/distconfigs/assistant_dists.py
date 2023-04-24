@@ -13,7 +13,7 @@ from deeppavlov_dreamtools import utils
 from deeppavlov_dreamtools.distconfigs import const
 from deeppavlov_dreamtools.distconfigs.components import DreamComponent
 from deeppavlov_dreamtools.distconfigs.generics import (
-    PipelineConfModel,
+    PipelineConf,
     ComposeOverride,
     ComposeDev,
     ComposeProxy,
@@ -273,7 +273,7 @@ class DreamPipeline(JsonDreamConfig):
     """
 
     DEFAULT_FILE_NAME = "pipeline_conf.json"
-    GENERIC_MODEL = PipelineConfModel
+    GENERIC_MODEL = PipelineConf
 
     # @property
     # def container_names(self):
