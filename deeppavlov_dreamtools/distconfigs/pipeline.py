@@ -102,11 +102,11 @@ class Pipeline:
             group_components = {}
             try:
                 for component_name, component in group.items():
-                    component_obj = DreamComponent.from_file(dream_root / component.source.component, dream_root)
+                    component_obj = DreamComponent.from_file(component.source.component, dream_root)
                     group_components[component_name] = component_obj
 
             except AttributeError:
-                component_obj = DreamComponent.from_file(dream_root / group.source.component, dream_root)
+                component_obj = DreamComponent.from_file(group.source.component, dream_root)
                 group_components = component_obj
             finally:
                 kwargs[group_name] = group_components

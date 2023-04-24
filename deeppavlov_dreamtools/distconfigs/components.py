@@ -57,12 +57,14 @@ class DreamComponentTemplate:
 
 
 def create_agent_component(
+    dream_root: Union[Path, str],
     agent_service: services.DreamService,
     config_path: Union[Path, str],
     name: str,
     display_name: str,
     author: str,
     description: str,
+    group: str,
     response_text: str,
     tags: Optional[List[str]] = None,
 ):
@@ -75,14 +77,15 @@ def create_agent_component(
         is_customizable=False,
         author=author,
         description=f"DP-Agent for {name}",
+        group=group,
         connector=generics.PipelineConfConnector(
             protocol="python",
             class_name="PredefinedTextConnector",
             response_text=response_text,
             annotations={
                 "sentseg": {
-                    "punct_sent": "Sorry, something went wrong inside. Please tell me, what did you say.",
-                    "segments": ["Sorry, something went wrong inside.", "Please tell me, what did you say."],
+                    "punct_sent": response_text,
+                    "segments": [f"{sentence.strip()}." for sentence in response_text.split(".") if sentence],
                 }
             },
         ),
@@ -92,15 +95,20 @@ def create_agent_component(
         endpoint="respond",
     )
 
-    return DreamComponent(
+    dream_component = DreamComponent(
+        dream_root=dream_root,
         source_dir=source_dir,
         component_file=config_path,
         component=component,
         service=agent_service,
     )
+    dream_component.save_configs()
+
+    return dream_component
 
 
 def create_generative_prompted_skill_component(
+    dream_root: Union[Path, str],
     generative_prompted_skill_service: services.DreamService,
     config_path: Union[Path, str],
     name: str,
@@ -128,41 +136,53 @@ def create_generative_prompted_skill_component(
         service=generative_prompted_skill_service.service_file,
     )
 
-    return DreamComponent(
+    dream_component = DreamComponent(
+        dream_root=dream_root,
         source_dir=source_dir,
         component_file=config_path,
         component=component,
         service=generative_prompted_skill_service,
     )
+    dream_component.save_configs()
+
+    return dream_component
 
 
 class DreamComponent:
     def __init__(
         self,
+        dream_root: Union[Path, str],
         source_dir: Union[Path, str],
         component_file: Union[Path, str],
         component: generics.Component,
         service: services.DreamService,
         # template: DreamComponentTemplate = None,
     ):
+        self.dream_root = dream_root
         self.source_dir = source_dir
         self.component_file = component_file
         self.component = component
         self.service = service
         # self.template = template
 
+    # def _create_config_dir(self):
+    #     config_dir = self.dream_root / self.source_dir
+    #     config_dir.mkdir(parents=True, exist_ok=True)
+
     @classmethod
-    def from_file(cls, path: Union[Path, str], service_path_prefix: Union[Path, str] = None):
+    def from_file(cls, path: Union[Path, str], dream_root: Union[Path, str] = None):
         path = Path(path)
+        dream_root = Path(dream_root)
 
-        source_dir = path.parent
-        component = generics.Component(**utils.load_yml(path))
+        source_dir = dream_root / path.parent
+        component = generics.Component(**utils.load_yml(dream_root / path))
 
-        service = services.DreamService.from_config_dir(service_path_prefix / component.service)
+        service = services.DreamService.from_config_dir(dream_root, dream_root / component.service)
 
-        return cls(source_dir, path, component, service)
+        return cls(dream_root, source_dir, path, component, service)
 
     def save_configs(self):
+        self.source_dir.mkdir(parents=True, exist_ok=True)
         utils.dump_yml(utils.pydantic_to_dict(self.component), self.component_file)
         self.service.save_configs()
 

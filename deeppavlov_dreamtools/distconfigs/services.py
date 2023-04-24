@@ -24,12 +24,13 @@ def _resolve_default_service_config_paths(
 
 
 def create_agent_service(
-    config_dir: Union[Path, str], service_name: str, assistant_dist_pipeline_file: Union[Path, str]
+    dream_root: Union[Path, str], config_dir: Union[Path, str], service_name: str, assistant_dist_pipeline_file: Union[Path, str]
 ):
     source_dir, config_dir, service_file, environment_file = _resolve_default_service_config_paths(
         config_dir=config_dir
     )
-    return DreamService(
+    service = DreamService(
+        dream_root,
         source_dir,
         config_dir,
         service_file,
@@ -55,15 +56,19 @@ def create_agent_service(
             "LANGUAGE": "EN",
         },
     )
+    service.save_configs()
+
+    return service
 
 
 def create_generative_prompted_skill_service(
-    config_dir: Union[Path, str], service_name: str, generative_service_model: str
+    dream_root: Union[Path, str], config_dir: Union[Path, str], service_name: str, generative_service_model: str
 ):
     source_dir, config_dir, service_file, environment_file = _resolve_default_service_config_paths(
         config_dir=config_dir
     )
-    return DreamService(
+    service = DreamService(
+        dream_root,
         source_dir,
         config_dir,
         service_file,
@@ -94,11 +99,15 @@ def create_generative_prompted_skill_service(
             "N_UTTERANCES_CONTEXT": 3,
         },
     )
+    service.save_configs()
+
+    return service
 
 
 class DreamService:
     def __init__(
         self,
+        dream_root: Union[Path, str],
         source_dir: Union[Path, str],
         config_dir: Union[Path, str],
         service_file: Union[Path, str],
@@ -106,6 +115,7 @@ class DreamService:
         service: generics.Service,
         environment: dict,
     ):
+        self.dream_root = dream_root
         self.source_dir = source_dir
         self.config_dir = config_dir
 
@@ -116,7 +126,7 @@ class DreamService:
         self.environment = environment
 
     @classmethod
-    def from_source_dir(cls, path: Union[Path, str], config_name: str):
+    def from_source_dir(cls, dream_root: Union[Path, str],  path: Union[Path, str], config_name: str):
         source_dir, config_dir, service_file, environment_file = _resolve_default_service_config_paths(
             source_dir=path, config_name=config_name
         )
@@ -124,22 +134,28 @@ class DreamService:
         service = generics.Service(**utils.load_yml(service_file))
         environment = utils.load_yml(environment_file)
 
-        return cls(source_dir, config_dir, service_file, environment_file, service, environment)
+        return cls(dream_root, source_dir, config_dir, service_file, environment_file, service, environment)
 
     @classmethod
-    def from_config_dir(cls, path: Union[Path, str]):
+    def from_config_dir(cls, dream_root: Union[Path, str], path: Union[Path, str]):
         source_dir, config_dir, service_file, environment_file = _resolve_default_service_config_paths(config_dir=path)
 
         service = generics.Service(**utils.load_yml(service_file))
         environment = utils.load_yml(environment_file)
 
-        return cls(source_dir, config_dir, service_file, environment_file, service, environment)
+        return cls(dream_root, source_dir, config_dir, service_file, environment_file, service, environment)
+
+    def _create_config_dir(self):
+        config_dir = self.dream_root / self.config_dir
+        config_dir.mkdir(parents=True, exist_ok=True)
 
     def save_service_config(self):
-        utils.dump_yml(utils.pydantic_to_dict(self.service), self.service_file, overwrite=True)
+        self._create_config_dir()
+        utils.dump_yml(utils.pydantic_to_dict(self.service), self.dream_root / self.service_file, overwrite=True)
 
     def save_environment_config(self):
-        utils.dump_yml(self.environment, self.environment_file, overwrite=True)
+        self._create_config_dir()
+        utils.dump_yml(self.environment, self.dream_root / self.environment_file, overwrite=True)
 
     def save_configs(self):
         self.save_service_config()
