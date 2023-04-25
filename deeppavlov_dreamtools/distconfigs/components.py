@@ -183,7 +183,7 @@ class DreamComponent:
 
     def save_configs(self):
         self.source_dir.mkdir(parents=True, exist_ok=True)
-        utils.dump_yml(utils.pydantic_to_dict(self.component), self.component_file)
+        utils.dump_yml(utils.pydantic_to_dict(self.component), self.dream_root / self.component_file, overwrite=True)
         self.service.save_configs()
 
     @property
