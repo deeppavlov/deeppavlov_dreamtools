@@ -197,8 +197,34 @@ class DreamComponent:
             **self.component.dict(exclude_none=True),
         )
 
+    @property
+    def prompt(self):
+        prompt_file = self.service.environment.get("PROMPT_FILE")
+        if prompt_file:
+            prompt = utils.load_json(self.dream_root / prompt_file)["prompt"]
+        else:
+            prompt = None
 
-# def list_components()
+        return prompt
+
+    @prompt.setter
+    def prompt(self, value: str):
+        prompt_file = self.service.environment.get("PROMPT_FILE")
+        if prompt_file:
+            utils.dump_json({"prompt": value}, self.dream_root / prompt_file)
+
+    @property
+    def lm_service(self):
+        lm_service_url = self.service.environment.get("GENERATIVE_SERVICE_URL")
+
+        return lm_service_url
+
+    @lm_service.setter
+    def lm_service(self, value: str):
+        self.service.environment["GENERATIVE_SERVICE_URL"] = value
+        self.service.save_environment_config()
+
+
 class ComponentRepository:
     def __init__(self, dream_root: Union[Path, str]):
         self.dream_root = Path(dream_root)
