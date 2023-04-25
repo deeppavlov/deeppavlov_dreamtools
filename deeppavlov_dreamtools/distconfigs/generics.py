@@ -184,7 +184,7 @@ class PipelineConf(BaseModelNoExtra):
 
 class ContainerBuildDefinition(BaseModelNoExtra):
     args: Optional[Dict[str, Any]]
-    context: Path
+    context: Optional[Path]
     dockerfile: Optional[Path]
 
     class Config:
