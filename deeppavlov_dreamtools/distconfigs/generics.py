@@ -15,7 +15,7 @@ from pathlib import Path
 import re
 from typing import Dict, Union, Optional, Any, List, Type, Literal
 
-from pydantic import BaseModel, Extra, validator, Field
+from pydantic import BaseModel, Extra, validator, Field, EmailStr
 
 from deeppavlov_dreamtools.utils import parse_connector_url
 
@@ -72,11 +72,14 @@ class BaseModelNoExtra(BaseModel):
         }
 
 
-class ComponentEndpoint(BaseModelNoExtra):
-    group: str
-    # port: int
-    endpoint: str
-
+COMPONENT_GROUPS = Literal[
+    "Script-based with NNs",
+    "Script-based w/o NNs",
+    "Fallback",
+    "Generative",
+    "FAQ",
+    "Retrieval",
+]
 
 COMPONENT_TYPES = Literal[
     "Script-based with NNs",
@@ -106,12 +109,11 @@ class PipelineConfConnector(BaseModelNoExtra):
 
 
 class PipelineConfComponentSource(BaseModelNoExtra):
-    directory: Path
-    container: str
-    endpoint: Optional[str]
+    component: Path
+    service: Path
 
 
-class PipelineConfServiceComponent(BaseModelNoExtra):
+class PipelineConfServiceComponent(BaseModel):
     group: Optional[str]
     connector: Union[str, PipelineConfConnector]
     dialog_formatter: Optional[str]
@@ -120,48 +122,14 @@ class PipelineConfServiceComponent(BaseModelNoExtra):
     required_previous_services: Optional[List[str]]
     state_manager_method: Optional[str]
     tags: Optional[List[str]]
-
-    @property
-    def container_name(self):
-        try:
-            url = self.connector.url
-        except AttributeError:
-            name = None
-        else:
-            host, port, endpoint = parse_connector_url(url)
-            name = host
-
-        return name
-
-    @property
-    def container_port(self):
-        try:
-            url = self.connector.url
-        except AttributeError:
-            port = None
-        else:
-            host, port, endpoint = parse_connector_url(url)
-
-        return port
-
-    @property
-    def container_endpoint(self):
-        try:
-            url = self.connector.url
-        except AttributeError:
-            endpoint = None
-        else:
-            host, port, endpoint = parse_connector_url(url)
-
-        return endpoint
+    host: Optional[str]
+    port: Optional[int]
+    endpoint: Optional[str]
 
 
 class PipelineConfService(PipelineConfServiceComponent):
     is_enabled: Optional[bool] = True
-    source: Optional[PipelineConfComponentSource] = PipelineConfComponentSource(
-        directory=Path(),
-        container="",
-    )
+    source: PipelineConfComponentSource
 
 
 class PipelineConfServiceList(BaseModelNoExtra):
@@ -204,7 +172,7 @@ class PipelineConfMetadata(BaseModelNoExtra):
     disk_usage: str
 
 
-class PipelineConfModel(BaseModelNoExtra):
+class PipelineConf(BaseModelNoExtra):
     """
     Implements pipeline.json config structure
     """
@@ -353,24 +321,51 @@ class ComposeLocal(BaseComposeConfigModel):
     services: Dict[str, ComposeLocalContainer]
 
 
-class Component(BaseModelNoExtra):
+# NEW
+class Service(BaseModelNoExtra):
+    name: str
+    endpoints: list
+    compose: Optional[ComposeContainer]
+    proxy: Optional[ComposeContainer]
+
+
+class ComponentEndpoint(BaseModelNoExtra):
+    group: str
+    endpoint: str
+
+
+class ComponentTemplate(BaseModelNoExtra):
     name: str
     display_name: str
-    container_name: str
+    author: EmailStr
+    description: str
+    endpoints: List[ComponentEndpoint]
+    config_keys: Optional[dict]
+
+
+class Component(BaseModelNoExtra):
+    # template: Optional[ComponentTemplate]
+    name: str
+    display_name: str
     component_type: Optional[COMPONENT_TYPES]
     model_type: Optional[MODEL_TYPES]
     is_customizable: bool
-    author: str
+    author: EmailStr
     description: str
-    ram_usage: str
+    ram_usage: Optional[str]
     gpu_usage: Optional[str]
-    # execution_time: float
-    port: int
-    endpoints: List[ComponentEndpoint]
-    build_args: Optional[dict]
-    compose_dev: ComposeContainer
-    compose_override: ComposeContainer
-    compose_proxy: ComposeContainer
+
+    group: Optional[str]
+    connector: Union[str, PipelineConfConnector]
+    dialog_formatter: Optional[str]
+    response_formatter: Optional[str]
+    previous_services: Optional[List[str]]
+    required_previous_services: Optional[List[str]]
+    state_manager_method: Optional[str]
+    tags: Optional[List[str]]
+    endpoint: Optional[str]
+
+    service: Path
     date_created: datetime = Field(default_factory=datetime.utcnow)
 
     @validator("ram_usage", "gpu_usage")
@@ -381,5 +376,5 @@ class Component(BaseModelNoExtra):
 
 AnyContainer = Union[ComposeContainer, ComposeDevContainer, ComposeLocalContainer]
 AnyComposeConfig = Union[ComposeOverride, ComposeDev, ComposeProxy, ComposeLocal]
-AnyConfig = Union[PipelineConfModel, ComposeOverride, ComposeDev, ComposeProxy, ComposeLocal]
-AnyConfigType = Type[Union[PipelineConfModel, ComposeOverride, ComposeDev, ComposeProxy, ComposeLocal]]
+AnyConfig = Union[PipelineConf, ComposeOverride, ComposeDev, ComposeProxy, ComposeLocal]
+AnyConfigType = Type[Union[PipelineConf, ComposeOverride, ComposeDev, ComposeProxy, ComposeLocal]]

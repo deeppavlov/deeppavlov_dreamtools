@@ -10,10 +10,10 @@ import yaml
 from pydantic import parse_obj_as
 
 from deeppavlov_dreamtools import utils
-from deeppavlov_dreamtools.distconfigs import const
+from deeppavlov_dreamtools.distconfigs import const, services, components
 from deeppavlov_dreamtools.distconfigs.components import DreamComponent
 from deeppavlov_dreamtools.distconfigs.generics import (
-    PipelineConfModel,
+    PipelineConf,
     ComposeOverride,
     ComposeDev,
     ComposeProxy,
@@ -273,7 +273,7 @@ class DreamPipeline(JsonDreamConfig):
     """
 
     DEFAULT_FILE_NAME = "pipeline_conf.json"
-    GENERIC_MODEL = PipelineConfModel
+    GENERIC_MODEL = PipelineConf
 
     # @property
     # def container_names(self):
@@ -933,8 +933,10 @@ class AssistantDist:
         self,
         name: str,
         display_name: str,
+        author: str,
         description: str = "",
-        service_names: Optional[list] = None,
+        existing_prompted_skill: str = None,
+        # service_names: Optional[list] = None,
     ):
         """
         Creates Dream distribution inherited from another distribution.
@@ -945,7 +947,7 @@ class AssistantDist:
             name: name of new Dream distribution
             display_name: human-readable name of new Dream distribution
             description: name of new Dream distribution
-            service_names: list of services to be included in new distribution
+            # service_names: list of services to be included in new distribution
         Returns:
             instance of DreamDist
         """
@@ -954,39 +956,97 @@ class AssistantDist:
 
         # _, new_compose_override = self.compose_override.filter_services(all_names)
 
-        new_pipeline = deepcopy(self.pipeline)
-
-        new_pipeline_conf = deepcopy(self.pipeline_conf)
-        new_pipeline_conf.display_name = display_name
-        new_pipeline_conf.description = description
-
-        new_compose_override = deepcopy(self.compose_override)
-        new_agent_command = re.sub(
-            f"assistant_dists/{self.name}/pipeline_conf.json",
-            f"assistant_dists/{name}/pipeline_conf.json",
-            new_compose_override.config.services["agent"].command,
+        prompted_service_name = utils.generate_unique_name()
+        prompted_service = services.create_generative_prompted_skill_service(
+            self.dream_root,
+            f"skills/dff_template_prompted_skill/service_configs/{prompted_service_name}",
+            prompted_service_name,
+            "transformers-lm-oasst12b"
         )
-        new_compose_override.config.services["agent"].command = new_agent_command
 
-        # new_compose_override.config.services["agent"].environment["WAIT_HOSTS"] = ""
-        new_compose_dev = new_compose_proxy = new_compose_local = None
-        if self.compose_dev:
-            new_compose_dev = deepcopy(self.compose_dev)
-        if self.compose_proxy:
-            new_compose_proxy = deepcopy(self.compose_proxy)
-        if self.compose_local:
-            new_compose_local = deepcopy(self.compose_local)
+        prompted_component_name = utils.generate_unique_name()
+        prompted_component = components.create_generative_prompted_skill_component(
+            self.dream_root,
+            prompted_service,
+            f"components/{prompted_component_name}.yml",
+            prompted_component_name,
+            f"Prompted Component {prompted_component_name}",
+            author,
+            "Copy of prompted service",
+        )
+
+        agent_service_name = utils.generate_unique_name()
+        agent_service = services.create_agent_service(
+            self.dream_root,
+            f"services/agent_services/service_configs/{agent_service_name}",
+            agent_service_name,
+            f"assistant_dists/{name}/pipeline_conf.json"
+        )
+
+        agent_last_chance_component_name = utils.generate_unique_name()
+        agent_last_chance_component = components.create_agent_component(
+            self.dream_root,
+            agent_service,
+            f"components/{agent_last_chance_component_name}.yml",
+            agent_last_chance_component_name,
+            f"Agent Component {agent_last_chance_component_name}",
+            author,
+            "Copy of agent",
+            "last_chance_service",
+            "Sorry, something went wrong inside. Please tell me, what did you say.",
+            ["last_chance"],
+        )
+
+        agent_timeout_component_name = utils.generate_unique_name()
+        agent_timeout_component = components.create_agent_component(
+            self.dream_root,
+            agent_service,
+            f"components/{agent_timeout_component_name}.yml",
+            agent_timeout_component_name,
+            f"Agent Component {agent_timeout_component_name}",
+            author,
+            "Copy of agent",
+            "timeout_service",
+            "Sorry, I need to think more on that. Let's talk about something else.",
+            ["timeout"],
+        )
+
+        new_pipeline = deepcopy(self.pipeline)
+        new_pipeline.skills[existing_prompted_skill] = prompted_component
+        new_pipeline.last_chance_service = agent_last_chance_component
+        new_pipeline.timeout_service = agent_timeout_component
+
+        # new_pipeline_conf = deepcopy(self.pipeline_conf)
+        # new_pipeline_conf.display_name = display_name
+        # new_pipeline_conf.description = description
+        #
+        # new_compose_override = deepcopy(self.compose_override)
+        # new_agent_command = re.sub(
+        #     f"assistant_dists/{self.name}/pipeline_conf.json",
+        #     f"assistant_dists/{name}/pipeline_conf.json",
+        #     new_compose_override.config.services["agent"].command,
+        # )
+        # new_compose_override.config.services["agent"].command = new_agent_command
+        #
+        # # new_compose_override.config.services["agent"].environment["WAIT_HOSTS"] = ""
+        # new_compose_dev = new_compose_proxy = new_compose_local = None
+        # if self.compose_dev:
+        #     new_compose_dev = deepcopy(self.compose_dev)
+        # if self.compose_proxy:
+        #     new_compose_proxy = deepcopy(self.compose_proxy)
+        # if self.compose_local:
+        #     new_compose_local = deepcopy(self.compose_local)
 
         return AssistantDist(
             self.resolve_dist_path(name, self.dream_root),
             name,
             self.dream_root,
             new_pipeline,
-            new_pipeline_conf,
-            new_compose_override,
-            new_compose_dev,
-            new_compose_proxy,
-            new_compose_local,
+            # new_pipeline_conf,
+            # new_compose_override,
+            # new_compose_dev,
+            # new_compose_proxy,
+            # new_compose_local,
         )
 
     def iter_loaded_configs(self):
@@ -1110,6 +1170,11 @@ class AssistantDist:
         paths = []
 
         self.dist_path.mkdir(parents=True, exist_ok=overwrite)
+        utils.dump_json(
+            utils.pydantic_to_dict(self.pipeline.generate_pipeline_conf(), exclude_none=True),
+            self.dist_path / "pipeline_conf.json",
+            overwrite=True,
+        )
         for config in self.iter_loaded_configs():
             path = config.to_dist(self.dist_path, overwrite)
             paths.append(path)
@@ -1189,52 +1254,6 @@ class AssistantDist:
 
         return skill_dir
 
-    def create_local_yml(
-        self,
-        services: list,
-        drop_ports: bool = True,
-        single_replica: bool = True,
-    ):
-        """
-        Creates local config for distribution.
-
-        Picks up container definitions from dev and proxy configs,
-        replaces selected proxy services with their definitions from dev config,
-        and dumps the resulting config to ``local.yml``
-
-        Args:
-            services: list of service names which should be deployed locally
-            drop_ports: if True, removes port definitions from local services
-            single_replica: if True, adds deployment arguments to all services
-
-        Returns:
-            path to new local config
-
-        """
-        services = list(services) + ["agent", "mongo"]
-
-        dev_config_part = self.compose_dev.filter_services(services, inplace=False)
-        proxy_config_part = self.compose_proxy.filter_services(exclude_names=services, inplace=False)
-        local_config = DreamComposeLocal(ComposeLocal(services=proxy_config_part.config.services))
-        all_config_parts = {
-            **dev_config_part.config.services,
-            **proxy_config_part.config.services,
-        }
-
-        for name, s in all_config_parts.items():
-            if name in services:
-                service = ComposeLocalContainer.parse_obj(s)
-                if drop_ports:
-                    service.ports = None
-            else:
-                service = s
-
-            if single_replica:
-                service.deploy = DeploymentDefinition(mode="replicated", replicas=1)
-
-            local_config.add_component(name, service, inplace=True)
-        return local_config.to_dist(self.dist_path)
-
     def enable_service(
         self,
         config_type: DreamConfigLiteral,
@@ -1252,7 +1271,9 @@ class AssistantDist:
             service_name: name of the service to be added to config, e.g. `ner`
         """
         dream_temp_config = self._fetch_dream_temp_config(config_type)
-        dream_temp_config.add_component(name=service_name, component_group=service_type, definition=definition, inplace=True)
+        dream_temp_config.add_component(
+            name=service_name, component_group=service_type, definition=definition, inplace=True
+        )
 
         self.temp_configs[config_type] = dream_temp_config
 

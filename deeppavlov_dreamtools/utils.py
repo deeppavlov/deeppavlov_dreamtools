@@ -1,9 +1,12 @@
 import json
 import logging
+import secrets
+import string
 from pathlib import Path
 from typing import Tuple, Union, Any
 
 import yaml
+from pydantic import BaseModel
 
 from deeppavlov_dreamtools.distconfigs import const
 
@@ -49,6 +52,21 @@ def parse_connector_url(url: str) -> Tuple[str, str, str]:
         endpoint = url_parts[1]
 
     return host, port, endpoint
+
+
+def pydantic_to_dict(data: BaseModel, exclude_none: bool = False):
+    # Until .dict() with jsonable type serialization is implemented
+    # we will have to use this workaround
+    # https://github.com/samuelcolvin/pydantic/issues/1409
+
+    return json.loads(data.json(exclude_none=exclude_none))
+
+
+def generate_unique_name(size: int = 12):
+    alphabet = string.ascii_letters + string.digits
+    unique_name = ''.join(secrets.choice(alphabet) for i in range(size))
+
+    return unique_name
 
 
 def load_json(path: Union[Path, str]):
