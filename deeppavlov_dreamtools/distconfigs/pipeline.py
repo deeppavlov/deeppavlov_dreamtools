@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Dict, Optional, Union, Iterable
+from typing import Dict, Optional, Union, Iterable, Tuple
 
 from deeppavlov_dreamtools import utils
 from deeppavlov_dreamtools.distconfigs import generics
@@ -69,7 +69,7 @@ class Pipeline:
             for name, component in getattr(self, group).items():
                 yield name, component
 
-    def iter_components(self):
+    def iter_components(self) -> Tuple[str, str | None, DreamComponent]:
         for group in self.COMPONENT_GROUPS:
             for name, component in self.iter_component_group(group):
                 yield group, name, component
@@ -84,6 +84,20 @@ class Pipeline:
         self._config = pipeline_conf
 
         return pipeline_conf
+
+    def generate_compose(self) -> generics.ComposeOverride:
+        all_services = {}
+        for group, name, component in self.iter_components():
+            try:
+                connector_url = component.component.connector.url
+                host, _, _ = utils.parse_connector_url(connector_url)
+            except (ValueError, AttributeError):
+                host = "agent"
+
+            all_services[host] = component.service.generate_compose()
+
+        compose = generics.ComposeOverride(services=all_services)
+        return compose
 
     @classmethod
     def from_file(cls, path: Union[Path, str]):
