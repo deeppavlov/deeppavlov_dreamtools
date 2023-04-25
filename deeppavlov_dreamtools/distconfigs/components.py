@@ -89,7 +89,7 @@ def create_agent_component(
                 }
             },
         ),
-        service=agent_service.service_file,
+        service=agent_service.config_dir,
         state_manager_method="add_bot_utterance_last_chance",
         tags=tags,
         endpoint="respond",
@@ -133,7 +133,7 @@ def create_generative_prompted_skill_component(
         previous_services=["skill_selectors"],
         state_manager_method="add_hypothesis",
         endpoint="respond",
-        service=generative_prompted_skill_service.service_file,
+        service=generative_prompted_skill_service.config_dir,
     )
 
     dream_component = DreamComponent(
