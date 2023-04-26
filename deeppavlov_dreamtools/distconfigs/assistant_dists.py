@@ -936,6 +936,7 @@ class AssistantDist:
         author: str,
         description: str = "",
         existing_prompted_skill: str = None,
+        existing_prompted_skill_connector_url: str = None,
         # service_names: Optional[list] = None,
     ):
         """
@@ -969,6 +970,7 @@ class AssistantDist:
             self.dream_root,
             prompted_service,
             f"components/{prompted_component_name}.yml",
+            existing_prompted_skill_connector_url,
             prompted_component_name,
             f"Prompted Component {prompted_component_name}",
             author,
