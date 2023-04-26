@@ -184,7 +184,7 @@ class PipelineConf(BaseModelNoExtra):
 
 class ContainerBuildDefinition(BaseModelNoExtra):
     args: Optional[Dict[str, Any]]
-    context: Path
+    context: Optional[Path]
     dockerfile: Optional[Path]
 
     class Config:
@@ -221,53 +221,6 @@ class ComposeContainer(BaseModelNoExtra):
     deploy: Optional[DeploymentDefinition]
     tty: Optional[bool]
     ports: Optional[List[str]]
-
-    @property
-    def port_definitions(self):
-        ports = []
-
-        # command
-        try:
-            port = re.findall(
-                r"-p (\d{3,6})|--port (\d{3,6})|\d+?.\d+?.\d+?.\d+?:(\d{3,6})",
-                self.command,
-            )[0]
-            ports.append(
-                {
-                    "key": "command",
-                    "text": self.command,
-                    "value": port[0] or port[1] or port[2],
-                }
-            )
-        except IndexError:
-            pass
-
-        try:
-            value = self.build.args["SERVICE_PORT"]
-            key = "build -> args -> SERVICE_PORT"
-            ports.append({"key": key, "text": value, "value": value})
-        except KeyError:
-            pass
-
-        # environment
-        iterator = []
-
-        if isinstance(self.environment, list):
-            iterator = [e.split("=") for e in self.environment]
-        elif isinstance(self.environment, dict):
-            iterator = self.environment.items()
-
-        for env_name, env_value in iterator:
-            if env_name == "PORT":
-                ports.append(
-                    {
-                        "key": f"environment -> {env_name}",
-                        "text": env_value,
-                        "value": env_value,
-                    }
-                )
-
-        return ports
 
 
 class ComposeDevContainer(BaseModelNoExtra):

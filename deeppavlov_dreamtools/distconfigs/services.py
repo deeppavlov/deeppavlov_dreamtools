@@ -24,7 +24,10 @@ def _resolve_default_service_config_paths(
 
 
 def create_agent_service(
-    dream_root: Union[Path, str], config_dir: Union[Path, str], service_name: str, assistant_dist_pipeline_file: Union[Path, str]
+    dream_root: Union[Path, str],
+    config_dir: Union[Path, str],
+    service_name: str,
+    assistant_dist_pipeline_file: Union[Path, str],
 ):
     source_dir, config_dir, service_file, environment_file = _resolve_default_service_config_paths(
         config_dir=config_dir
@@ -126,7 +129,7 @@ class DreamService:
         self.environment = environment
 
     @classmethod
-    def from_source_dir(cls, dream_root: Union[Path, str],  path: Union[Path, str], config_name: str):
+    def from_source_dir(cls, dream_root: Union[Path, str], path: Union[Path, str], config_name: str):
         source_dir, config_dir, service_file, environment_file = _resolve_default_service_config_paths(
             source_dir=path, config_name=config_name
         )
@@ -164,3 +167,19 @@ class DreamService:
     def set_environment_value(self, key: str, value: str):
         self.environment[key] = value
         self.save_environment_config()
+
+    def generate_compose(self, drop_ports: bool = True, drop_volumes: bool = True) -> generics.ComposeContainer:
+        service_compose = self.service.compose
+
+        if self.environment:
+            try:
+                service_compose.build.args = self.environment
+            except AttributeError:
+                service_compose.build = {"args": self.environment}
+
+        if drop_ports:
+            service_compose.ports = None
+        if drop_volumes:
+            service_compose.volumes = None
+
+        return service_compose
