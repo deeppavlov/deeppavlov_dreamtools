@@ -116,7 +116,7 @@ class PipelineConfComponentSource(BaseModelNoExtra):
 class PipelineConfServiceComponent(BaseModel):
     group: Optional[str]
     connector: Union[str, PipelineConfConnector]
-    dialog_formatter: Optional[str]
+    dialog_formatter: Optional[Union[str, dict]]
     response_formatter: Optional[str]
     previous_services: Optional[List[str]]
     required_previous_services: Optional[List[str]]
