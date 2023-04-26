@@ -123,6 +123,8 @@ def create_generative_prompted_skill_component(
     component = generics.Component(
         name=name,
         display_name=display_name,
+        component_type="Generative",
+        model_type="NN-based",
         is_customizable=True,
         author=author,
         description=description,
