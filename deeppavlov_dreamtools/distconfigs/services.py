@@ -65,7 +65,11 @@ def create_agent_service(
 
 
 def create_generative_prompted_skill_service(
-    dream_root: Union[Path, str], config_dir: Union[Path, str], service_name: str, generative_service_model: str
+    dream_root: Union[Path, str],
+    config_dir: Union[Path, str],
+    service_name: str,
+    generative_service_model: str,
+    generative_service_command: str,
 ):
     source_dir, config_dir, service_file, environment_file = _resolve_default_service_config_paths(
         config_dir=config_dir
@@ -84,6 +88,7 @@ def create_generative_prompted_skill_service(
                 build=generics.ContainerBuildDefinition(
                     context=".", dockerfile="./skills/dff_template_prompted_skill/Dockerfile"
                 ),
+                command=generative_service_command,
                 deploy=generics.DeploymentDefinition(
                     resources=generics.DeploymentDefinitionResources(
                         limits=generics.DeploymentDefinitionResourcesArg(memory="128M"),
