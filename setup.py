@@ -1,4 +1,8 @@
 from setuptools import setup, find_packages
+from pathlib import Path
+
+with open(Path(__file__).resolve().parent / 'requirements.txt') as fin:
+    requirements = fin.readlines()
 
 authors = [
     "Maxim Talimanchuk <mtalimanchuk@gmail.com>",
@@ -12,11 +16,7 @@ setup(
     version="0.0.1",
     packages=find_packages(),
     include_package_data=True,
-    install_requires=[
-        "pydantic==1.9.0",
-        "Click==8.0.3",
-        "PyYAML==5.3b1",
-    ],
+    install_requires=requirements,
     entry_points={
         "console_scripts": [
             "dreamtools = deeppavlov_dreamtools.cmd:cli",
