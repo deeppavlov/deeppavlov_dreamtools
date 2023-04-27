@@ -130,7 +130,7 @@ def create_generative_prompted_skill_component(
         description=description,
         ram_usage="150M",
         group="skills",
-        connector=generics.PipelineConfConnector(protocol="http", timeout="5.0", url=connector_url),
+        connector=generics.PipelineConfConnector(protocol="http", timeout="10.0", url=connector_url),
         dialog_formatter={
             "name": "state_formatters.dp_formatters:dff_prompted_skill_formatter",
             "skill_name": name,

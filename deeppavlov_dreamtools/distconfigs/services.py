@@ -98,8 +98,8 @@ def create_generative_prompted_skill_service(
             "PROMPT_FILE": f"common/prompts/{service_name}.json",
             "GENERATIVE_SERVICE_URL": f"http://{generative_service_model}:8146/respond",
             "GENERATIVE_SERVICE_CONFIG": "default_generative_config.json",
-            "GENERATIVE_TIMEOUT": 5,
-            "N_UTTERANCES_CONTEXT": 3,
+            "GENERATIVE_TIMEOUT": 10,
+            "N_UTTERANCES_CONTEXT": 7,
         },
     )
     service.save_configs()
