@@ -214,7 +214,7 @@ class DeploymentDefinition(BaseModelNoExtra):
 class ComposeContainer(BaseModelNoExtra):
     image: Optional[str]
     volumes: Optional[List[str]]
-    env_file: Optional[list]
+    env_file: Optional[Union[list, str]]
     build: Optional[ContainerBuildDefinition]
     command: Optional[Union[list, str]]
     environment: Optional[Union[Dict[str, Any], list]]

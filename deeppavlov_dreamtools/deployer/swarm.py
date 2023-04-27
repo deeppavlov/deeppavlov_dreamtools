@@ -46,7 +46,8 @@ class SwarmDeployer:
         portainer_key: str,
         registry_addr: str = None,
         user_services: List[str] = None,
-        deployment_dict: dict = None
+        deployment_dict: dict = None,
+        default_prefix: str = DEFAULT_PREFIX
     ):
         """
         Args:
@@ -59,6 +60,7 @@ class SwarmDeployer:
         self.registry_addr = registry_addr
         self.user_services = user_services
         self.deployment_dict = deployment_dict
+        self.default_prefix = default_prefix
 
     def deploy(self, dist: AssistantDist) -> None:
         """
@@ -120,9 +122,9 @@ class SwarmDeployer:
                     if urlparse(env_value).hostname in self.user_services:
                         env_dict[env_var] = self.get_url_prefixed(env_value, user_prefix)
                     else:
-                        env_dict[env_var] = self.get_url_prefixed(env_value, DEFAULT_PREFIX)
+                        env_dict[env_var] = self.get_url_prefixed(env_value, self.default_prefix)
                 else:
-                    env_dict[env_var] = self.get_url_prefixed(env_value, DEFAULT_PREFIX)
+                    env_dict[env_var] = self.get_url_prefixed(env_value, self.default_prefix)
 
         with open(dist.dist_path / ".env", "w") as f:
             for var, value in env_dict.items():
@@ -143,7 +145,7 @@ class SwarmDeployer:
             if self.user_services is not None and pipeline_conf_service_name in self.user_services:
                 prefix_ = user_prefix
             else:
-                prefix_ = DEFAULT_PREFIX
+                prefix_ = self.default_prefix
             try:
                 new_url = self.get_url_prefixed(service.connector.url, prefix_)
             except AttributeError:
@@ -162,17 +164,21 @@ class SwarmDeployer:
             if self.user_services is not None and service_name in self.user_services:
                 prefix_ = prefix
             else:
-                prefix_ = DEFAULT_PREFIX
+                prefix_ = self.default_prefix
             connector_object.url = SwarmDeployer.get_url_prefixed(connector_object.url, prefix_)
 
     def _change_waithosts_url(self, compose_override: DreamComposeOverride, user_prefix: str):
-        wait_hosts = compose_override.config.services["agent"].environment["WAIT_HOSTS"].split(", ")
+        wait_hosts = compose_override.config.services["agent"].environment["WAIT_HOSTS"]
+        if not wait_hosts:
+            logger.warning('WAIT_HOSTS is empty')
+            return
+        wait_hosts = wait_hosts.split(", ")
         for i in range(len(wait_hosts)):
             service_name = wait_hosts[i].split(":")[0]
             if self.user_services and service_name in self.user_services:
                 wait_hosts[i] = "".join([user_prefix, wait_hosts[i]])
             else:
-                wait_hosts[i] = "".join([DEFAULT_PREFIX, wait_hosts[i]])
+                wait_hosts[i] = "".join([self.default_prefix, wait_hosts[i]])
         compose_override.config.services["agent"].environment["WAIT_HOSTS"] = ", ".join(wait_hosts)
 
     @staticmethod
@@ -272,7 +278,7 @@ class SwarmDeployer:
         if self.user_services:  # remove mongo
             with open(deployment_file_path) as fin:
                 data = yaml.safe_load(fin)
-                del data['services']['mongo']
+                data['services'].pop('mongo', None)
             with open(deployment_file_path, 'w') as fout:
                 yaml.dump(data, fout)
 
