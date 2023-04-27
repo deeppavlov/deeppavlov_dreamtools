@@ -65,7 +65,11 @@ def create_agent_service(
 
 
 def create_generative_prompted_skill_service(
-    dream_root: Union[Path, str], config_dir: Union[Path, str], service_name: str, generative_service_model: str
+    dream_root: Union[Path, str],
+    config_dir: Union[Path, str],
+    service_name: str,
+    generative_service_model: str,
+    generative_service_command: str,
 ):
     source_dir, config_dir, service_file, environment_file = _resolve_default_service_config_paths(
         config_dir=config_dir
@@ -84,6 +88,7 @@ def create_generative_prompted_skill_service(
                 build=generics.ContainerBuildDefinition(
                     context=".", dockerfile="./skills/dff_template_prompted_skill/Dockerfile"
                 ),
+                command=generative_service_command,
                 deploy=generics.DeploymentDefinition(
                     resources=generics.DeploymentDefinitionResources(
                         limits=generics.DeploymentDefinitionResourcesArg(memory="128M"),
@@ -98,8 +103,8 @@ def create_generative_prompted_skill_service(
             "PROMPT_FILE": f"common/prompts/{service_name}.json",
             "GENERATIVE_SERVICE_URL": f"http://{generative_service_model}:8146/respond",
             "GENERATIVE_SERVICE_CONFIG": "default_generative_config.json",
-            "GENERATIVE_TIMEOUT": 5,
-            "N_UTTERANCES_CONTEXT": 3,
+            "GENERATIVE_TIMEOUT": 10,
+            "N_UTTERANCES_CONTEXT": 7,
         },
     )
     service.save_configs()

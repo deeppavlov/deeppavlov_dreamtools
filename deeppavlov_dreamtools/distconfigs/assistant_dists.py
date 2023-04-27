@@ -937,6 +937,7 @@ class AssistantDist:
         description: str = "",
         existing_prompted_skill: str = None,
         existing_prompted_skill_connector_url: str = None,
+        existing_prompted_skill_command: str = None,
         # service_names: Optional[list] = None,
     ):
         """
@@ -962,7 +963,8 @@ class AssistantDist:
             self.dream_root,
             f"skills/dff_template_prompted_skill/service_configs/{prompted_service_name}",
             prompted_service_name,
-            "transformers-lm-oasst12b"
+            "transformers-lm-oasst12b",
+            existing_prompted_skill_command,
         )
 
         prompted_component_name = utils.generate_unique_name()
