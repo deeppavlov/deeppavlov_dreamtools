@@ -938,6 +938,7 @@ class AssistantDist:
         existing_prompted_skill: str = None,
         existing_prompted_skill_connector_url: str = None,
         existing_prompted_skill_command: str = None,
+        existing_prompted_skill_port: int = None,
         # service_names: Optional[list] = None,
     ):
         """
@@ -963,6 +964,7 @@ class AssistantDist:
             self.dream_root,
             f"skills/dff_template_prompted_skill/service_configs/{prompted_service_name}",
             prompted_service_name,
+            existing_prompted_skill_port,
             "transformers-lm-oasst12b",
             existing_prompted_skill_command,
         )

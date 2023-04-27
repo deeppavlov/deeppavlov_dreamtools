@@ -68,6 +68,7 @@ def create_generative_prompted_skill_service(
     dream_root: Union[Path, str],
     config_dir: Union[Path, str],
     service_name: str,
+    service_port: int,
     generative_service_model: str,
     generative_service_command: str,
 ):
@@ -99,6 +100,7 @@ def create_generative_prompted_skill_service(
             ),
         ),
         environment={
+            "SERVICE_PORT": service_port,
             "SERVICE_NAME": service_name,
             "PROMPT_FILE": f"common/prompts/{service_name}.json",
             "GENERATIVE_SERVICE_URL": f"http://{generative_service_model}:8146/respond",
