@@ -102,7 +102,6 @@ def create_agent_component(
         component=component,
         service=agent_service,
     )
-    dream_component.prompt = "Your name is BuilderBot, act like you know a lot about building bots"
     dream_component.save_configs()
 
     return dream_component
@@ -150,6 +149,7 @@ def create_generative_prompted_skill_component(
         component=component,
         service=generative_prompted_skill_service,
     )
+    dream_component.prompt = "Your name is BuilderBot, act like you know a lot about building bots"
     dream_component.save_configs()
 
     return dream_component
