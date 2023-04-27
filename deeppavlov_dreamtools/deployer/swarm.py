@@ -375,14 +375,30 @@ class SwarmDeployer:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.STDOUT,
         )
+        # TODO: check awscli version, to choose login type, verify login success
+        subprocess.run(
+            f"eval $(aws ecr get-login --no-include-email)",
+            shell=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.STDOUT,
+        )
 
 
 if __name__ == "__main__":
-    dream_dist = AssistantDist.from_name(name="deepy_faq", dream_root=DREAM_ROOT_PATH)
+    dream_dist = AssistantDist.from_name(name='string_de0dab80', dream_root=DREAM_ROOT_PATH)
+
+    def get_services(dist: AssistantDist):
+        services = dist.compose_override.config.services.keys()
+        user_services = [service for service in services if service.endswith('-prompted-skill')]
+        user_services.append('agent')
+        if 'prompt-selector' in services:
+            user_services.append('prompt-selector')
+        return user_services
     deployer = SwarmDeployer(
-        user_identifier="test",
-        user_services=["faq-skill"],
+        user_identifier=dream_dist.name,
+        user_services=get_services(dream_dist),
         portainer_key=None,
         portainer_url=None,
     )
-    deployer.deploy(dream_dist)  # mutates python object(dist.name->user_identifier_name)
+    deployer._set_up_user_dist(dream_dist)
+    # deployer.deploy(dream_dist)  # mutates python object(dist.name->user_identifier_name)
