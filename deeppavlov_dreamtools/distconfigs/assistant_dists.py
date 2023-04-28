@@ -1019,6 +1019,7 @@ class AssistantDist:
 
         new_pipeline = deepcopy(self.pipeline)
         new_pipeline.skills[existing_prompted_skill] = prompted_component
+        new_pipeline.agent = new_pipeline.validate_agent_services(agent_last_chance_component, agent_timeout_component)
         new_pipeline.last_chance_service = agent_last_chance_component
         new_pipeline.timeout_service = agent_timeout_component
 

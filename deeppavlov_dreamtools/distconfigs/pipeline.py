@@ -1,11 +1,13 @@
+import itertools
 import json
 from pathlib import Path
-from typing import Dict, Optional, Union, Iterable, Tuple
+from typing import Dict, Optional, Union, Iterable, Tuple, List
 
 from deeppavlov_dreamtools import utils
 from deeppavlov_dreamtools.distconfigs import generics
 from deeppavlov_dreamtools.distconfigs.components import DreamComponent
 from deeppavlov_dreamtools.distconfigs.generics import PipelineConfMetadata, PipelineConf, Component
+from deeppavlov_dreamtools.distconfigs.services import DreamService
 
 
 class Pipeline:
@@ -52,6 +54,10 @@ class Pipeline:
         self._config = config
         self.metadata = metadata
 
+        self.agent = self.validate_agent_services(
+            last_chance_service, timeout_service
+        )
+
         self.last_chance_service = last_chance_service
         self.timeout_service = timeout_service
         self.annotators = annotators
@@ -61,6 +67,17 @@ class Pipeline:
         self.skill_selectors = skill_selectors
         self.skills = skills
         self.response_selectors = response_selectors
+
+    @staticmethod
+    def validate_agent_services(*args: DreamComponent):
+        for a, b in itertools.combinations(args, 2):
+            if a.service.service != b.service.service:
+                raise ValueError(f"{a.component_file} != {b.component_file}")
+
+        return args[0]
+
+    def _update_agent_wait_hosts(self, wait_hosts: List[str]):
+        self.agent.service.set_environment_value("WAIT_HOSTS", ", ".join(wait_hosts))
 
     def iter_component_group(self, group: str):
         if group in self.SINGLE_COMPONENT_GROUPS:
@@ -87,14 +104,20 @@ class Pipeline:
 
     def generate_compose(self) -> generics.ComposeOverride:
         all_services = {}
+        all_ports = {}
+
         for group, name, component in self.iter_components():
             try:
                 connector_url = component.component.connector.url
-                host, _, _ = utils.parse_connector_url(connector_url)
+                host, port, _ = utils.parse_connector_url(connector_url)
             except (ValueError, AttributeError):
-                host = "agent"
+                host, port = "agent", None
 
             all_services[host] = component.service.generate_compose()
+            all_ports[host] = port
+
+        wait_hosts = [f"{h}:{p}" for h, p in all_ports.items() if h != "agent"]
+        self._update_agent_wait_hosts(wait_hosts)
 
         compose = generics.ComposeOverride(services=all_services)
         return compose
