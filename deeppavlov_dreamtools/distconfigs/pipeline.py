@@ -86,7 +86,7 @@ class Pipeline:
             for name, component in getattr(self, group).items():
                 yield name, component
 
-    def iter_components(self) -> Tuple[str, str | None, DreamComponent]:
+    def iter_components(self) -> Tuple[str, Optional[str], DreamComponent]:
         for group in self.COMPONENT_GROUPS:
             for name, component in self.iter_component_group(group):
                 yield group, name, component
