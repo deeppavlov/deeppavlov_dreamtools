@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Union
+from typing import Union, List
 
 from deeppavlov_dreamtools import utils
 from deeppavlov_dreamtools.distconfigs import generics
@@ -53,9 +53,9 @@ def create_agent_service(
         environment={
             "WAIT_HOSTS": "",
             "WAIT_HOSTS_TIMEOUT": "${WAIT_TIMEOUT:-480}",
-            "HIGH_PRIORITY_INTENTS": "1",
-            "RESTRICTION_FOR_SENSITIVE_CASE": "1",
-            "ALWAYS_TURN_ON_ALL_SKILLS": "0",
+            "HIGH_PRIORITY_INTENTS": 1,
+            "RESTRICTION_FOR_SENSITIVE_CASE": 1,
+            "ALWAYS_TURN_ON_ALL_SKILLS": 0,
             "LANGUAGE": "EN",
         },
     )
@@ -108,6 +108,54 @@ def create_generative_prompted_skill_service(
             "GENERATIVE_SERVICE_CONFIG": "default_generative_config.json",
             "GENERATIVE_TIMEOUT": 10,
             "N_UTTERANCES_CONTEXT": 7,
+        },
+    )
+    service.save_configs()
+
+    return service
+
+
+def create_prompt_selector_service(
+    dream_root: Union[Path, str],
+    config_dir: Union[Path, str],
+    service_name: str,
+    prompts_to_consider: List[str],
+):
+    source_dir, config_dir, service_file, environment_file = _resolve_default_service_config_paths(
+        config_dir=config_dir
+    )
+    service = DreamService(
+        dream_root,
+        source_dir,
+        config_dir,
+        service_file,
+        environment_file,
+        service=generics.Service(
+            name=service_name,
+            endpoints=["respond"],
+            compose=generics.ComposeContainer(
+                env_file=[".env"],
+                build=generics.ContainerBuildDefinition(
+                    context=".",
+                    dockerfile="./annotators/prompt_selector/Dockerfile",
+                ),
+                command="flask run -h 0.0.0.0 -p 8135",
+                deploy=generics.DeploymentDefinition(
+                    resources=generics.DeploymentDefinitionResources(
+                        limits=generics.DeploymentDefinitionResourcesArg(memory="100M"),
+                        reservations=generics.DeploymentDefinitionResourcesArg(memory="100M"),
+                    )
+                ),
+                volumes=["./annotators/prompt_selector:/src", "./common:/src/common"],
+                ports=["8135:8135"]
+            ),
+        ),
+        environment={
+            "SERVICE_PORT": 8135,
+            "SERVICE_NAME": "prompt_selector",
+            "N_SENTENCES_TO_RETURN": 3,
+            "PROMPTS_TO_CONSIDER": ",".join(prompts_to_consider),
+            "FLASK_APP": "server",
         },
     )
     service.save_configs()

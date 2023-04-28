@@ -155,6 +155,51 @@ def create_generative_prompted_skill_component(
     return dream_component
 
 
+def create_prompt_selector_component(
+    dream_root: Union[Path, str],
+    prompt_selector_service: services.DreamService,
+    config_path: Union[Path, str],
+    name: str,
+):
+    config_path = Path(config_path)
+    source_dir = config_path.parent
+
+    component = generics.Component(
+        name=name,
+        display_name="Prompt Selector",
+        model_type="Dictionary/Pattern-based",
+        is_customizable="false",
+        author="publisher@deeppavlov.ai",
+        description=(
+            "Annotator utilizing Sentence Ranker to rank prompts and selecting "
+            "`N_SENTENCES_TO_RETURN` most relevant prompts (based on questions provided in prompts)"
+        ),
+        ram_usage="100M",
+        group="annotators",
+        connector=generics.PipelineConfConnector(
+            protocol="http",
+            timeout="2.0",
+            url="http://prompt-selector:8135/respond",
+        ),
+        dialog_formatter="state_formatters.dp_formatters:context_formatter_dialog",
+        response_formatter="state_formatters.dp_formatters:simple_formatter_service",
+        state_manager_method="add_annotation",
+        endpoint="respond",
+        service=prompt_selector_service.config_dir,
+    )
+
+    dream_component = DreamComponent(
+        dream_root=dream_root,
+        source_dir=source_dir,
+        component_file=config_path,
+        component=component,
+        service=prompt_selector_service,
+    )
+    dream_component.save_configs()
+
+    return dream_component
+
+
 class DreamComponent:
     def __init__(
         self,
