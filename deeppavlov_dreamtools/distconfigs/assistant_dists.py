@@ -1018,11 +1018,28 @@ class AssistantDist:
             ["timeout"],
         )
 
+        prompt_selector_service_name = utils.generate_unique_name()
+        prompt_selector_service = services.create_prompt_selector_service(
+            self.dream_root,
+            f"annotators/prompt_selector/service_configs/{prompt_selector_service_name}",
+            prompt_selector_service_name,
+            [prompted_service_name],
+        )
+
+        prompt_selector_component_name = utils.generate_unique_name()
+        prompt_selector_component = components.create_prompt_selector_component(
+            self.dream_root,
+            prompt_selector_service,
+            f"components/{prompt_selector_component_name}.yml",
+            prompt_selector_component_name,
+        )
+
         new_pipeline = deepcopy(self.pipeline)
         new_pipeline.skills[existing_prompted_skill] = prompted_component
         new_pipeline.agent = new_pipeline.validate_agent_services(agent_last_chance_component, agent_timeout_component)
         new_pipeline.last_chance_service = agent_last_chance_component
         new_pipeline.timeout_service = agent_timeout_component
+        new_pipeline.annotators["prompt_selector"] = prompt_selector_component
 
         # new_pipeline_conf = deepcopy(self.pipeline_conf)
         # new_pipeline_conf.display_name = display_name
