@@ -67,6 +67,7 @@ def create_agent_service(
 def create_generative_prompted_skill_service(
     dream_root: Union[Path, str],
     config_dir: Union[Path, str],
+    service_uid: str,
     service_name: str,
     service_port: int,
     generative_service_model: str,
@@ -103,7 +104,7 @@ def create_generative_prompted_skill_service(
         environment={
             "SERVICE_PORT": service_port,
             "SERVICE_NAME": service_name,
-            "PROMPT_FILE": f"common/prompts/{service_name}.json",
+            "PROMPT_FILE": f"common/prompts/{service_uid}.json",
             "GENERATIVE_SERVICE_URL": f"http://{generative_service_model}:{generative_service_port}/respond",
             "GENERATIVE_SERVICE_CONFIG": "default_generative_config.json",
             "GENERATIVE_TIMEOUT": 10,

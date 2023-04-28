@@ -960,10 +960,13 @@ class AssistantDist:
         # _, new_compose_override = self.compose_override.filter_services(all_names)
 
         prompted_service_name = utils.generate_unique_name()
+        prompted_skill_name = f"dff_{prompted_service_name}_prompted_skill"
+        prompted_skill_container_name = f"dff-{prompted_service_name}-prompted-skill"
         prompted_service = services.create_generative_prompted_skill_service(
             self.dream_root,
-            f"skills/dff_template_prompted_skill/service_configs/{prompted_service_name}",
+            f"skills/dff_template_prompted_skill/service_configs/{prompted_skill_name}",
             prompted_service_name,
+            prompted_skill_name,
             existing_prompted_skill_port,
             "transformers-lm-oasst12b",
             8158,
@@ -975,8 +978,8 @@ class AssistantDist:
             self.dream_root,
             prompted_service,
             f"components/{prompted_component_name}.yml",
-            existing_prompted_skill_connector_url,
-            prompted_component_name,
+            f"http://{prompted_skill_container_name}:{existing_prompted_skill_port}/respond",
+            prompted_skill_name,
             f"Prompted Component {prompted_component_name}",
             author,
             "Copy of prompted service",
@@ -1035,7 +1038,8 @@ class AssistantDist:
         )
 
         new_pipeline = deepcopy(self.pipeline)
-        new_pipeline.skills[existing_prompted_skill] = prompted_component
+        del new_pipeline.skills[existing_prompted_skill]
+        new_pipeline.skills[prompted_skill_name] = prompted_component
         new_pipeline.agent = new_pipeline.validate_agent_services(agent_last_chance_component, agent_timeout_component)
         new_pipeline.last_chance_service = agent_last_chance_component
         new_pipeline.timeout_service = agent_timeout_component
