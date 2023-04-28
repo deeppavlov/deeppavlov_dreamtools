@@ -70,6 +70,7 @@ def create_generative_prompted_skill_service(
     service_name: str,
     service_port: int,
     generative_service_model: str,
+    generative_service_port: int,
     generative_service_command: str,
 ):
     source_dir, config_dir, service_file, environment_file = _resolve_default_service_config_paths(
@@ -103,7 +104,7 @@ def create_generative_prompted_skill_service(
             "SERVICE_PORT": service_port,
             "SERVICE_NAME": service_name,
             "PROMPT_FILE": f"common/prompts/{service_name}.json",
-            "GENERATIVE_SERVICE_URL": f"http://{generative_service_model}:8146/respond",
+            "GENERATIVE_SERVICE_URL": f"http://{generative_service_model}:{generative_service_port}/respond",
             "GENERATIVE_SERVICE_CONFIG": "default_generative_config.json",
             "GENERATIVE_TIMEOUT": 10,
             "N_UTTERANCES_CONTEXT": 7,
