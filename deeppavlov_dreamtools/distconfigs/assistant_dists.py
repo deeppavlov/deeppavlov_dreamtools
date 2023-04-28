@@ -966,6 +966,7 @@ class AssistantDist:
             prompted_service_name,
             existing_prompted_skill_port,
             "transformers-lm-oasst12b",
+            8158,
             existing_prompted_skill_command,
         )
 
