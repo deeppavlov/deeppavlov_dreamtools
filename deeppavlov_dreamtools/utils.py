@@ -63,7 +63,7 @@ def pydantic_to_dict(data: BaseModel, exclude_none: bool = False):
 
 
 def generate_unique_name(size: int = 12):
-    alphabet = string.ascii_letters + string.digits
+    alphabet = string.ascii_lowercase + string.digits
     unique_name = ''.join(secrets.choice(alphabet) for i in range(size))
 
     return unique_name
