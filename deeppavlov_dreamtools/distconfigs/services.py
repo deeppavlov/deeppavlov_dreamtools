@@ -232,6 +232,7 @@ class DreamService:
                 service_compose.build.args = self.environment
             except AttributeError:
                 service_compose.build = {"args": self.environment}
+            service_compose.environment = self.environment
 
         if drop_ports:
             service_compose.ports = None
