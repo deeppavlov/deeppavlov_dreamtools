@@ -248,7 +248,7 @@ class SwarmDeployer:
 
     # TODO: consider moving deployment_path to AssistantDist as property
     def _get_deployment_path(self, dist: AssistantDist) -> Path:
-        return dist.dist_path / f"{self.user_identifier}_deployment.yml"
+        return dist.dist_path / "deployment.yml"
 
     def _save_deployment_dict_in_dist_path(self, dict_yml: dict, dist: AssistantDist) -> None:
         deployer_filepath = self._get_deployment_path(dist)
@@ -335,6 +335,8 @@ class SwarmDeployer:
         except ecr_client.exceptions.RepositoryNotFoundException as e:
             logger.info(f"{repository_name} repository wasn't found. It will be created")
             return False
+        except Exception as e:
+            raise ValueError(f'Got {repr(e)} error for {repository_name}')
 
     def _build_image_on_local(self, dist: AssistantDist):
         build_cmd = f'docker compose -f {self._get_deployment_path(dist)} --project-directory {dist.dream_root} build'

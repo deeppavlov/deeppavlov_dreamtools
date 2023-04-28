@@ -1,9 +1,11 @@
 from pathlib import Path
-from typing import Union
+from typing import List, Union
 from urllib.parse import urljoin
 
 import requests
 import urllib3
+
+from deeppavlov_dreamtools.deployer.models import Stack
 
 # TODO: remove when insecure request cause will be eliminated
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -65,8 +67,8 @@ class SwarmClient:
             files={"file": open(file, "rb")},
         )
 
-    def get_stacks(self):
-        return self._get("/api/stacks").json()
+    def get_stacks(self) -> List[Stack]:
+        return [Stack.parse_obj(s) for s in self._get("/api/stacks").json()]
 
     def delete_stack(self, stack_id):
         return self._delete(f"/api/stacks/{stack_id}", params={"external": True, "endpointId": self.endpoint_id})
