@@ -226,12 +226,11 @@ class DreamComponent:
         path = Path(path)
         dream_root = Path(dream_root)
 
-        source_dir = dream_root / path.parent
         component = generics.Component(**utils.load_yml(dream_root / path))
 
-        service = services.DreamService.from_config_dir(dream_root, dream_root / component.service)
+        service = services.DreamService.from_config_dir(dream_root, component.service)
 
-        return cls(dream_root, source_dir, path, component, service)
+        return cls(dream_root, path.parent, path, component, service)
 
     def save_configs(self):
         self.source_dir.mkdir(parents=True, exist_ok=True)

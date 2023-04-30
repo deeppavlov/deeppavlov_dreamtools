@@ -200,8 +200,8 @@ class DreamService:
     def from_config_dir(cls, dream_root: Union[Path, str], path: Union[Path, str]):
         source_dir, config_dir, service_file, environment_file = _resolve_default_service_config_paths(config_dir=path)
 
-        service = generics.Service(**utils.load_yml(service_file))
-        environment = utils.load_yml(environment_file)
+        service = generics.Service(**utils.load_yml(dream_root / service_file))
+        environment = utils.load_yml(dream_root / environment_file)
 
         return cls(dream_root, source_dir, config_dir, service_file, environment_file, service, environment)
 
