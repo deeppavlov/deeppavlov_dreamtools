@@ -262,7 +262,7 @@ class DreamComponent:
     def prompt(self, value: str):
         prompt_file = self.service.environment.get("PROMPT_FILE")
         if prompt_file:
-            utils.dump_json({"prompt": value}, self.dream_root / prompt_file)
+            utils.dump_json({"prompt": value}, self.dream_root / prompt_file, overwrite=True)
 
     @property
     def lm_service(self):
