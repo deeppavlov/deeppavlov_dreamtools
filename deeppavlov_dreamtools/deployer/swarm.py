@@ -217,7 +217,10 @@ class SwarmDeployer:
             if isinstance(yml_config_object, DreamPipeline):
                 continue
             for service_name, _ in yml_config_object.iter_services():
-                image_name = f"{dist.name}_{service_name}" if service_name != "mongo" else service_name
+                if service_name.endswith('-prompted-skill'):
+                    image_name = f'prompted-skill:{dist.name}_{service_name.replace("-prompted-skill", "")}'
+                else:
+                    image_name = f"{service_name}:{dist.name}" if service_name != "mongo" else service_name
                 if self.registry_addr:
                     services.update({service_name: {"image": f"{self.registry_addr}/{image_name}"}})
                 else:
@@ -286,7 +289,7 @@ class SwarmDeployer:
         self.swarm_client.delete_stack(stack_name)
         logger.info(f"{stack_name} successfully removed")
 
-    def push_images(self, image_names: List[str]):
+    def push_images(self, dist):
         """
         HOST MACHINE
         repository_name == stack_name == self.user_identifier
@@ -294,11 +297,15 @@ class SwarmDeployer:
         """
         ecr_client = boto3.client("ecr")
         docker_client = docker.from_env()
-
-        for image_name in image_names:
-            image_name_ = image_name
+        with open(self._get_deployment_path(dist)) as fin:
+            deployment = yaml.safe_load(fin.read())
+        for service in deployment['services'].values():
+            image_name_ = image_name = service['image']
+            # TODO: replace with regex
             if ":" in image_name:
                 image_name_, tag = image_name.split(":")
+            if "/" in image_name_:
+                ecr_url, image_name_ = image_name_.split("/")
 
             if self._check_if_repository_exists(ecr_client=ecr_client, repository_name=image_name_):
                 response = ecr_client.describe_repositories(
@@ -307,21 +314,29 @@ class SwarmDeployer:
                     ]
                 )
                 repository_description = response["repositories"][0]
+                logger.info(f'initialized {repository_description["repositoryUri"]} repository')
             else:
                 repository_description = ecr_client.create_repository(repositoryName=image_name_)["repository"]
-            repository_uri = repository_description["repositoryUri"]
-
+                logger.info(f'{repository_description["repositoryUri"]} found')
             # image = docker_client.images.get(image_name)
             # image.tag(repository_uri, "test")
             # image.tags doesn't guarantee that tags in python objects  match with docker tags in system, so then
             # composing string is required
-            image_tag = f"{repository_uri}:{self.user_identifier}"
-
-            try:
-                logger.info(f"Pushing image {image_name_}")
-                print(docker_client.images.push(repository_uri))
-            except docker.errors.APIError as e:
-                logger.error(f"While pushing image raised error: {e}")
+        try:
+            push_cmd = f'docker compose -f {self._get_deployment_path(dist)} --project-directory {dist.dream_root} push'
+            logger.info("Pushing images")
+            process = subprocess.Popen(
+                push_cmd,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            output, error = process.communicate()
+            if process.returncode != 0:
+                raise ChildProcessError(f"Failed to push images: {error.decode()}.")
+            logger.info(f"Images pushed")
+        except docker.errors.APIError as e:
+            logger.error(f"While pushing image raised error: {e}")
 
     def _check_if_repository_exists(self, ecr_client, repository_name):
         try:
@@ -352,22 +367,12 @@ class SwarmDeployer:
             raise ChildProcessError(f"Failed to build images: {error.decode()}.")
         logger.info("Images built")
 
-    def _get_image_names_of_the_dist(self, dist: AssistantDist):
-        if self.user_services:
-            image_names = ["".join([dist.name, "_", user_service]) for user_service in self.user_services]
-        else:
-            image_names = [
-                "".join([dist.name, "_", service_name]) for service_name, _ in dist.compose_override.iter_services()
-            ]
-        return image_names
-
     def build_and_push_to_registry(self, dist: AssistantDist):
         """
         HOST MACHINE
         """
         self._build_image_on_local(dist)
-        image_names: List[str] = self._get_image_names_of_the_dist(dist)
-        self.push_images(image_names)
+        self.push_images(dist)
 
     def _login_local(self):
         subprocess.run(
