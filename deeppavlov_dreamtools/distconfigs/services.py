@@ -73,6 +73,7 @@ def create_generative_prompted_skill_service(
     generative_service_model: str,
     generative_service_port: int,
     generative_service_command: str,
+    prompt: str = None,
 ):
     source_dir, config_dir, service_file, environment_file = _resolve_default_service_config_paths(
         config_dir=config_dir
@@ -111,6 +112,9 @@ def create_generative_prompted_skill_service(
             "N_UTTERANCES_CONTEXT": 7,
         },
     )
+    if prompt:
+        utils.dump_json({"prompt": prompt}, dream_root / f"common/prompts/{service_uid}.json", overwrite=True)
+
     service.save_configs()
 
     return service

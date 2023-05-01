@@ -934,12 +934,8 @@ class AssistantDist:
         name: str,
         display_name: str,
         author: str,
-        description: str = "",
-        existing_prompted_skill: str = None,
-        existing_prompted_skill_connector_url: str = None,
-        existing_prompted_skill_command: str = None,
-        existing_prompted_skill_port: int = None,
-        # service_names: Optional[list] = None,
+        description: str,
+        existing_prompted_skills: List[Dict],
     ):
         """
         Creates Dream distribution inherited from another distribution.
@@ -950,6 +946,18 @@ class AssistantDist:
             name: name of new Dream distribution
             display_name: human-readable name of new Dream distribution
             description: name of new Dream distribution
+            existing_prompted_skills: [
+                {
+                    "name": str,
+                    "port": int,
+                    "command": str,
+                    "lm_service_model": str | None,
+                    "lm_service_port": int | None,
+                    "prompt": int | None,
+                    "display_name": str | None,
+                    "description": str | None,
+                }
+            ]
             # service_names: list of services to be included in new distribution
         Returns:
             instance of DreamDist
@@ -959,31 +967,38 @@ class AssistantDist:
 
         # _, new_compose_override = self.compose_override.filter_services(all_names)
 
-        prompted_service_name = utils.generate_unique_name()
-        prompted_skill_name = f"dff_{prompted_service_name}_prompted_skill"
-        prompted_skill_container_name = f"dff-{prompted_service_name}-prompted-skill"
-        prompted_service = services.create_generative_prompted_skill_service(
-            self.dream_root,
-            f"skills/dff_template_prompted_skill/service_configs/{prompted_skill_name}",
-            prompted_service_name,
-            prompted_skill_name,
-            existing_prompted_skill_port,
-            "transformers-lm-oasst12b",
-            8158,
-            existing_prompted_skill_command,
-        )
+        new_generative_prompted_skills = {}
+        prompted_service_names = []
 
-        prompted_component_name = utils.generate_unique_name()
-        prompted_component = components.create_generative_prompted_skill_component(
-            self.dream_root,
-            prompted_service,
-            f"components/{prompted_component_name}.yml",
-            f"http://{prompted_skill_container_name}:{existing_prompted_skill_port}/respond",
-            prompted_skill_name,
-            f"Prompted Component {prompted_component_name}",
-            author,
-            "Copy of prompted service",
-        )
+        for skill in existing_prompted_skills:
+            prompted_service_name = utils.generate_unique_name()
+            prompted_skill_name = f"dff_{prompted_service_name}_prompted_skill"
+            prompted_skill_container_name = f"dff-{prompted_service_name}-prompted-skill"
+            prompted_service = services.create_generative_prompted_skill_service(
+                self.dream_root,
+                f"skills/dff_template_prompted_skill/service_configs/{prompted_skill_name}",
+                prompted_service_name,
+                prompted_skill_name,
+                skill["port"],
+                skill.get("lm_service_model", "transformers-lm-oasst12b"),
+                skill.get("lm_service_port", 8158),
+                skill["command"],
+                skill.get("prompt"),
+            )
+            prompted_service_names.append(prompted_service_name)
+
+            prompted_component_name = utils.generate_unique_name()
+            prompted_component = components.create_generative_prompted_skill_component(
+                self.dream_root,
+                prompted_service,
+                f"components/{prompted_component_name}.yml",
+                f"http://{prompted_skill_container_name}:{skill['port']}/respond",
+                prompted_skill_name,
+                skill.get("display_name", f"Prompted Component {prompted_component_name}"),
+                author,
+                skill.get("description", "Copy of prompted service"),
+            )
+            new_generative_prompted_skills[skill["name"]] = prompted_component
 
         agent_service_name = utils.generate_unique_name()
         agent_service = services.create_agent_service(
@@ -1026,7 +1041,7 @@ class AssistantDist:
             self.dream_root,
             f"annotators/prompt_selector/service_configs/{prompt_selector_service_name}",
             prompt_selector_service_name,
-            [prompted_service_name],
+            prompted_service_names,
         )
 
         prompt_selector_component_name = utils.generate_unique_name()
@@ -1038,8 +1053,11 @@ class AssistantDist:
         )
 
         new_pipeline = deepcopy(self.pipeline)
-        del new_pipeline.skills[existing_prompted_skill]
-        new_pipeline.skills[prompted_skill_name] = prompted_component
+
+        for skill_name, prompted_component in new_generative_prompted_skills.items():
+            del new_pipeline.skills[skill_name]
+            new_pipeline.skills[prompted_component.component.name] = prompted_component
+
         new_pipeline.agent = new_pipeline.validate_agent_services(agent_last_chance_component, agent_timeout_component)
         new_pipeline.last_chance_service = agent_last_chance_component
         new_pipeline.timeout_service = agent_timeout_component
