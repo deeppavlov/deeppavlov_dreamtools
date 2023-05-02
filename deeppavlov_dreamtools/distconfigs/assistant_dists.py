@@ -1233,23 +1233,23 @@ class AssistantDist:
         self.dist_path.mkdir(parents=True, exist_ok=overwrite)
 
         if generate_configs:
-            self.pipeline_conf = self.pipeline.generate_pipeline_conf()
-            self.compose_override = self.pipeline.generate_compose()
+            self.pipeline_conf.config = self.pipeline.generate_pipeline_conf()
+            self.compose_override.config = self.pipeline.generate_compose()
 
         utils.dump_json(
-            utils.pydantic_to_dict(self.pipeline_conf, exclude_none=True),
+            utils.pydantic_to_dict(self.pipeline_conf.config, exclude_none=True),
             self.dist_path / "pipeline_conf.json",
             overwrite=True,
         )
         utils.dump_yml(
-            utils.pydantic_to_dict(self.compose_override, exclude_none=True),
+            utils.pydantic_to_dict(self.compose_override.config, exclude_none=True),
             self.dist_path / "docker-compose.override.yml",
             overwrite=True,
         )
 
-        for config in self.iter_loaded_configs():
-            path = config.to_dist(self.dist_path, overwrite)
-            paths.append(path)
+        # for config in self.iter_loaded_configs():
+        #     path = config.to_dist(self.dist_path, overwrite)
+        #     paths.append(path)
 
         return paths
 

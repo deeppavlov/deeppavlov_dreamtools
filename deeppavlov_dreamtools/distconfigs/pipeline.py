@@ -118,7 +118,7 @@ class Pipeline:
 
         wait_hosts = [f"{h}:{p}" for h, p in all_ports.items() if h != "agent"]
         self._update_agent_wait_hosts(wait_hosts)
-
+        all_services["agent"] = self.agent.service.generate_compose()
         compose = generics.ComposeOverride(services=all_services)
         return compose
 
