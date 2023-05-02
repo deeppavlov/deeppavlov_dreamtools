@@ -1204,12 +1204,26 @@ class AssistantDist:
         if self.compose_proxy:
             self.compose_proxy.remove_component(component.container_name, inplace=True)
 
-    def save(self, overwrite: bool = False):
+    def generate_pipeline_conf(self) -> PipelineConf:
+        self.pipeline_conf = self.pipeline.generate_pipeline_conf()
+        self.save(overwrite=True)
+
+        return self.pipeline_conf
+
+    def generate_compose(self) -> ComposeOverride:
+        self.compose_override = self.pipeline.generate_compose()
+        self.save(overwrite=True)
+
+        return self.compose_override
+
+    def save(self, overwrite: bool = False, generate_configs: bool = True):
         """
         Dumps current config objects to files.
 
         Args:
             overwrite: if True, overwrites existing files
+            generate_configs: generate correct automated configs instead of the existing ones.
+                Mostly used to verify legacy handmade ymls.
 
         Returns:
             list of paths to saved config files
@@ -1218,13 +1232,17 @@ class AssistantDist:
 
         self.dist_path.mkdir(parents=True, exist_ok=overwrite)
 
+        if generate_configs:
+            self.pipeline_conf = self.pipeline.generate_pipeline_conf()
+            self.compose_override = self.pipeline.generate_compose()
+
         utils.dump_json(
-            utils.pydantic_to_dict(self.pipeline.generate_pipeline_conf(), exclude_none=True),
+            utils.pydantic_to_dict(self.pipeline_conf, exclude_none=True),
             self.dist_path / "pipeline_conf.json",
             overwrite=True,
         )
         utils.dump_yml(
-            utils.pydantic_to_dict(self.pipeline.generate_compose(), exclude_none=True),
+            utils.pydantic_to_dict(self.compose_override, exclude_none=True),
             self.dist_path / "docker-compose.override.yml",
             overwrite=True,
         )
