@@ -45,7 +45,7 @@ class DeployerError:
         self.exception = f"{type(exc).__name__}"
         self.message = message or str(exc)
 
-    def __dict__(self):
+    def dict(self):
         return {"state": self.state, "exception": self.exception, "message": self.message}
 
 
