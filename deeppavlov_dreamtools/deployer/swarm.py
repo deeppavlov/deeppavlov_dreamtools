@@ -105,7 +105,7 @@ class SwarmDeployer:
         # logger.info("Deploying services on the node")
         yield DeployerState.DEPLOYING_STACK, None
         try:
-            self.swarm_client.create_stack(self._get_deployment_path(dist), self.user_identifier)
+            stack = self.swarm_client.create_stack(self._get_deployment_path(dist), self.user_identifier)
         except Exception as e:
             yield None, DeployerError(DeployerState.DEPLOYING_STACK, e)
             raise e

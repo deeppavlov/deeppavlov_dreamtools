@@ -58,7 +58,7 @@ class SwarmClient:
 
     def create_stack(self, file: Union[str, Path], stack_name: str):
         # TODO: add/replace with creating stack with string
-        return self._post(
+        ans = self._post(
             "/api/stacks",
             params={
                 "type": 1,
@@ -69,6 +69,7 @@ class SwarmClient:
             },
             files={"file": open(file, "rb")},
         )
+        return Stack.parse_obj(ans.json())
 
     def get_stacks(self) -> List[Stack]:
         return [Stack.parse_obj(s) for s in self._get("/api/stacks").json()]
