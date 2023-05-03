@@ -4,6 +4,7 @@ from urllib.parse import urljoin
 
 import requests
 import urllib3
+import yaml
 
 from deeppavlov_dreamtools.deployer.models import Stack
 
@@ -99,3 +100,11 @@ class SwarmClient:
                 "stackFileContent": stack_file_content
             }
         )
+
+    def get_stack_file(self, stack_id):
+        ans = self._get(f'/api/stacks/{stack_id}/file')
+        return yaml.safe_load(ans.json()['StackFileContent'])
+
+    def get_used_ports(self):
+        stack_files = [self.get_stack_file(stack.Id) for stack in self.get_stacks()]
+        return [file['services']['agent']['ports'][0]['published'] for file in stack_files]
