@@ -42,6 +42,9 @@ class SwarmClient:
     def _delete(self, path, **kwargs):
         return self._request("delete", path, **kwargs)
 
+    def _put(self, path, **kwargs):
+        return self._request("put", path, **kwargs)
+
     def _get_swarm_id(self):
         resp = self._get(f"/api/endpoints/{self.endpoint_id}/docker/swarm")
         return resp.json()["ID"]
@@ -72,3 +75,26 @@ class SwarmClient:
 
     def delete_stack(self, stack_id):
         return self._delete(f"/api/stacks/{stack_id}", params={"external": True, "endpointId": self.endpoint_id})
+
+    def update_stack(self, stack_id: int, file: Union[str, Path], prune: bool = True, pull_image: bool = True):
+        """
+        Args:
+            stack_id: Stack identifier.
+            file: Stack file.
+            prune: Whether nor not prune (remove) services that are no longer in the updated stack.
+            pull_image: Force a pulling to current image with the original tag though the image is already the latest.
+        """
+        with open(file) as fin:
+            stack_file_content = fin.read()
+        return self._put(
+            f"/api/stacks/{stack_id}",
+            params={
+                "id": stack_id,
+                "endpointId": self.endpoint_id
+            },
+            json={
+                "prune": prune,
+                "pullImage": pull_image,
+                "stackFileContent": stack_file_content
+            }
+        )
