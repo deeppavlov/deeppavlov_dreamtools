@@ -1233,8 +1233,8 @@ class AssistantDist:
         self.dist_path.mkdir(parents=True, exist_ok=overwrite)
 
         if generate_configs:
-            self.pipeline_conf.config = self.pipeline.generate_pipeline_conf()
-            self.compose_override.config = self.pipeline.generate_compose()
+            self.pipeline_conf = DreamPipeline(self.pipeline.generate_pipeline_conf())
+            self.compose_override = DreamComposeOverride(self.pipeline.generate_compose())
 
         utils.dump_json(
             utils.pydantic_to_dict(self.pipeline_conf.config, exclude_none=True),
