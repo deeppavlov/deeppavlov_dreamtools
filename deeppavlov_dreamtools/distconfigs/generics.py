@@ -72,15 +72,6 @@ class BaseModelNoExtra(BaseModel):
         }
 
 
-COMPONENT_GROUPS = Literal[
-    "Script-based with NNs",
-    "Script-based w/o NNs",
-    "Fallback",
-    "Generative",
-    "FAQ",
-    "Retrieval",
-]
-
 COMPONENT_TYPES = Literal[
     "Script-based with NNs",
     "Script-based w/o NNs",
