@@ -1,7 +1,6 @@
 import logging
 import shutil
 import subprocess
-from enum import Enum
 from pathlib import Path
 from typing import List
 from urllib.parse import urlparse
@@ -138,7 +137,7 @@ class SwarmDeployer:
         if self.user_services is not None:
             self.user_services.append("agent")
             dist.compose_override = dist.compose_override.filter_services(self.user_services)[1]
-        dist.save(overwrite=True)
+        dist.save(overwrite=True, generate_configs=False)
 
         self._create_dists_env_file(dist, user_prefix=prefix)
         self._create_deployment_yml_file(dist=dist)
@@ -335,11 +334,13 @@ class SwarmDeployer:
         docker login must be configured
         """
         ecr_client = boto3.client("ecr")
-        docker_client = docker.from_env()
         with open(self._get_deployment_path(dist)) as fin:
             deployment = yaml.safe_load(fin.read())
-        for service in deployment['services'].values():
-            image_name_ = image_name = service['image']
+        for service_name, service in deployment['services'].items():
+            try:
+                image_name_ = image_name = service['image']
+            except KeyError:
+                raise KeyError(f'there is no "image" key in {service_name}')
             # TODO: replace with regex
             if ":" in image_name:
                 image_name_, tag = image_name.split(":")
