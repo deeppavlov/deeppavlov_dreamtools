@@ -1,6 +1,7 @@
 import logging
 import shutil
 import subprocess
+from enum import Enum
 from pathlib import Path
 from typing import List
 from urllib.parse import urlparse
@@ -28,6 +29,25 @@ env_var_name_slice = slice(0, -4)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s:%(levelname)s:%(name)s:%(message)s")
 logger = logging.getLogger("dreamtools.SwarmDeployer")
+
+
+class DeployerState:
+    CREATING_CONFIG_FILES = "CREATING_CONFIG_FILES"
+    BUILDING_IMAGE = "BUILDING_IMAGE"
+    PUSHING_IMAGES = "PUSHING_IMAGES"
+    DEPLOYING_STACK = "DEPLOYING_STACK"
+    DEPLOYED = "DEPLOYED"
+
+
+class DeployerError:
+    def __init__(self, state: str, exc: Exception, message: str = None):
+        self.state = state
+        self._exc = exc
+        self.exception = f"{type(exc).__name__}"
+        self.message = message or str(exc)
+
+    def __dict__(self):
+        return {"state": self.state, "exception": self.exception, "message": self.message}
 
 
 class SwarmDeployer:
@@ -62,21 +82,40 @@ class SwarmDeployer:
         self.deployment_dict = deployment_dict
         self.default_prefix = default_prefix
 
-    def deploy(self, dist: AssistantDist) -> None:
+    def deploy(self, dist: AssistantDist):
         """
         Problem to be solved: deploy dream assistant distributions remotely.
         General steps:
         1) create configuration files on the host machine
         2) build & push images described in those configs from the host machine
         3) on the remote machine pull and deploy services from those images onto the docker stack
-        """
-        self._set_up_user_dist(dist=dist)
-        self.build_and_push_to_registry(dist=dist)
 
-        logger.info("Deploying services on the node")
-        self.swarm_client.create_stack(self._get_deployment_path(dist), self.user_identifier)
-        shutil.rmtree(dist.dist_path)  # delete local files of the created distribution
-        logger.info("Services deployed")
+        Yields:
+            tuple of (state, error) events from the deployment process
+        """
+        yield DeployerState.CREATING_CONFIG_FILES, None
+        self._set_up_user_dist(dist=dist)
+
+        # self.build_and_push_to_registry(dist=dist)
+        yield DeployerState.BUILDING_IMAGE, None
+        self._build_image_on_local(dist=dist)
+
+        yield DeployerState.PUSHING_IMAGES, None
+        self.push_images(dist=dist)
+
+        # logger.info("Deploying services on the node")
+        yield DeployerState.DEPLOYING_STACK, None
+        try:
+            self.swarm_client.create_stack(self._get_deployment_path(dist), self.user_identifier)
+        except Exception as e:
+            yield None, DeployerError(DeployerState.DEPLOYING_STACK, e)
+            raise e
+        finally:
+            shutil.rmtree(dist.dist_path)  # delete local files of the created distribution
+            logger.info(f"Deleted local files for {dist.dist_path}")
+
+        yield DeployerState.DEPLOYED, None
+        # logger.info("Services deployed")
 
     def _set_up_user_dist(self, dist: AssistantDist):
         prefix = self.user_identifier + "_"
