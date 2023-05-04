@@ -92,19 +92,22 @@ class SwarmClient:
             f"/api/stacks/{stack_id}",
             params={
                 "id": stack_id,
-                "endpointId": self.endpoint_id
+                "endpointId": self.endpoint_id,
             },
             json={
                 "prune": prune,
                 "pullImage": pull_image,
-                "stackFileContent": stack_file_content
-            }
+                "stackFileContent": stack_file_content,
+            },
         )
 
     def get_stack_file(self, stack_id):
-        ans = self._get(f'/api/stacks/{stack_id}/file')
-        return yaml.safe_load(ans.json()['StackFileContent'])
+        ans = self._get(f"/api/stacks/{stack_id}/file")
+        return yaml.safe_load(ans.json()["StackFileContent"])
 
     def get_used_ports(self):
-        stack_files = [self.get_stack_file(stack.Id) for stack in self.get_stacks()]
-        return [file['services']['agent']['ports'][0]['published'] for file in stack_files]
+        stacks = self.get_stacks()
+        stack_files = [self.get_stack_file(stack.Id) for stack in stacks]
+        return {
+            stack.Id: file["services"]["agent"]["ports"][0]["published"] for stack, file in zip(stacks, stack_files)
+        }
