@@ -130,7 +130,7 @@ def create_generative_prompted_skill_component(
         description=description,
         ram_usage="150M",
         group="skills",
-        connector=generics.PipelineConfConnector(protocol="http", timeout="10.0", url=connector_url),
+        connector=generics.PipelineConfConnector(protocol="http", timeout="20.0", url=connector_url),
         dialog_formatter={
             "name": "state_formatters.dp_formatters:dff_prompted_skill_formatter",
             "skill_name": name,
@@ -273,99 +273,3 @@ class DreamComponent:
     def lm_service(self, value: str):
         self.service.environment["GENERATIVE_SERVICE_URL"] = value
         self.service.save_environment_config()
-
-
-class ComponentRepository:
-    def __init__(self, dream_root: Union[Path, str]):
-        self.dream_root = Path(dream_root)
-        self.components = None
-
-    def _iter_components(self):
-        for component_card_path in self.dream_root.rglob(COMPONENT_CARD_FILENAME):
-            component_card = utils.load_yml(component_card_path)
-
-            for name, component in component_card.items():
-                for endpoint in component["endpoints"]:
-                    yield DreamComponent.from_component_dir(
-                        component_card_path.parent,
-                        component["container_name"],
-                        endpoint["group"],
-                        component.get("template"),
-                        endpoint=endpoint["endpoint"],
-                    )
-
-    def scan_components(self):
-        self.components = list(self._iter_components())
-        return self.components
-
-    def add_component_config(self, group: str, name: str, config: generics.Component):
-        component_card_path = self.dream_root / group / name / "component.yml"
-        component_card = utils.load_yml(component_card_path)
-        component_card[config.container_name] = json.loads(config.json(exclude_none=True))
-        utils.dump_yml(component_card, component_card_path, overwrite=True)
-
-        return config
-
-    def add_generative_prompted_skill(
-        self,
-        name: str,
-        display_name: str,
-        container_name: str,
-        author: str,
-        description: str,
-        ram_usage: str,
-        port: int,
-        lm_service: str,
-        prompt: str,
-        gpu_usage: Optional[str] = None,
-    ):
-        prompt_file = f"common/prompts/{name}.json"
-
-        component = generics.Component(
-            name=name,
-            display_name=display_name,
-            container_name=container_name,
-            component_type="Generative",
-            model_type="NN-based",
-            is_customizable=True,
-            author=author,
-            description=description,
-            ram_usage=ram_usage,
-            gpu_usage=gpu_usage,
-            port=port,
-            endpoints=[{"group": "skills", "endpoint": "respond"}],
-            build_args={
-                "SERVICE_PORT": port,
-                "SERVICE_NAME": name,
-                "PROMPT_FILE": f"common/prompts/{name}.json",
-                "GENERATIVE_SERVICE_URL": f"http://{lm_service}:8130/respond",
-                "GENERATIVE_SERVICE_CONFIG": "default_generative_config.json",
-                "GENERATIVE_TIMEOUT": 5,
-                "N_UTTERANCES_CONTEXT": 3,
-            },
-            compose_override={
-                "env_file": [".env"],
-                "build": {
-                    "args": {
-                        "SERVICE_PORT": port,
-                        "SERVICE_NAME": name,
-                        "PROMPT_FILE": prompt_file,
-                        "GENERATIVE_SERVICE_URL": f"http://{lm_service}:8130/respond",
-                        "GENERATIVE_SERVICE_CONFIG": "default_generative_config.json",
-                        "GENERATIVE_TIMEOUT": 5,
-                        "N_UTTERANCES_CONTEXT": 3,
-                    },
-                    "context": ".",
-                    "dockerfile": "./skills/dff_template_prompted_skill/Dockerfile",
-                },
-                "command": f"gunicorn --workers=1 server:app -b 0.0.0.0:{port} --reload",
-                "deploy": {"resources": {"limits": {"memory": "128M"}, "reservations": {"memory": "128M"}}},
-            },
-            compose_dev={
-                "volumes": ["./skills/dff_template_prompted_skill:/src", "./common:/src/common"],
-                "ports": [f"{port}:{port}"],
-            },
-            compose_proxy={},
-        )
-        utils.dump_json({"prompt": prompt}, self.dream_root / prompt_file)
-        return self.add_component_config("skills", "dff_template_prompted_skill", component)
