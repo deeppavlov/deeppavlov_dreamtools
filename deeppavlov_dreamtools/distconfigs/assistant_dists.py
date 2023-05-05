@@ -10,10 +10,10 @@ import yaml
 from pydantic import parse_obj_as
 
 from deeppavlov_dreamtools import utils
-from deeppavlov_dreamtools.distconfigs import const
+from deeppavlov_dreamtools.distconfigs import const, services, components
 from deeppavlov_dreamtools.distconfigs.components import DreamComponent
 from deeppavlov_dreamtools.distconfigs.generics import (
-    PipelineConfModel,
+    PipelineConf,
     ComposeOverride,
     ComposeDev,
     ComposeProxy,
@@ -205,7 +205,7 @@ class YmlDreamConfig(BaseDreamConfig):
         config = self.GENERIC_MODEL.parse_obj(model_dict)
         return names, self.__class__(config)
 
-    def add_service(self, name: str, definition: AnyContainer, inplace: bool = False):
+    def add_component(self, name: str, definition: AnyContainer, inplace: bool = False):
         """
         Adds service to config
 
@@ -232,7 +232,7 @@ class YmlDreamConfig(BaseDreamConfig):
             value = self.__class__(config)
         return value
 
-    def remove_service(self, name: str, inplace: bool = False):
+    def remove_component(self, name: str, inplace: bool = False):
         """
         Removes service from config.
 
@@ -273,7 +273,7 @@ class DreamPipeline(JsonDreamConfig):
     """
 
     DEFAULT_FILE_NAME = "pipeline_conf.json"
-    GENERIC_MODEL = PipelineConfModel
+    GENERIC_MODEL = PipelineConf
 
     # @property
     # def container_names(self):
@@ -396,10 +396,10 @@ class DreamPipeline(JsonDreamConfig):
         config = self.GENERIC_MODEL(**model_dict)
         return include_names_extended, self.__class__(config)
 
-    def add_service(
+    def add_component(
         self,
         name: str,
-        service_type: str,
+        component_group: str,
         definition: PipelineConfService,
         inplace: bool = False,
     ):
@@ -408,7 +408,7 @@ class DreamPipeline(JsonDreamConfig):
 
         Args:
             name: service name
-            service_type: service type in pipeline
+            component_group: service type in pipeline
             definition: generic service object
             inplace: if True, updates the config instance, returns a new copy of config instance otherwise
 
@@ -416,7 +416,7 @@ class DreamPipeline(JsonDreamConfig):
             config instance
         """
         services = self.config.copy().services
-        getattr(services, service_type)[name] = definition
+        getattr(services, component_group)[name] = definition
 
         model_dict = {
             "connectors": self.config.connectors,
@@ -430,12 +430,12 @@ class DreamPipeline(JsonDreamConfig):
             value = self.__class__(config)
         return value
 
-    def remove_service(self, service_type: str, name: str, inplace: bool = False):
+    def remove_component(self, component_group: str, name: str, inplace: bool = False):
         """
         Removes service from config.
 
         Args:
-            service_type: service type in pipeline
+            component_group: service type in pipeline
             name: service name
             inplace: if True, updates the config instance, returns a new copy of config instance otherwise
         Returns:
@@ -444,9 +444,9 @@ class DreamPipeline(JsonDreamConfig):
         # TODO implement recursive removal of dependent services
         services = self.config.copy().services
         try:
-            del getattr(services, service_type)[name]
+            del getattr(services, component_group)[name]
         except AttributeError:
-            raise KeyError(f"{service_type} is not a valid service group")
+            raise KeyError(f"{component_group} is not a valid service group")
         except KeyError:
             raise KeyError(f"{name} is not in the service list")
 
@@ -933,8 +933,9 @@ class AssistantDist:
         self,
         name: str,
         display_name: str,
-        description: str = "",
-        service_names: Optional[list] = None,
+        author: str,
+        description: str,
+        existing_prompted_skills: List[Dict],
     ):
         """
         Creates Dream distribution inherited from another distribution.
@@ -945,7 +946,19 @@ class AssistantDist:
             name: name of new Dream distribution
             display_name: human-readable name of new Dream distribution
             description: name of new Dream distribution
-            service_names: list of services to be included in new distribution
+            existing_prompted_skills: [
+                {
+                    "name": str,
+                    "port": int,
+                    "command": str,
+                    "lm_service_model": str | None,
+                    "lm_service_port": int | None,
+                    "prompt": int | None,
+                    "display_name": str | None,
+                    "description": str | None,
+                }
+            ]
+            # service_names: list of services to be included in new distribution
         Returns:
             instance of DreamDist
         """
@@ -954,39 +967,133 @@ class AssistantDist:
 
         # _, new_compose_override = self.compose_override.filter_services(all_names)
 
+        new_generative_prompted_skills = {}
+        prompted_service_names = []
+
+        for skill in existing_prompted_skills:
+            prompted_service_name = utils.generate_unique_name()
+            prompted_skill_name = f"dff_{prompted_service_name}_prompted_skill"
+            prompted_skill_container_name = f"dff-{prompted_service_name}-prompted-skill"
+            prompted_service = services.create_generative_prompted_skill_service(
+                self.dream_root,
+                f"skills/dff_template_prompted_skill/service_configs/{prompted_skill_name}",
+                prompted_service_name,
+                prompted_skill_name,
+                skill["port"],
+                skill.get("lm_service_model", "transformers-lm-oasst12b"),
+                skill.get("lm_service_port", 8158),
+                skill["command"],
+                skill.get("prompt"),
+            )
+            prompted_service_names.append(prompted_service_name)
+
+            prompted_component_name = utils.generate_unique_name()
+            prompted_component = components.create_generative_prompted_skill_component(
+                self.dream_root,
+                prompted_service,
+                f"components/{prompted_component_name}.yml",
+                f"http://{prompted_skill_container_name}:{skill['port']}/respond",
+                prompted_skill_name,
+                skill.get("display_name", f"Prompted Component {prompted_component_name}"),
+                author,
+                skill.get("description", "Copy of prompted service"),
+            )
+            new_generative_prompted_skills[skill["name"]] = prompted_component
+
+        agent_service_name = utils.generate_unique_name()
+        agent_service = services.create_agent_service(
+            self.dream_root,
+            f"services/agent_services/service_configs/{agent_service_name}",
+            agent_service_name,
+            f"assistant_dists/{name}/pipeline_conf.json"
+        )
+
+        agent_last_chance_component_name = utils.generate_unique_name()
+        agent_last_chance_component = components.create_agent_component(
+            self.dream_root,
+            agent_service,
+            f"components/{agent_last_chance_component_name}.yml",
+            agent_last_chance_component_name,
+            f"Agent Component {agent_last_chance_component_name}",
+            author,
+            "Copy of agent",
+            "last_chance_service",
+            "Sorry, something went wrong inside. Please tell me, what did you say.",
+            ["last_chance"],
+        )
+
+        agent_timeout_component_name = utils.generate_unique_name()
+        agent_timeout_component = components.create_agent_component(
+            self.dream_root,
+            agent_service,
+            f"components/{agent_timeout_component_name}.yml",
+            agent_timeout_component_name,
+            f"Agent Component {agent_timeout_component_name}",
+            author,
+            "Copy of agent",
+            "timeout_service",
+            "Sorry, I need to think more on that. Let's talk about something else.",
+            ["timeout"],
+        )
+
+        prompt_selector_service_name = utils.generate_unique_name()
+        prompt_selector_service = services.create_prompt_selector_service(
+            self.dream_root,
+            f"annotators/prompt_selector/service_configs/{prompt_selector_service_name}",
+            prompt_selector_service_name,
+            prompted_service_names,
+        )
+
+        prompt_selector_component_name = utils.generate_unique_name()
+        prompt_selector_component = components.create_prompt_selector_component(
+            self.dream_root,
+            prompt_selector_service,
+            f"components/{prompt_selector_component_name}.yml",
+            prompt_selector_component_name,
+        )
+
         new_pipeline = deepcopy(self.pipeline)
 
-        new_pipeline_conf = deepcopy(self.pipeline_conf)
-        new_pipeline_conf.display_name = display_name
-        new_pipeline_conf.description = description
+        for skill_name, prompted_component in new_generative_prompted_skills.items():
+            del new_pipeline.skills[skill_name]
+            new_pipeline.skills[prompted_component.component.name] = prompted_component
 
-        new_compose_override = deepcopy(self.compose_override)
-        new_agent_command = re.sub(
-            f"assistant_dists/{self.name}/pipeline_conf.json",
-            f"assistant_dists/{name}/pipeline_conf.json",
-            new_compose_override.config.services["agent"].command,
-        )
-        new_compose_override.config.services["agent"].command = new_agent_command
+        new_pipeline.agent = new_pipeline.validate_agent_services(agent_last_chance_component, agent_timeout_component)
+        new_pipeline.last_chance_service = agent_last_chance_component
+        new_pipeline.timeout_service = agent_timeout_component
+        new_pipeline.annotators["prompt_selector"] = prompt_selector_component
 
-        # new_compose_override.config.services["agent"].environment["WAIT_HOSTS"] = ""
-        new_compose_dev = new_compose_proxy = new_compose_local = None
-        if self.compose_dev:
-            new_compose_dev = deepcopy(self.compose_dev)
-        if self.compose_proxy:
-            new_compose_proxy = deepcopy(self.compose_proxy)
-        if self.compose_local:
-            new_compose_local = deepcopy(self.compose_local)
+        # new_pipeline_conf = deepcopy(self.pipeline_conf)
+        # new_pipeline_conf.display_name = display_name
+        # new_pipeline_conf.description = description
+        #
+        # new_compose_override = deepcopy(self.compose_override)
+        # new_agent_command = re.sub(
+        #     f"assistant_dists/{self.name}/pipeline_conf.json",
+        #     f"assistant_dists/{name}/pipeline_conf.json",
+        #     new_compose_override.config.services["agent"].command,
+        # )
+        # new_compose_override.config.services["agent"].command = new_agent_command
+        #
+        # # new_compose_override.config.services["agent"].environment["WAIT_HOSTS"] = ""
+        # new_compose_dev = new_compose_proxy = new_compose_local = None
+        # if self.compose_dev:
+        #     new_compose_dev = deepcopy(self.compose_dev)
+        # if self.compose_proxy:
+        #     new_compose_proxy = deepcopy(self.compose_proxy)
+        # if self.compose_local:
+        #     new_compose_local = deepcopy(self.compose_local)
 
         return AssistantDist(
             self.resolve_dist_path(name, self.dream_root),
             name,
             self.dream_root,
             new_pipeline,
-            new_pipeline_conf,
-            new_compose_override,
-            new_compose_dev,
-            new_compose_proxy,
-            new_compose_local,
+            # new_pipeline_conf,
+            # new_compose_override,
+            # new_compose_dev,
+            # new_compose_proxy,
+            # new_compose_local,
         )
 
     def iter_loaded_configs(self):
@@ -1074,12 +1181,49 @@ class AssistantDist:
 
             yield self._extract_component_from_service(service_group, service_name, service)
 
-    def save(self, overwrite: bool = False):
+    def add_component(self, component: DreamComponent):
+        self.pipeline.add_component(component)
+
+        # self.compose_override.add_component(component.config.name, component.config.compose_override, inplace=True)
+        #
+        # if self.compose_dev:
+        #     self.compose_dev.add_component(component.config.name, component.config.compose_dev, inplace=True)
+        #
+        # if self.compose_proxy:
+        #     self.compose_proxy.add_component(component.config.name, component.config.compose_proxy, inplace=True)
+
+    def remove_component(self, group: str, name: str):
+        # component = self.pipeline.get_component(group, name)
+        self.pipeline.remove_component(group, name)
+
+        # self.compose_override.remove_component(component.container_name, inplace=True)
+        #
+        # if self.compose_dev:
+        #     self.compose_dev.remove_component(component.container_name, inplace=True)
+        #
+        # if self.compose_proxy:
+        #     self.compose_proxy.remove_component(component.container_name, inplace=True)
+
+    def generate_pipeline_conf(self) -> PipelineConf:
+        self.pipeline_conf = self.pipeline.generate_pipeline_conf()
+        self.save(overwrite=True)
+
+        return self.pipeline_conf
+
+    def generate_compose(self) -> ComposeOverride:
+        self.compose_override = self.pipeline.generate_compose()
+        self.save(overwrite=True)
+
+        return self.compose_override
+
+    def save(self, overwrite: bool = False, generate_configs: bool = True):
         """
         Dumps current config objects to files.
 
         Args:
             overwrite: if True, overwrites existing files
+            generate_configs: generate correct automated configs instead of the existing ones.
+                Mostly used to verify legacy handmade ymls.
 
         Returns:
             list of paths to saved config files
@@ -1087,9 +1231,25 @@ class AssistantDist:
         paths = []
 
         self.dist_path.mkdir(parents=True, exist_ok=overwrite)
-        for config in self.iter_loaded_configs():
-            path = config.to_dist(self.dist_path, overwrite)
-            paths.append(path)
+
+        if generate_configs:
+            self.pipeline_conf = DreamPipeline(self.pipeline.generate_pipeline_conf())
+            self.compose_override = DreamComposeOverride(self.pipeline.generate_compose())
+
+        utils.dump_json(
+            utils.pydantic_to_dict(self.pipeline_conf.config, exclude_none=True),
+            self.dist_path / "pipeline_conf.json",
+            overwrite=True,
+        )
+        utils.dump_yml(
+            utils.pydantic_to_dict(self.compose_override.config, exclude_none=True),
+            self.dist_path / "docker-compose.override.yml",
+            overwrite=True,
+        )
+
+        # for config in self.iter_loaded_configs():
+        #     path = config.to_dist(self.dist_path, overwrite)
+        #     paths.append(path)
 
         return paths
 
@@ -1127,7 +1287,7 @@ class AssistantDist:
                 previous_services=["skill_selectors"],
                 state_manager_method="add_hypothesis",
             )
-            self.pipeline_conf.add_service(name_with_underscores, "skills", pl_service, inplace=True)
+            self.pipeline_conf.add_component(name_with_underscores, "skills", pl_service, inplace=True)
 
         if self.compose_override:
             override_service = ComposeContainer(
@@ -1145,14 +1305,14 @@ class AssistantDist:
                     )
                 ),
             )
-            self.compose_override.add_service(name_with_dashes, override_service, inplace=True)
+            self.compose_override.add_component(name_with_dashes, override_service, inplace=True)
 
         if self.compose_dev:
             dev_service = ComposeDevContainer(
                 volumes=[f"./skills/{name}:/src", "./common:/src/common"],
                 ports=[f"{port}:{port}"],
             )
-            self.compose_dev.add_service(name_with_dashes, dev_service, inplace=True)
+            self.compose_dev.add_component(name_with_dashes, dev_service, inplace=True)
 
         if self.compose_proxy:
             proxy_service = ComposeContainer(
@@ -1160,57 +1320,11 @@ class AssistantDist:
                 build=ContainerBuildDefinition(context=Path("dp/proxy"), dockerfile=Path("Dockerfile")),
                 environment=[f"PROXY_PASS=dream.deeppavlov.ai:{port}", f"PORT={port}"],
             )
-            self.compose_proxy.add_service(name_with_dashes, proxy_service, inplace=True)
+            self.compose_proxy.add_component(name_with_dashes, proxy_service, inplace=True)
 
         self.save(True)
 
         return skill_dir
-
-    def create_local_yml(
-        self,
-        services: list,
-        drop_ports: bool = True,
-        single_replica: bool = True,
-    ):
-        """
-        Creates local config for distribution.
-
-        Picks up container definitions from dev and proxy configs,
-        replaces selected proxy services with their definitions from dev config,
-        and dumps the resulting config to ``local.yml``
-
-        Args:
-            services: list of service names which should be deployed locally
-            drop_ports: if True, removes port definitions from local services
-            single_replica: if True, adds deployment arguments to all services
-
-        Returns:
-            path to new local config
-
-        """
-        services = list(services) + ["agent", "mongo"]
-
-        dev_config_part = self.compose_dev.filter_services(services, inplace=False)
-        proxy_config_part = self.compose_proxy.filter_services(exclude_names=services, inplace=False)
-        local_config = DreamComposeLocal(ComposeLocal(services=proxy_config_part.config.services))
-        all_config_parts = {
-            **dev_config_part.config.services,
-            **proxy_config_part.config.services,
-        }
-
-        for name, s in all_config_parts.items():
-            if name in services:
-                service = ComposeLocalContainer.parse_obj(s)
-                if drop_ports:
-                    service.ports = None
-            else:
-                service = s
-
-            if single_replica:
-                service.deploy = DeploymentDefinition(mode="replicated", replicas=1)
-
-            local_config.add_service(name, service, inplace=True)
-        return local_config.to_dist(self.dist_path)
 
     def enable_service(
         self,
@@ -1229,7 +1343,9 @@ class AssistantDist:
             service_name: name of the service to be added to config, e.g. `ner`
         """
         dream_temp_config = self._fetch_dream_temp_config(config_type)
-        dream_temp_config.add_service(name=service_name, service_type=service_type, definition=definition, inplace=True)
+        dream_temp_config.add_component(
+            name=service_name, component_group=service_type, definition=definition, inplace=True
+        )
 
         self.temp_configs[config_type] = dream_temp_config
 
@@ -1239,12 +1355,12 @@ class AssistantDist:
 
         Args:
             config_type: Literal["pipeline_conf", "compose_override", "compose_dev", "compose_proxy"]
-            service_type: name of the service_type
+            service_type: name of the component_group
             service_name: name of the service to be added to config
         """
         dream_temp_config = self._fetch_dream_temp_config(config_type)  # DreamDist.pipeline_conf, for example
 
-        dream_temp_config.remove_service(service_type=service_type, name=service_name, inplace=True)
+        dream_temp_config.remove_component(component_group=service_type, name=service_name, inplace=True)
         self.temp_configs[config_type] = dream_temp_config
 
     def _fetch_dream_temp_config(self, config_type: DreamConfigLiteral):
@@ -1308,6 +1424,11 @@ class AssistantDist:
                         mismatching_ports_info.append(f"{service_name}: {str(e)}")
         if mismatching_ports_info:
             raise ValueError("\n".join(mismatching_ports_info))
+
+    def del_ports_and_volumes(self):
+        for _, compose in self.iter_container_configs():
+            for service in compose.config.services.values():
+                service.ports, service.volumes = None, None
 
     def delete(self):
         shutil.rmtree(self.dist_path, ignore_errors=True)

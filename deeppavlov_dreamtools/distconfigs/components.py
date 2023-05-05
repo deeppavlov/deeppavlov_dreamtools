@@ -1,82 +1,275 @@
+import json
 from pathlib import Path
-from typing import Union, Type, Optional
+from typing import Union, Type, Optional, List
 
 from pydantic import parse_obj_as
 
 from deeppavlov_dreamtools import utils
-from deeppavlov_dreamtools.constants import COMPONENT_CARD_FILENAME, COMPONENT_PIPELINE_FILENAME
-from deeppavlov_dreamtools.distconfigs.generics import Component, PipelineConfServiceComponent
+from deeppavlov_dreamtools.constants import (
+    COMPONENT_CARD_FILENAME,
+    COMPONENT_PIPELINE_FILENAME,
+    COMPONENT_TEMPLATE_FILENAME,
+)
+from deeppavlov_dreamtools.distconfigs import generics, services
 from deeppavlov_dreamtools.utils import parse_connector_url
+
+
+class MissingPipelineException(Exception):
+    """"""
+
+
+class DreamComponentTemplate:
+    def __init__(self, config: generics.ComponentTemplate, file_path: str, name: str):
+        self.config = config
+        self.file_path = file_path
+        self.name = name
+
+    @classmethod
+    def from_file(cls, file_path: Union[Path, str], name: str):
+        """
+        Loads template with the given name from template file
+
+        Args:
+            file_path: path to template file
+            name: template name
+
+        Returns:
+            DreamComponentTemplate instance
+
+        Raises:
+            ValueError: template with the given name does not exist in the file
+        """
+        template_card = utils.load_yml(file_path)
+        template_config = None
+
+        for template in template_card:
+            if template["name"] == name:
+                template_config = template
+                break
+
+        if not template_config:
+            raise ValueError(f"Template {name} not found in {file_path}")
+
+        return cls(config=generics.ComponentTemplate(**template_config), file_path=file_path, name=name)
+
+    def save(self) -> None:
+        utils.dump_yml(self.config, self.file_path, overwrite=True)
+
+
+def create_agent_component(
+    dream_root: Union[Path, str],
+    agent_service: services.DreamService,
+    config_path: Union[Path, str],
+    name: str,
+    display_name: str,
+    author: str,
+    description: str,
+    group: str,
+    response_text: str,
+    tags: Optional[List[str]] = None,
+):
+    config_path = Path(config_path)
+    source_dir = config_path.parent
+
+    component = generics.Component(
+        name=name,
+        display_name=display_name,
+        is_customizable=False,
+        author=author,
+        description=f"DP-Agent for {name}",
+        group=group,
+        connector=generics.PipelineConfConnector(
+            protocol="python",
+            class_name="PredefinedTextConnector",
+            response_text=response_text,
+            annotations={
+                "sentseg": {
+                    "punct_sent": response_text,
+                    "segments": [f"{sentence.strip()}." for sentence in response_text.split(".") if sentence],
+                }
+            },
+        ),
+        service=agent_service.config_dir,
+        state_manager_method="add_bot_utterance_last_chance",
+        tags=tags,
+        endpoint="respond",
+    )
+
+    dream_component = DreamComponent(
+        dream_root=dream_root,
+        source_dir=source_dir,
+        component_file=config_path,
+        component=component,
+        service=agent_service,
+    )
+    dream_component.save_configs()
+
+    return dream_component
+
+
+def create_generative_prompted_skill_component(
+    dream_root: Union[Path, str],
+    generative_prompted_skill_service: services.DreamService,
+    config_path: Union[Path, str],
+    connector_url: str,
+    name: str,
+    display_name: str,
+    author: str,
+    description: str,
+):
+    config_path = Path(config_path)
+    source_dir = config_path.parent
+
+    component = generics.Component(
+        name=name,
+        display_name=display_name,
+        component_type="Generative",
+        model_type="NN-based",
+        is_customizable=True,
+        author=author,
+        description=description,
+        ram_usage="150M",
+        group="skills",
+        connector=generics.PipelineConfConnector(protocol="http", timeout="20.0", url=connector_url),
+        dialog_formatter={
+            "name": "state_formatters.dp_formatters:dff_prompted_skill_formatter",
+            "skill_name": name,
+        },
+        response_formatter="state_formatters.dp_formatters:skill_with_attributes_formatter_service",
+        previous_services=["skill_selectors"],
+        state_manager_method="add_hypothesis",
+        endpoint="respond",
+        service=generative_prompted_skill_service.config_dir,
+    )
+
+    dream_component = DreamComponent(
+        dream_root=dream_root,
+        source_dir=source_dir,
+        component_file=config_path,
+        component=component,
+        service=generative_prompted_skill_service,
+    )
+    dream_component.save_configs()
+
+    return dream_component
+
+
+def create_prompt_selector_component(
+    dream_root: Union[Path, str],
+    prompt_selector_service: services.DreamService,
+    config_path: Union[Path, str],
+    name: str,
+):
+    config_path = Path(config_path)
+    source_dir = config_path.parent
+
+    component = generics.Component(
+        name=name,
+        display_name="Prompt Selector",
+        model_type="Dictionary/Pattern-based",
+        is_customizable="false",
+        author="publisher@deeppavlov.ai",
+        description=(
+            "Annotator utilizing Sentence Ranker to rank prompts and selecting "
+            "`N_SENTENCES_TO_RETURN` most relevant prompts (based on questions provided in prompts)"
+        ),
+        ram_usage="100M",
+        group="annotators",
+        connector=generics.PipelineConfConnector(
+            protocol="http",
+            timeout="2.0",
+            url="http://prompt-selector:8135/respond",
+        ),
+        dialog_formatter="state_formatters.dp_formatters:context_formatter_dialog",
+        response_formatter="state_formatters.dp_formatters:simple_formatter_service",
+        state_manager_method="add_annotation",
+        endpoint="respond",
+        service=prompt_selector_service.config_dir,
+    )
+
+    dream_component = DreamComponent(
+        dream_root=dream_root,
+        source_dir=source_dir,
+        component_file=config_path,
+        component=component,
+        service=prompt_selector_service,
+    )
+    dream_component.save_configs()
+
+    return dream_component
 
 
 class DreamComponent:
     def __init__(
         self,
-        component_dir: Union[Path, str],
-        config: Component,
-        pipeline: PipelineConfServiceComponent,
-        container_name: str,
-        group: str,
-        endpoint: Optional[str] = None,
+        dream_root: Union[Path, str],
+        source_dir: Union[Path, str],
+        component_file: Union[Path, str],
+        component: generics.Component,
+        service: services.DreamService,
+        # template: DreamComponentTemplate = None,
     ):
-        self.component_dir = Path(component_dir)
-        self.config = config
-        self.pipeline = pipeline
-        self.container_name = container_name
-        self.group = group
-        self.endpoint = endpoint
+        self.dream_root = dream_root
+        self.source_dir = source_dir
+        self.component_file = component_file
+        self.component = component
+        self.service = service
+        # self.template = template
+
+    # def _create_config_dir(self):
+    #     config_dir = self.dream_root / self.source_dir
+    #     config_dir.mkdir(parents=True, exist_ok=True)
 
     @classmethod
-    def from_component_dir(
-        cls, path: Union[str, Path], container_name: str, group: str, endpoint: Optional[str] = None
-    ):
-        """
-        Loads component from directory path.
-
-        Directory must contain component.yml and pipeline.yml config files
-
-        Args:
-            path: path to component directory
-            container_name: name of the specific container config
-            group: group name, e.g. annotators, skills, etc.
-            endpoint: endpoint name
-
-        Returns:
-            DreamComponent config instance
-        """
+    def from_file(cls, path: Union[Path, str], dream_root: Union[Path, str] = None):
         path = Path(path)
-        config_path = path / COMPONENT_CARD_FILENAME
-        pipeline_path = path / COMPONENT_PIPELINE_FILENAME
+        dream_root = Path(dream_root)
 
-        try:
-            config = utils.load_yml(config_path)
-            pipeline = utils.load_yml(pipeline_path)
-        except FileNotFoundError:
-            raise FileNotFoundError(f"{container_name} {group} {endpoint} does not exist in {path}")
+        component = generics.Component(**utils.load_yml(dream_root / path))
 
-        try:
-            config = parse_obj_as(Component, config[container_name])
-        except KeyError:
-            raise KeyError(f"{container_name} container does not exist in {config_path}")
+        service = services.DreamService.from_config_dir(dream_root, component.service)
 
-        pipeline_dict = None
-        try:
-            for pl in pipeline[container_name]:
-                if pl["group"] == group:
-                    if endpoint:
-                        if pl["connector"].get("url"):
-                            _, _, pl_endpoint = parse_connector_url(pl["connector"]["url"])
-                            if endpoint == pl_endpoint:
-                                pipeline_dict = pl
-                        else:
-                            raise ValueError(f"Endpoint {endpoint} not defined for {group} in {pipeline_path}")
-                    else:
-                        pipeline_dict = pl
+        return cls(dream_root, path.parent, path, component, service)
 
-                if pipeline_dict:
-                    pipeline = parse_obj_as(PipelineConfServiceComponent, pipeline_dict)
+    def save_configs(self):
+        self.source_dir.mkdir(parents=True, exist_ok=True)
+        utils.dump_yml(utils.pydantic_to_dict(self.component), self.dream_root / self.component_file, overwrite=True)
+        self.service.save_configs()
 
-        except KeyError:
-            raise KeyError(f"{container_name} container does not exist in {pipeline_path}")
+    @property
+    def pipeline(self):
+        return generics.PipelineConfService(
+            is_enabled=True,
+            source=generics.PipelineConfComponentSource(
+                component=self.component_file,
+                service=self.component.service,
+            ),
+            **self.component.dict(exclude_none=True),
+        )
 
-        return cls(path, config, pipeline, container_name, group, endpoint)
+    @property
+    def prompt(self):
+        prompt_file = self.service.environment.get("PROMPT_FILE")
+        if prompt_file:
+            prompt = utils.load_json(self.dream_root / prompt_file)["prompt"]
+        else:
+            prompt = None
+
+        return prompt
+
+    @prompt.setter
+    def prompt(self, value: str):
+        prompt_file = self.service.environment.get("PROMPT_FILE")
+        if prompt_file:
+            utils.dump_json({"prompt": value}, self.dream_root / prompt_file, overwrite=True)
+
+    @property
+    def lm_service(self):
+        lm_service_url = self.service.environment.get("GENERATIVE_SERVICE_URL")
+
+        return lm_service_url
+
+    @lm_service.setter
+    def lm_service(self, value: str):
+        self.service.environment["GENERATIVE_SERVICE_URL"] = value
+        self.service.save_environment_config()
