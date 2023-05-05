@@ -1184,25 +1184,25 @@ class AssistantDist:
     def add_component(self, component: DreamComponent):
         self.pipeline.add_component(component)
 
-        self.compose_override.add_component(component.config.name, component.config.compose_override, inplace=True)
-
-        if self.compose_dev:
-            self.compose_dev.add_component(component.config.name, component.config.compose_dev, inplace=True)
-
-        if self.compose_proxy:
-            self.compose_proxy.add_component(component.config.name, component.config.compose_proxy, inplace=True)
+        # self.compose_override.add_component(component.config.name, component.config.compose_override, inplace=True)
+        #
+        # if self.compose_dev:
+        #     self.compose_dev.add_component(component.config.name, component.config.compose_dev, inplace=True)
+        #
+        # if self.compose_proxy:
+        #     self.compose_proxy.add_component(component.config.name, component.config.compose_proxy, inplace=True)
 
     def remove_component(self, group: str, name: str):
-        component = self.pipeline.get_component(group, name)
+        # component = self.pipeline.get_component(group, name)
         self.pipeline.remove_component(group, name)
 
-        self.compose_override.remove_component(component.container_name, inplace=True)
-
-        if self.compose_dev:
-            self.compose_dev.remove_component(component.container_name, inplace=True)
-
-        if self.compose_proxy:
-            self.compose_proxy.remove_component(component.container_name, inplace=True)
+        # self.compose_override.remove_component(component.container_name, inplace=True)
+        #
+        # if self.compose_dev:
+        #     self.compose_dev.remove_component(component.container_name, inplace=True)
+        #
+        # if self.compose_proxy:
+        #     self.compose_proxy.remove_component(component.container_name, inplace=True)
 
     def generate_pipeline_conf(self) -> PipelineConf:
         self.pipeline_conf = self.pipeline.generate_pipeline_conf()

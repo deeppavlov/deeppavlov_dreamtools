@@ -54,9 +54,7 @@ class Pipeline:
         self._config = config
         self.metadata = metadata
 
-        self.agent = self.validate_agent_services(
-            last_chance_service, timeout_service
-        )
+        self.agent = self.validate_agent_services(last_chance_service, timeout_service)
 
         self.last_chance_service = last_chance_service
         self.timeout_service = timeout_service
@@ -241,6 +239,12 @@ class Pipeline:
 
     def add_component(self, component: DreamComponent):
         component_group = getattr(self, component.component.group)
+
+        if component_group in self.SINGLE_COMPONENT_GROUPS:
+            raise NotImplementedError(
+                f"You cannot currently add components to {', '.join(self.SINGLE_COMPONENT_GROUPS)}"
+            )
+
         component_group[component.component.name] = component.pipeline
         setattr(self, component.component.group, component_group)
 
