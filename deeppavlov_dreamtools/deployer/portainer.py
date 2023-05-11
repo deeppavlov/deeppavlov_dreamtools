@@ -105,6 +105,17 @@ class SwarmClient:
         ans = self._get(f"/api/stacks/{stack_id}/file")
         return yaml.safe_load(ans.json()["StackFileContent"])
 
+    def get_reservations(self) -> int:
+        """Gets all deployed stacks memory reservations."""
+        reservations = {}
+        for stack in self.get_stacks():
+            file = self.get_stack_file(stack.Id)
+            mem = [s.get('deploy', {}).get('resources', {}).get('reservations', {}).get('memory', {}) for s in
+                   file['services'].values()]
+            reservations[stack.Name] = sum([int(m) for m in mem if m])
+        reservations['total_reserves'] = sum(reservations.values())
+        return reservations
+
     def get_used_ports(self):
         stacks = self.get_stacks()
         stack_files = [self.get_stack_file(stack.Id) for stack in stacks]
