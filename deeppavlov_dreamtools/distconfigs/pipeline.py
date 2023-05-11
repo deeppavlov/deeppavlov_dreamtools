@@ -260,7 +260,7 @@ class Pipeline:
         component_group[component.component.name] = component
         setattr(self, component.component.group, component_group)
 
-    def add_generative_prompted_component(self, component: DreamComponent):
+    def add_generative_prompted_skill(self, component: DreamComponent):
         self.skills[component.component.name] = component
         self._update_prompt_selector()
 
@@ -275,6 +275,6 @@ class Pipeline:
         del component_group[name]
         setattr(self, group, component_group)
 
-    def remove_generative_prompted_component(self, name: str):
+    def remove_generative_prompted_skill(self, name: str):
         del self.skills[name]
         self._update_prompt_selector()
