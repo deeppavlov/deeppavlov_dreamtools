@@ -47,6 +47,12 @@ def create_agent_service(
                     f"sh -c 'bin/wait && python -m deeppavlov_agent.run "
                     f"agent.pipeline_config={assistant_dist_pipeline_file}'"
                 ),
+                deploy=generics.DeploymentDefinition(
+                    resources=generics.DeploymentDefinitionResources(
+                        limits=generics.DeploymentDefinitionResourcesArg(memory="200M"),
+                        reservations=generics.DeploymentDefinitionResourcesArg(memory="200M"),
+                    )
+                ),
                 volumes=[".:/dp-agent"],
             ),
         ),
