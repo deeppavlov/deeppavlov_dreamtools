@@ -1192,6 +1192,9 @@ class AssistantDist:
         # if self.compose_proxy:
         #     self.compose_proxy.add_component(component.config.name, component.config.compose_proxy, inplace=True)
 
+    def add_generative_prompted_skill(self, component: DreamComponent):
+        self.pipeline.add_generative_prompted_skill(component)
+
     def remove_component(self, group: str, name: str):
         # component = self.pipeline.get_component(group, name)
         self.pipeline.remove_component(group, name)
@@ -1203,6 +1206,9 @@ class AssistantDist:
         #
         # if self.compose_proxy:
         #     self.compose_proxy.remove_component(component.container_name, inplace=True)
+
+    def remove_generative_prompted_skill(self, name: str):
+        self.pipeline.remove_generative_prompted_skill(name)
 
     def generate_pipeline_conf(self) -> PipelineConf:
         self.pipeline_conf = self.pipeline.generate_pipeline_conf()

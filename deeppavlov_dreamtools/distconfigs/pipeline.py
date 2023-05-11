@@ -77,6 +77,18 @@ class Pipeline:
     def _update_agent_wait_hosts(self, wait_hosts: List[str]):
         self.agent.service.set_environment_value("WAIT_HOSTS", ", ".join(wait_hosts))
 
+    def _update_prompt_selector(self):
+        prompts_to_consider = []
+
+        for name, component in self.iter_component_group("skills"):
+            if component.service.environment.get("PROMPT_FILE"):
+                prompt_name = Path(component.service.environment["PROMPT_FILE"]).stem
+                prompts_to_consider.append(prompt_name)
+
+        self.annotators["prompt_selector"].service.set_environment_value(
+            "PROMPTS_TO_CONSIDER", ",".join(prompts_to_consider)
+        )
+
     def iter_component_group(self, group: str):
         if group in self.SINGLE_COMPONENT_GROUPS:
             yield None, getattr(self, group)
@@ -248,6 +260,10 @@ class Pipeline:
         component_group[component.component.name] = component
         setattr(self, component.component.group, component_group)
 
+    def add_generative_prompted_skill(self, component: DreamComponent):
+        self.skills[component.component.name] = component
+        self._update_prompt_selector()
+
     def remove_component(self, group: str, name: str):
         component_group = getattr(self, group)
 
@@ -258,3 +274,7 @@ class Pipeline:
 
         del component_group[name]
         setattr(self, group, component_group)
+
+    def remove_generative_prompted_skill(self, name: str):
+        del self.skills[name]
+        self._update_prompt_selector()
