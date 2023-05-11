@@ -245,10 +245,16 @@ class Pipeline:
                 f"You cannot currently add components to {', '.join(self.SINGLE_COMPONENT_GROUPS)}"
             )
 
-        component_group[component.component.name] = component.pipeline
+        component_group[component.component.name] = component
         setattr(self, component.component.group, component_group)
 
     def remove_component(self, group: str, name: str):
         component_group = getattr(self, group)
+
+        if component_group in self.SINGLE_COMPONENT_GROUPS:
+            raise NotImplementedError(
+                f"You cannot currently remove components from {', '.join(self.SINGLE_COMPONENT_GROUPS)}"
+            )
+
         del component_group[name]
         setattr(self, group, component_group)
