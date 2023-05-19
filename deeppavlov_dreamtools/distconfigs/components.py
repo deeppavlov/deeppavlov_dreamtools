@@ -273,3 +273,14 @@ class DreamComponent:
     def lm_service(self, value: str):
         self.service.environment["GENERATIVE_SERVICE_URL"] = value
         self.service.save_environment_config()
+
+    @property
+    def lm_config(self):
+        lm_config = self.service.environment.get("GENERATIVE_SERVICE_CONFIG")
+
+        return lm_config
+
+    @lm_config.setter
+    def lm_config(self, value: str):
+        self.service.environment["GENERATIVE_SERVICE_CONFIG"] = value
+        self.service.save_environment_config()
