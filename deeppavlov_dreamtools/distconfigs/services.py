@@ -114,7 +114,7 @@ def create_generative_prompted_skill_service(
             "PROMPT_FILE": f"common/prompts/{service_uid}.json",
             "GENERATIVE_SERVICE_URL": f"http://{generative_service_model}:{generative_service_port}/respond",
             "GENERATIVE_SERVICE_CONFIG": "default_generative_config.json",
-            "GENERATIVE_TIMEOUT": 20,
+            "GENERATIVE_TIMEOUT": 120,
             "N_UTTERANCES_CONTEXT": 7,
             "ENVVARS_TO_SEND": "OPENAI_API_KEY,OPENAI_ORGANIZATION"
         },
