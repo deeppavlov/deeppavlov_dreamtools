@@ -982,8 +982,8 @@ class AssistantDist:
                 skill["port"],
                 skill.get("lm_service_model", "transformers-lm-oasst12b"),
                 skill.get("lm_service_port", 8158),
-                skill["command"],
                 skill.get("prompt"),
+                skill.get("prompt_goals"),
             )
             prompted_service_names.append(prompted_service_name)
 
@@ -1053,6 +1053,12 @@ class AssistantDist:
         )
 
         new_pipeline = deepcopy(self.pipeline)
+
+        new_pipeline.metadata = PipelineConfMetadata(
+            display_name=display_name,
+            author=author,
+            description=description,
+        )
 
         for skill_name, prompted_component in new_generative_prompted_skills.items():
             del new_pipeline.skills[skill_name]
