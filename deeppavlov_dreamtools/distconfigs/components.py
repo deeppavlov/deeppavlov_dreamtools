@@ -249,15 +249,23 @@ class DreamComponent:
 
     @property
     def prompt(self):
-        prompt = self.service.load_prompt_file()
+        try:
+            prompt = self.service.load_prompt_file()
+            prompt = prompt.prompt
+        except ValueError:
+            prompt = None
 
-        return prompt.prompt
+        return prompt
 
     @property
     def prompt_goals(self):
-        prompt = self.service.load_prompt_file()
+        try:
+            prompt = self.service.load_prompt_file()
+            goals = prompt.goals
+        except ValueError:
+            goals = None
 
-        return prompt.goals
+        return goals
 
     def update_prompt(self, prompt: str, goals: str):
         self.service.dump_prompt_file(prompt, goals)
