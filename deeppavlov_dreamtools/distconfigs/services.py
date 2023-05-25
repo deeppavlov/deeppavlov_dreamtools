@@ -1,8 +1,15 @@
 from pathlib import Path
 from typing import Union, List
 
+from pydantic import BaseModel
+
 from deeppavlov_dreamtools import utils
 from deeppavlov_dreamtools.distconfigs import generics
+
+
+class ServicePrompt(BaseModel):
+    prompt: str
+    goals: str
 
 
 def _resolve_default_service_config_paths(
@@ -78,8 +85,8 @@ def create_generative_prompted_skill_service(
     service_port: int,
     generative_service_model: str,
     generative_service_port: int,
-    generative_service_command: str,
     prompt: str = None,
+    prompt_goals: str = None,
 ):
     source_dir, config_dir, service_file, environment_file = _resolve_default_service_config_paths(
         config_dir=config_dir
@@ -98,7 +105,6 @@ def create_generative_prompted_skill_service(
                 build=generics.ContainerBuildDefinition(
                     context=".", dockerfile="./skills/dff_template_prompted_skill/Dockerfile"
                 ),
-                command=generative_service_command,
                 deploy=generics.DeploymentDefinition(
                     resources=generics.DeploymentDefinitionResources(
                         limits=generics.DeploymentDefinitionResourcesArg(memory="128M"),
@@ -116,11 +122,18 @@ def create_generative_prompted_skill_service(
             "GENERATIVE_SERVICE_CONFIG": "default_generative_config.json",
             "GENERATIVE_TIMEOUT": 120,
             "N_UTTERANCES_CONTEXT": 7,
-            "ENVVARS_TO_SEND": "OPENAI_API_KEY,OPENAI_ORGANIZATION"
+            "ENVVARS_TO_SEND": "OPENAI_API_KEY,OPENAI_ORGANIZATION",
         },
     )
+
+    prompt_data = {}
     if prompt:
-        utils.dump_json({"prompt": prompt}, dream_root / f"common/prompts/{service_uid}.json", overwrite=True)
+        prompt_data["prompt"] = prompt
+    if prompt_goals:
+        prompt_data["goals"] = prompt_goals
+
+    if prompt_data:
+        utils.dump_json(prompt_data, dream_root / f"common/prompts/{service_uid}.json", overwrite=True)
 
     service.save_configs()
 
@@ -159,7 +172,7 @@ def create_prompt_selector_service(
                     )
                 ),
                 volumes=["./annotators/prompt_selector:/src", "./common:/src/common"],
-                ports=["8135:8135"]
+                ports=["8135:8135"],
             ),
         ),
         environment={
@@ -232,9 +245,30 @@ class DreamService:
         self.save_service_config()
         self.save_environment_config()
 
+    def get_environment_value(self, key: str):
+        env_value = self.environment.get(key)
+        if not env_value:
+            raise ValueError(f"No {key} env provided in {self.environment_file}")
+
+        return env_value
+
     def set_environment_value(self, key: str, value: str):
         self.environment[key] = value
         self.save_environment_config()
+
+    def load_prompt_file(self):
+        prompt_file = self.get_environment_value("PROMPT_FILE")
+        prompt = utils.load_json(self.dream_root / prompt_file)
+
+        return ServicePrompt(**prompt)
+
+    def dump_prompt_file(self, prompt: str, goals: str):
+        prompt_file = self.get_environment_value("PROMPT_FILE")
+        utils.dump_json(
+            ServicePrompt(prompt=prompt, goals=goals).dict(),
+            self.dream_root / prompt_file,
+            overwrite=True,
+        )
 
     def generate_compose(self, drop_ports: bool = True, drop_volumes: bool = True) -> generics.ComposeContainer:
         service_compose = self.service.compose
