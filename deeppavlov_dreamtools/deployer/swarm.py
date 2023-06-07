@@ -110,12 +110,10 @@ class SwarmDeployer:
             state = DeployerState.DEPLOYING_STACK
             yield state, {}, None
             stack = self.swarm_client.create_stack(self._get_deployment_path(dist), self.user_identifier)
+            shutil.rmtree(dist.dist_path)  # delete local files of the created distribution
         except Exception as e:
             yield None, {}, DeployerError(state, e)
             raise e
-        finally:
-            shutil.rmtree(dist.dist_path)  # delete local files of the created distribution
-            logger.info(f"Deleted local files for {dist.dist_path}")
 
         yield DeployerState.DEPLOYED, {"stack_id": stack.Id}, None
         # logger.info("Services deployed")
