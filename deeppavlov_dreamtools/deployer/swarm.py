@@ -92,22 +92,26 @@ class SwarmDeployer:
         Yields:
             tuple of (state, updates, error) events from the deployment process
         """
+        state = DeployerState.CREATING_CONFIG_FILES
         try:
-            yield DeployerState.CREATING_CONFIG_FILES, {}, None
+            yield state, {}, None
             self._set_up_user_dist(dist=dist)
 
             # self.build_and_push_to_registry(dist=dist)
-            yield DeployerState.BUILDING_IMAGE, {}, None
+            state = DeployerState.BUILDING_IMAGE
+            yield state, {}, None
             self._build_image_on_local(dist=dist)
 
-            yield DeployerState.PUSHING_IMAGES, {}, None
+            state = DeployerState.PUSHING_IMAGES
+            yield state, {}, None
             self.push_images(dist=dist)
 
             # logger.info("Deploying services on the node")
-            yield DeployerState.DEPLOYING_STACK, {}, None
+            state = DeployerState.DEPLOYING_STACK
+            yield state, {}, None
             stack = self.swarm_client.create_stack(self._get_deployment_path(dist), self.user_identifier)
         except Exception as e:
-            yield None, {}, DeployerError(DeployerState.DEPLOYING_STACK, e)
+            yield None, {}, DeployerError(state, e)
             raise e
         finally:
             shutil.rmtree(dist.dist_path)  # delete local files of the created distribution
@@ -118,7 +122,12 @@ class SwarmDeployer:
 
     def _set_up_user_dist(self, dist: AssistantDist):
         prefix = self.user_identifier + "_"
-        dist.name = prefix + dist.name
+        new_name = prefix + dist.name
+        try:
+            dist.name = new_name
+        except FileExistsError:
+            shutil.rmtree(dist.dist_path.with_name(new_name))
+            dist.name = new_name
         dist.compose_dev, dist.compose_proxy, dist.compose_local = None, None, None
 
         logger.info(f"Creating files for {dist.name} distribution")
