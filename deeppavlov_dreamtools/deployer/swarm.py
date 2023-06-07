@@ -92,19 +92,19 @@ class SwarmDeployer:
         Yields:
             tuple of (state, updates, error) events from the deployment process
         """
-        yield DeployerState.CREATING_CONFIG_FILES, {}, None
-        self._set_up_user_dist(dist=dist)
-
-        # self.build_and_push_to_registry(dist=dist)
-        yield DeployerState.BUILDING_IMAGE, {}, None
-        self._build_image_on_local(dist=dist)
-
-        yield DeployerState.PUSHING_IMAGES, {}, None
-        self.push_images(dist=dist)
-
-        # logger.info("Deploying services on the node")
-        yield DeployerState.DEPLOYING_STACK, {}, None
         try:
+            yield DeployerState.CREATING_CONFIG_FILES, {}, None
+            self._set_up_user_dist(dist=dist)
+
+            # self.build_and_push_to_registry(dist=dist)
+            yield DeployerState.BUILDING_IMAGE, {}, None
+            self._build_image_on_local(dist=dist)
+
+            yield DeployerState.PUSHING_IMAGES, {}, None
+            self.push_images(dist=dist)
+
+            # logger.info("Deploying services on the node")
+            yield DeployerState.DEPLOYING_STACK, {}, None
             stack = self.swarm_client.create_stack(self._get_deployment_path(dist), self.user_identifier)
         except Exception as e:
             yield None, {}, DeployerError(DeployerState.DEPLOYING_STACK, e)
