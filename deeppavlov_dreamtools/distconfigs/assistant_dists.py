@@ -731,7 +731,7 @@ class AssistantDist:
         Checks if distribution dist_path doesn't match with any existing distribution
         """
         if Path(new_path).exists():
-            raise ValueError(f"Distribution with path {new_path} already exists!")
+            raise FileExistsError(f"Distribution with path {new_path} already exists!")
 
     def _check_if_path_located_in_correct_dream_directory(self, new_path: Path):
         dream_assistant_path = self.dream_root / const.ASSISTANT_DISTS_DIR_NAME
