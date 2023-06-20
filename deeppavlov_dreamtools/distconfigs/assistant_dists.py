@@ -945,15 +945,18 @@ class AssistantDist:
         Args:
             name: name of new Dream distribution
             display_name: human-readable name of new Dream distribution
+            author: author email
             description: name of new Dream distribution
             existing_prompted_skills: [
                 {
                     "name": str,
                     "port": int,
                     "command": str,
-                    "lm_service_model": str | None,
-                    "lm_service_port": int | None,
-                    "prompt": int | None,
+                    "lm_service_model": str,
+                    "lm_service_port": int,
+                    "lm_service_config": dict,
+                    "prompt": str | None,
+                    "prompt_goals": str | None,
                     "display_name": str | None,
                     "description": str | None,
                 }
@@ -982,6 +985,7 @@ class AssistantDist:
                 skill["port"],
                 skill.get("lm_service_model", "transformers-lm-oasst12b"),
                 skill.get("lm_service_port", 8158),
+                skill.get("lm_config"),
                 skill.get("prompt"),
                 skill.get("prompt_goals"),
             )

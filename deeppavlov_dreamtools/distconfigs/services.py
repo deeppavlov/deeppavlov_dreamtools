@@ -85,6 +85,7 @@ def create_generative_prompted_skill_service(
     service_port: int,
     generative_service_model: str,
     generative_service_port: int,
+    generative_service_config: dict,
     prompt: str = None,
     prompt_goals: str = None,
 ):
@@ -119,21 +120,15 @@ def create_generative_prompted_skill_service(
             "SERVICE_NAME": service_name,
             "PROMPT_FILE": f"common/prompts/{service_uid}.json",
             "GENERATIVE_SERVICE_URL": f"http://{generative_service_model}:{generative_service_port}/respond",
-            "GENERATIVE_SERVICE_CONFIG": "default_generative_config.json",
+            "GENERATIVE_SERVICE_CONFIG": f"{service_uid}.json",
             "GENERATIVE_TIMEOUT": 120,
             "N_UTTERANCES_CONTEXT": 7,
             "ENVVARS_TO_SEND": "OPENAI_API_KEY,OPENAI_ORGANIZATION",
         },
     )
 
-    prompt_data = {}
-    if prompt:
-        prompt_data["prompt"] = prompt
-    if prompt_goals:
-        prompt_data["goals"] = prompt_goals
-
-    if prompt_data:
-        utils.dump_json(prompt_data, dream_root / f"common/prompts/{service_uid}.json", overwrite=True)
+    service.dump_lm_config_file(generative_service_config)
+    service.dump_prompt_file(prompt, prompt_goals)
 
     service.save_configs()
 
@@ -267,6 +262,20 @@ class DreamService:
         utils.dump_json(
             ServicePrompt(prompt=prompt, goals=goals).dict(),
             self.dream_root / prompt_file,
+            overwrite=True,
+        )
+
+    def load_lm_config_file(self):
+        lm_config_file = self.get_environment_value("GENERATIVE_SERVICE_CONFIG")
+        lm_config = utils.load_json(self.dream_root / "common" / "generative_configs" / lm_config_file)
+
+        return lm_config
+
+    def dump_lm_config_file(self, lm_config: dict):
+        lm_config_file = self.get_environment_value("GENERATIVE_SERVICE_CONFIG")
+        utils.dump_json(
+            lm_config,
+            self.dream_root / "common" / "generative_configs" / lm_config_file,
             overwrite=True,
         )
 
