@@ -283,11 +283,13 @@ class DreamComponent:
 
     @property
     def lm_config(self):
-        lm_config = self.service.environment.get("GENERATIVE_SERVICE_CONFIG")
+        try:
+            lm_config = self.service.load_lm_config_file()
+        except ValueError:
+            lm_config = None
 
         return lm_config
 
     @lm_config.setter
-    def lm_config(self, value: str):
-        self.service.environment["GENERATIVE_SERVICE_CONFIG"] = value
-        self.service.save_environment_config()
+    def lm_config(self, value: dict):
+        self.service.dump_lm_config_file(value)
