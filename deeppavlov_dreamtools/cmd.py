@@ -4,7 +4,7 @@ from typing import List
 
 import click
 
-from deeppavlov_dreamtools import commands, AssistantDist
+from deeppavlov_dreamtools import AssistantDist
 from deeppavlov_dreamtools.distconfigs.components import DreamComponent
 from deeppavlov_dreamtools.distconfigs.generics import PipelineConfMetadata
 from deeppavlov_dreamtools.distconfigs.pipeline import Pipeline
@@ -267,33 +267,33 @@ def new_skill(ctx: click.Context, name):
     click.echo(f"New skill not implemented yet")
 
 
-@new.command("local")
-@click.option("-d", "--dist", help="Dream distribution name")
-@click.option(
-    "-s",
-    "--services",
-    multiple=True,
-)
-@click.option("--drop-ports/--no-drop-ports", default=True)
-@click.option("--single-replica/--no-single-replica", default=True)
-@click.pass_context
-@must_be_inside_dream
-def new_local(
-    ctx: click.Context,
-    dist: str,
-    services: list,
-    drop_ports: bool,
-    single_replica: bool,
-):
-    """Create new local.yml"""
-    path = commands.new.local_yml(
-        dist,
-        ctx.obj.dream_root,
-        services,
-        drop_ports=drop_ports,
-        single_replica=single_replica,
-    )
-    click.echo(f"Created new local.yml under {path}")
+# @new.command("local")
+# @click.option("-d", "--dist", help="Dream distribution name")
+# @click.option(
+#     "-s",
+#     "--services",
+#     multiple=True,
+# )
+# @click.option("--drop-ports/--no-drop-ports", default=True)
+# @click.option("--single-replica/--no-single-replica", default=True)
+# @click.pass_context
+# @must_be_inside_dream
+# def new_local(
+#     ctx: click.Context,
+#     dist: str,
+#     services: list,
+#     drop_ports: bool,
+#     single_replica: bool,
+# ):
+#     """Create new local.yml"""
+#     path = commands.new.local_yml(
+#         dist,
+#         ctx.obj.dream_root,
+#         services,
+#         drop_ports=drop_ports,
+#         single_replica=single_replica,
+#     )
+#     click.echo(f"Created new local.yml under {path}")
 
 
 @cli.group()
