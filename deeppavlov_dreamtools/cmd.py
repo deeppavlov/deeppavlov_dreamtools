@@ -197,6 +197,11 @@ def new(ctx: click.Context):
     multiple=True,
     help="Response Selectors to include in the distribution (can be specified multiple times)",
 )
+@click.option(
+    "--services",
+    multiple=True,
+    help="External Services to include in the distribution (can be specified multiple times)",
+)
 @click.pass_context
 @must_be_inside_dream
 def new_dist(
@@ -215,6 +220,7 @@ def new_dist(
     skill_selectors: List[str],
     skills: List[str],
     response_selectors: List[str],
+    services: List[str],
 ):
     """Creates new distribution in ./assistant_dists"""
 
@@ -246,6 +252,7 @@ def new_dist(
                 skill_selectors=_load_components_from_user_values(skill_selectors),
                 skills=_load_components_from_user_values(skills),
                 response_selectors=_load_components_from_user_values(response_selectors),
+                external_services=_load_components_from_user_values(services)
             ),
         )
         dist.save(overwrite=overwrite, generate_configs=True)
