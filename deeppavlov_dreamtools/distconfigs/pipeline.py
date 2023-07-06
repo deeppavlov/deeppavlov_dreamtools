@@ -266,6 +266,12 @@ class Pipeline:
                 f"You cannot currently add components to {', '.join(self.SINGLE_COMPONENT_GROUPS)}"
             )
 
+        if component.component.name in component_group:
+            raise ValueError(
+                f"Component {component.component_file} ({component.component.name}) "
+                f"already exists in '{self.metadata.display_name}' {component.component.group}"
+            )
+
         component_group[component.component.name] = component
         setattr(self, component.component.group, component_group)
 
