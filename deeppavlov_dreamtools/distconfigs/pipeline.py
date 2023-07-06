@@ -50,7 +50,7 @@ class Pipeline:
         response_annotator_selectors: Optional[DreamComponent] = None,
         candidate_annotators: Optional[Dict[str, DreamComponent]] = None,
         skill_selectors: Optional[Dict[str, DreamComponent]] = None,
-        external_services: Optional[Dict[str, DreamComponent]] = None,
+        services: Optional[Dict[str, DreamComponent]] = None,
     ):
         self._config = config
         self.metadata = metadata
@@ -66,7 +66,7 @@ class Pipeline:
         self.skill_selectors = skill_selectors
         self.skills = skills
         self.response_selectors = response_selectors
-        self.external_services = external_services
+        self.services = services or {}
 
     @staticmethod
     def validate_agent_services(*args: DreamComponent):
@@ -128,8 +128,8 @@ class Pipeline:
             all_services[host] = component.service.generate_compose()
             all_ports[host] = port
 
-        if self.external_services:
-            for name, component in self.external_services.items():
+        if self.services:
+            for name, component in self.services.items():
                 connector_url = component.component.connector.url
                 host, port, _ = utils.parse_connector_url(connector_url)
                 all_services[host] = component.service.generate_compose()

@@ -243,16 +243,16 @@ def new_dist(
                     author=author,
                     description=description,
                 ),
-                last_chance_service=DreamComponent.from_file(last_chance_service, ctx.obj.dream_root),
-                timeout_service=DreamComponent.from_file(timeout_service, ctx.obj.dream_root),
-                response_annotator_selectors=DreamComponent.from_file(response_annotator_selectors, ctx.obj.dream_root),
                 annotators=_load_components_from_user_values(annotators),
-                response_annotators=_load_components_from_user_values(response_annotators),
-                candidate_annotators=_load_components_from_user_values(candidate_annotators),
-                skill_selectors=_load_components_from_user_values(skill_selectors),
                 skills=_load_components_from_user_values(skills),
                 response_selectors=_load_components_from_user_values(response_selectors),
-                external_services=_load_components_from_user_values(services)
+                last_chance_service=DreamComponent.from_file(last_chance_service, ctx.obj.dream_root),
+                timeout_service=DreamComponent.from_file(timeout_service, ctx.obj.dream_root),
+                response_annotators=_load_components_from_user_values(response_annotators),
+                response_annotator_selectors=DreamComponent.from_file(response_annotator_selectors, ctx.obj.dream_root),
+                candidate_annotators=_load_components_from_user_values(candidate_annotators),
+                skill_selectors=_load_components_from_user_values(skill_selectors),
+                services=_load_components_from_user_values(services),
             ),
         )
         dist.save(overwrite=overwrite, generate_configs=True)
@@ -265,15 +265,15 @@ def new_dist(
         )
 
 
-@new.command("skill")
-@click.argument("name")
-@click.pass_context
-@must_be_inside_dream
-def new_skill(ctx: click.Context, name):
-    """Create new basic skill template in ./skills"""
-    click.echo(f"New skill not implemented yet")
-
-
+# @new.command("skill")
+# @click.argument("name")
+# @click.pass_context
+# @must_be_inside_dream
+# def new_skill(ctx: click.Context, name):
+#     """Create new basic skill template in ./skills"""
+#     click.echo(f"New skill not implemented yet")
+#
+#
 # @new.command("local")
 # @click.option("-d", "--dist", help="Dream distribution name")
 # @click.option(
@@ -342,54 +342,73 @@ def clone_dist(
 
 @cli.group()
 @click.pass_context
-def verify(ctx: click.Context):
-    """Verify distribution or skill"""
+def add(ctx: click.Context):
+    """Create new distribution or skill"""
 
 
-@verify.command("dist")
-@click.argument("name")
-@click.option("--all", is_flag=True, default=True)
-@click.option("--mandatory/--no-mandatory", default=True)
-@click.option("--advised/--no-advised", default=True)
-@click.option("--optional/--no-optional", default=True)
+@add.command("component")
+@click.argument("path")
+@click.option("-d", "--dist")
 @click.pass_context
 @must_be_inside_dream
-def verify_dist(ctx: click.Context, name, **kwargs):
-    """Verify distribution"""
-    # for response in commands.verify.dist(name, ctx.obj.dream_root):
-    #     click.echo(response)
+def add_component(ctx: click.Context, path: str, dist: str):
+    dist = AssistantDist.from_name(dist, ctx.obj.dream_root)
+    component = DreamComponent.from_file(path, ctx.obj.dream_root)
+
+    dist.add_component(component)
+    dist.save(overwrite=True, generate_configs=True)
 
 
-@verify.command("dff")
-@click.argument("name")
-@click.pass_context
-@must_be_inside_dream
-def verify_dff(ctx: click.Context, name):
-    """Verify dff skill"""
-    click.echo(f"Verified dff {name}")
-
-
-@verify.command("downloads")
-@click.argument("name")
-@click.pass_context
-@must_be_inside_dream
-def verify_downloads(ctx: click.Context, name):
-    """Verify downloads"""
-    click.echo(f"Verified downloads {name}")
-
-
-@cli.group()
-@click.pass_context
-def test(ctx: click.Context):
-    """Test something"""
-
-
-@test.command("api")
-@click.argument("name")
-@click.option("--xlsx", is_flag=True)
-def test_api(name, xlsx: bool):
-    """Test api"""
-    click.echo(f"Tested API {name}, xlsx = {xlsx}")
+# @cli.group()
+# @click.pass_context
+# def verify(ctx: click.Context):
+#     """Verify distribution or skill"""
+#
+#
+# @verify.command("dist")
+# @click.argument("name")
+# @click.option("--all", is_flag=True, default=True)
+# @click.option("--mandatory/--no-mandatory", default=True)
+# @click.option("--advised/--no-advised", default=True)
+# @click.option("--optional/--no-optional", default=True)
+# @click.pass_context
+# @must_be_inside_dream
+# def verify_dist(ctx: click.Context, name, **kwargs):
+#     """Verify distribution"""
+#     # for response in commands.verify.dist(name, ctx.obj.dream_root):
+#     #     click.echo(response)
+#
+#
+# @verify.command("dff")
+# @click.argument("name")
+# @click.pass_context
+# @must_be_inside_dream
+# def verify_dff(ctx: click.Context, name):
+#     """Verify dff skill"""
+#     click.echo(f"Verified dff {name}")
+#
+#
+# @verify.command("downloads")
+# @click.argument("name")
+# @click.pass_context
+# @must_be_inside_dream
+# def verify_downloads(ctx: click.Context, name):
+#     """Verify downloads"""
+#     click.echo(f"Verified downloads {name}")
+#
+#
+# @cli.group()
+# @click.pass_context
+# def test(ctx: click.Context):
+#     """Test something"""
+#
+#
+# @test.command("api")
+# @click.argument("name")
+# @click.option("--xlsx", is_flag=True)
+# def test_api(name, xlsx: bool):
+#     """Test api"""
+#     click.echo(f"Tested API {name}, xlsx = {xlsx}")
 
 
 if __name__ == "__main__":
