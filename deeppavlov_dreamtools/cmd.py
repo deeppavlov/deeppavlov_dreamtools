@@ -358,6 +358,8 @@ def add_component(ctx: click.Context, path: str, dist: str):
     dist.add_component(component)
     dist.save(overwrite=True, generate_configs=True)
 
+    click.echo(f"Added {component.component.group} {component.component.name} to {dist.name} Dream distribution")
+
 
 # @cli.group()
 # @click.pass_context
