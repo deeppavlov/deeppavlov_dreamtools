@@ -330,7 +330,7 @@ def clone_dist(
     try:
         dist = AssistantDist.from_name(template, ctx.obj.dream_root)
         cloned_dist = dist.clone(name, display_name, author, description, existing_prompted_skills=[])
-        cloned_dist.save(overwrite)
+        cloned_dist.save(overwrite, generate_configs=True)
 
         click.echo(f"Created new Dream distribution {cloned_dist.name}")
     except FileExistsError:

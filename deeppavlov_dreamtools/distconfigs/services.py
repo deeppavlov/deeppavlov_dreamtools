@@ -35,10 +35,25 @@ def create_agent_service(
     config_dir: Union[Path, str],
     service_name: str,
     assistant_dist_pipeline_file: Union[Path, str],
+    environment: dict = None,
 ):
     source_dir, config_dir, service_file, environment_file = _resolve_default_service_config_paths(
         config_dir=config_dir
     )
+
+    if environment:
+        environment["WAIT_HOSTS"] = ""
+    else:
+        environment = {
+            "WAIT_HOSTS": "",
+            "WAIT_HOSTS_TIMEOUT": "${WAIT_TIMEOUT:-480}",
+            "HIGH_PRIORITY_INTENTS": 1,
+            "RESTRICTION_FOR_SENSITIVE_CASE": 1,
+            "ALWAYS_TURN_ON_ALL_SKILLS": 0,
+            "LANGUAGE": "EN",
+            "FALLBACK_FILE": "fallbacks_dream_en.json",
+        }
+
     service = DreamService(
         dream_root,
         source_dir,
@@ -63,14 +78,7 @@ def create_agent_service(
                 volumes=[".:/dp-agent"],
             ),
         ),
-        environment={
-            "WAIT_HOSTS": "",
-            "WAIT_HOSTS_TIMEOUT": "${WAIT_TIMEOUT:-480}",
-            "HIGH_PRIORITY_INTENTS": 1,
-            "RESTRICTION_FOR_SENSITIVE_CASE": 1,
-            "ALWAYS_TURN_ON_ALL_SKILLS": 0,
-            "LANGUAGE": "EN",
-        },
+        environment=environment,
     )
     service.save_configs()
 
