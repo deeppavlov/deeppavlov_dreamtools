@@ -79,7 +79,39 @@ pipeline = Pipeline.from_name("ai_faq_assistant", dream_root="/home/username/pro
 ```
 
 ### DreamComponent
-Represents component object. Component is a part of Pipeline which describes how to interact with a service.
+Represents component object. Component is a part of Pipeline which describes how to interact with a service. It is represented by a YML file that looks like this:
+
+<details>
+    <summary>Example Component File</summary>
+    
+    name: entity_detection
+    display_name: Entity Detection
+    component_type: null
+    model_type: NN-based
+    is_customizable: false
+    author: publisher@deeppavlov.ai
+    description: extracts entities and their types from utterances
+    ram_usage: 5.5G
+    gpu_usage: null
+    group: annotators
+    connector:
+      protocol: http
+      timeout: 1.0
+      url: http://entity-detection-ru:8103/respond
+    dialog_formatter: state_formatters.dp_formatters:entity_detection_formatter_dialog
+    response_formatter: state_formatters.dp_formatters:simple_formatter_service
+    previous_services:
+    - annotators.spelling_preprocessing
+    - annotators.sentseg
+    required_previous_services: null
+    state_manager_method: add_annotation
+    tags: null
+    endpoint: respond
+    service: annotators/entity_detection_rus/service_configs/entity-detection-ru
+    date_created: '2023-03-16T09:45:32'
+    
+</details>
+
 You can load it from classmethod `from_file`
 
 In dream repository, Components are found inside [components](https://github.com/deeppavlov/dream/tree/main/components)
