@@ -15,7 +15,11 @@ pip install -e .
 
 
 # Package API
-There are 4 main objects which represent Dream configurations
+There are 4 main objects which represent Dream configurations:
+- [AssistantDist](#AssistantDist)
+- [Pipeline](#Pipeline)
+- [DreamComponent](#DreamComponent)
+- [DreamService](#DreamService)
 
 ## Usage
 
@@ -54,6 +58,8 @@ Represents distribution object.
 You can either load it from classmethods `from_name`, `from_dist`
 or initialize it directly passing underlying objects [see initializing from scratch](#Initializing-objects-from-scratch)
 
+In dream repository, distributions are found inside [assistant_dists](https://github.com/deeppavlov/dream/tree/main/assistant_dists)
+
 ```python
 from deeppavlov_dreamtools import AssistantDist
 
@@ -65,15 +71,18 @@ Represents pipeline object.
 You can either load it from classmethod `from_name`
 or initialize it directly passing underlying objects [see initializing from scratch](#Initializing-objects-from-scratch)
 
+In dream repository, distributions are found inside [assistant_dists/{dist_name}](https://github.com/deeppavlov/dream/tree/main/assistant_dists/ai_faq_assistant/pipeline_conf.json)
 ```python
 from deeppavlov_dreamtools import Pipeline
 
 pipeline = Pipeline.from_name("ai_faq_assistant", dream_root="/home/username/projects/dream")
 ```
 
-### Component
+### DreamComponent
 Represents component object. Component is a part of Pipeline which describes how to interact with a service.
 You can load it from classmethod `from_file`
+
+In dream repository, distributions are found inside [components](https://github.com/deeppavlov/dream/tree/main/components)
 ```python
 from deeppavlov_dreamtools import DreamComponent
 
@@ -81,10 +90,12 @@ component = DreamComponent.from_file("components/1Q9QXih1U2zhCpVm9zxdsA.yml", dr
 ```
 
 
-### Service
+### DreamService
 Represents service object. Service is a part of Component which describes how to deploy a service.
 Multiple components can use a single service.
 You can load it from classmethods `from_config_dir`, `from_source_dir`
+
+In dream repository, distributions are found inside [{service_group}/{service_name}/service_configs/{config_name}](https://github.com/deeppavlov/dream/tree/main/skills/dff_template_prompted_skill/service_configs/dff-ai-faq-prompted-skill)
 ```python
 from deeppavlov_dreamtools import DreamService
 
