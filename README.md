@@ -1,6 +1,6 @@
 ![coverage-badge](report/coverage.svg)
 # Overview
-dreamtools is a package which exposes high-level API for creating and editing Dream configuration files.
+dreamtools is a package exposes high-level API for creating and editing Dream configuration files as well as a CLI interface.
 
 # Installation
 Install from GitHub
@@ -71,7 +71,7 @@ Represents pipeline object.
 You can either load it from classmethod `from_name`
 or initialize it directly passing underlying objects [see initializing from scratch](#Initializing-objects-from-scratch)
 
-In dream repository, distributions are found inside [assistant_dists/{dist_name}](https://github.com/deeppavlov/dream/tree/main/assistant_dists/ai_faq_assistant/pipeline_conf.json)
+In dream repository, Pipelines are found inside [assistant_dists/{dist_name}](https://github.com/deeppavlov/dream/tree/main/assistant_dists/ai_faq_assistant/pipeline_conf.json)
 ```python
 from deeppavlov_dreamtools import Pipeline
 
@@ -82,7 +82,7 @@ pipeline = Pipeline.from_name("ai_faq_assistant", dream_root="/home/username/pro
 Represents component object. Component is a part of Pipeline which describes how to interact with a service.
 You can load it from classmethod `from_file`
 
-In dream repository, distributions are found inside [components](https://github.com/deeppavlov/dream/tree/main/components)
+In dream repository, Components are found inside [components](https://github.com/deeppavlov/dream/tree/main/components)
 ```python
 from deeppavlov_dreamtools import DreamComponent
 
@@ -95,7 +95,7 @@ Represents service object. Service is a part of Component which describes how to
 Multiple components can use a single service.
 You can load it from classmethods `from_config_dir`, `from_source_dir`
 
-In dream repository, distributions are found inside [{service_group}/{service_name}/service_configs/{config_name}](https://github.com/deeppavlov/dream/tree/main/skills/dff_template_prompted_skill/service_configs/dff-ai-faq-prompted-skill)
+In dream repository, Services are found inside [{service_group}/{service_name}/service_configs/{config_name}](https://github.com/deeppavlov/dream/tree/main/skills/dff_template_prompted_skill/service_configs/dff-ai-faq-prompted-skill)
 ```python
 from deeppavlov_dreamtools import DreamService
 
@@ -145,7 +145,7 @@ dist = AssistantDist(
         skill_selectors={
             "description_based_skill_selector": DreamComponent.from_file("components/dfsw4bji8bgjq2.yml", "/home/username/projects/dream"),
         },
-        services={
+        services={https://github.com/deeppavlov/deeppavlov_dreamtools/blob/fix/cli-actions/README.md
             "transformers_lm_oasst12b": DreamComponent.from_file("component/sdkajfhsidhf8wfjh2ornfkle.yml", "/home/username/projects/dream")
         },
     ),
