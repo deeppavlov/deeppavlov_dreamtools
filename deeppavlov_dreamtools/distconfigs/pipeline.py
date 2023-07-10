@@ -50,6 +50,7 @@ class Pipeline:
         response_annotator_selectors: Optional[DreamComponent] = None,
         candidate_annotators: Optional[Dict[str, DreamComponent]] = None,
         skill_selectors: Optional[Dict[str, DreamComponent]] = None,
+        services: Optional[Dict[str, DreamComponent]] = None,
     ):
         self._config = config
         self.metadata = metadata
@@ -65,6 +66,7 @@ class Pipeline:
         self.skill_selectors = skill_selectors
         self.skills = skills
         self.response_selectors = response_selectors
+        self.services = services or {}
 
     @staticmethod
     def validate_agent_services(*args: DreamComponent):
@@ -76,6 +78,18 @@ class Pipeline:
 
     def _update_agent_wait_hosts(self, wait_hosts: List[str]):
         self.agent.service.set_environment_value("WAIT_HOSTS", ", ".join(wait_hosts))
+
+    def _update_prompt_selector(self):
+        prompts_to_consider = []
+
+        for name, component in self.iter_component_group("skills"):
+            if component.service.environment.get("PROMPT_FILE"):
+                prompt_name = Path(component.service.environment["PROMPT_FILE"]).stem
+                prompts_to_consider.append(prompt_name)
+
+        self.annotators["prompt_selector"].service.set_environment_value(
+            "PROMPTS_TO_CONSIDER", ",".join(prompts_to_consider)
+        )
 
     def iter_component_group(self, group: str):
         if group in self.SINGLE_COMPONENT_GROUPS:
@@ -113,6 +127,13 @@ class Pipeline:
 
             all_services[host] = component.service.generate_compose()
             all_ports[host] = port
+
+        if self.services:
+            for name, component in self.services.items():
+                connector_url = component.component.connector.url
+                host, port, _ = utils.parse_connector_url(connector_url)
+                all_services[host] = component.service.generate_compose()
+                all_ports[host] = port
 
         wait_hosts = [f"{h}:{p}" for h, p in all_ports.items() if h != "agent"]
         self._update_agent_wait_hosts(wait_hosts)
@@ -245,10 +266,30 @@ class Pipeline:
                 f"You cannot currently add components to {', '.join(self.SINGLE_COMPONENT_GROUPS)}"
             )
 
-        component_group[component.component.name] = component.pipeline
+        if component.component.name in component_group:
+            raise ValueError(
+                f"Component {component.component_file} ({component.component.name}) "
+                f"already exists in '{self.metadata.display_name}' {component.component.group}"
+            )
+
+        component_group[component.component.name] = component
         setattr(self, component.component.group, component_group)
+
+    def add_generative_prompted_skill(self, component: DreamComponent):
+        self.skills[component.component.name] = component
+        self._update_prompt_selector()
 
     def remove_component(self, group: str, name: str):
         component_group = getattr(self, group)
+
+        if component_group in self.SINGLE_COMPONENT_GROUPS:
+            raise NotImplementedError(
+                f"You cannot currently remove components from {', '.join(self.SINGLE_COMPONENT_GROUPS)}"
+            )
+
         del component_group[name]
         setattr(self, group, component_group)
+
+    def remove_generative_prompted_skill(self, name: str):
+        del self.skills[name]
+        self._update_prompt_selector()

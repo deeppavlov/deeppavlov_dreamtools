@@ -249,19 +249,26 @@ class DreamComponent:
 
     @property
     def prompt(self):
-        prompt_file = self.service.environment.get("PROMPT_FILE")
-        if prompt_file:
-            prompt = utils.load_json(self.dream_root / prompt_file)["prompt"]
-        else:
+        try:
+            prompt = self.service.load_prompt_file()
+            prompt = prompt.prompt
+        except ValueError:
             prompt = None
 
         return prompt
 
-    @prompt.setter
-    def prompt(self, value: str):
-        prompt_file = self.service.environment.get("PROMPT_FILE")
-        if prompt_file:
-            utils.dump_json({"prompt": value}, self.dream_root / prompt_file, overwrite=True)
+    @property
+    def prompt_goals(self):
+        try:
+            prompt = self.service.load_prompt_file()
+            goals = prompt.goals
+        except ValueError:
+            goals = None
+
+        return goals
+
+    def update_prompt(self, prompt: str, goals: str):
+        self.service.dump_prompt_file(prompt, goals)
 
     @property
     def lm_service(self):
@@ -273,3 +280,16 @@ class DreamComponent:
     def lm_service(self, value: str):
         self.service.environment["GENERATIVE_SERVICE_URL"] = value
         self.service.save_environment_config()
+
+    @property
+    def lm_config(self):
+        try:
+            lm_config = self.service.load_lm_config_file()
+        except ValueError:
+            lm_config = None
+
+        return lm_config
+
+    @lm_config.setter
+    def lm_config(self, value: dict):
+        self.service.dump_lm_config_file(value)

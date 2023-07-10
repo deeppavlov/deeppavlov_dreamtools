@@ -731,7 +731,7 @@ class AssistantDist:
         Checks if distribution dist_path doesn't match with any existing distribution
         """
         if Path(new_path).exists():
-            raise ValueError(f"Distribution with path {new_path} already exists!")
+            raise FileExistsError(f"Distribution with path {new_path} already exists!")
 
     def _check_if_path_located_in_correct_dream_directory(self, new_path: Path):
         dream_assistant_path = self.dream_root / const.ASSISTANT_DISTS_DIR_NAME
@@ -945,15 +945,18 @@ class AssistantDist:
         Args:
             name: name of new Dream distribution
             display_name: human-readable name of new Dream distribution
+            author: author email
             description: name of new Dream distribution
             existing_prompted_skills: [
                 {
                     "name": str,
                     "port": int,
                     "command": str,
-                    "lm_service_model": str | None,
-                    "lm_service_port": int | None,
-                    "prompt": int | None,
+                    "lm_service_model": str,
+                    "lm_service_port": int,
+                    "lm_service_config": dict,
+                    "prompt": str | None,
+                    "prompt_goals": str | None,
                     "display_name": str | None,
                     "description": str | None,
                 }
@@ -982,8 +985,9 @@ class AssistantDist:
                 skill["port"],
                 skill.get("lm_service_model", "transformers-lm-oasst12b"),
                 skill.get("lm_service_port", 8158),
-                skill["command"],
+                skill.get("lm_config"),
                 skill.get("prompt"),
+                skill.get("prompt_goals"),
             )
             prompted_service_names.append(prompted_service_name)
 
@@ -1005,7 +1009,8 @@ class AssistantDist:
             self.dream_root,
             f"services/agent_services/service_configs/{agent_service_name}",
             agent_service_name,
-            f"assistant_dists/{name}/pipeline_conf.json"
+            f"assistant_dists/{name}/pipeline_conf.json",
+            environment=self.pipeline.agent.service.environment
         )
 
         agent_last_chance_component_name = utils.generate_unique_name()
@@ -1053,6 +1058,12 @@ class AssistantDist:
         )
 
         new_pipeline = deepcopy(self.pipeline)
+
+        new_pipeline.metadata = PipelineConfMetadata(
+            display_name=display_name,
+            author=author,
+            description=description,
+        )
 
         for skill_name, prompted_component in new_generative_prompted_skills.items():
             del new_pipeline.skills[skill_name]
@@ -1192,6 +1203,9 @@ class AssistantDist:
         # if self.compose_proxy:
         #     self.compose_proxy.add_component(component.config.name, component.config.compose_proxy, inplace=True)
 
+    def add_generative_prompted_skill(self, component: DreamComponent):
+        self.pipeline.add_generative_prompted_skill(component)
+
     def remove_component(self, group: str, name: str):
         # component = self.pipeline.get_component(group, name)
         self.pipeline.remove_component(group, name)
@@ -1203,6 +1217,9 @@ class AssistantDist:
         #
         # if self.compose_proxy:
         #     self.compose_proxy.remove_component(component.container_name, inplace=True)
+
+    def remove_generative_prompted_skill(self, name: str):
+        self.pipeline.remove_generative_prompted_skill(name)
 
     def generate_pipeline_conf(self) -> PipelineConf:
         self.pipeline_conf = self.pipeline.generate_pipeline_conf()

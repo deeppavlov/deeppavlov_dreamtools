@@ -156,11 +156,13 @@ class PipelineConfMetadata(BaseModelNoExtra):
     display_name: str
     author: str
     description: str
-    version: str
-    date_created: datetime
-    ram_usage: str
-    gpu_usage: str
-    disk_usage: str
+    date_created: datetime = Field(default_factory=datetime.utcnow)
+
+    # subject to deprecation:
+    version: Optional[str]
+    ram_usage: Optional[str]
+    gpu_usage: Optional[str]
+    disk_usage: Optional[str]
 
 
 class PipelineConf(BaseModelNoExtra):

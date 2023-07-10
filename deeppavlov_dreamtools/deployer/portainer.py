@@ -1,3 +1,4 @@
+from logging import getLogger
 from pathlib import Path
 from typing import List, Union
 from urllib.parse import urljoin
@@ -10,6 +11,8 @@ from deeppavlov_dreamtools.deployer.models import Stack
 
 # TODO: remove when insecure request cause will be eliminated
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+logger = getLogger(__file__)
 
 
 class SwarmClient:
@@ -105,9 +108,27 @@ class SwarmClient:
         ans = self._get(f"/api/stacks/{stack_id}/file")
         return yaml.safe_load(ans.json()["StackFileContent"])
 
+    def get_reservations(self) -> int:
+        """Gets all deployed stacks memory reservations."""
+        reservations = {}
+        for stack in self.get_stacks():
+            file = self.get_stack_file(stack.Id)
+            mem = [s.get('deploy', {}).get('resources', {}).get('reservations', {}).get('memory', {}) for s in
+                   file['services'].values()]
+            reservations[stack.Name] = sum([int(m) for m in mem if m])
+        reservations['total_reserves'] = sum(reservations.values())
+        return reservations
+
     def get_used_ports(self):
         stacks = self.get_stacks()
-        stack_files = [self.get_stack_file(stack.Id) for stack in stacks]
+        stack_files = []
+        for stack in stacks:
+            if stack.Status != 1:
+                continue
+            try:
+                stack_files.append(self.get_stack_file(stack.Id))
+            except requests.exceptions.HTTPError as e:
+                logger.error(f'Got {repr(e)} error for stack.Id == {stack.Id}')
         return {
             stack.Id: file["services"]["agent"]["ports"][0]["published"] for stack, file in zip(stacks, stack_files)
         }

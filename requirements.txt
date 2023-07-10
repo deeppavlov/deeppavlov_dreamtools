@@ -6,3 +6,4 @@ fabric==3.0.0
 python-dotenv
 boto3
 docker
+typing_extensions<4.6.0
