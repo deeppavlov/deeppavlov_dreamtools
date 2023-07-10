@@ -1,200 +1,217 @@
 ![coverage-badge](report/coverage.svg)
+# Overview
+dreamtools is a package which exposes high-level API for creating and editing Dream configuration files.
 
 # Installation
+Install from GitHub
+```
+pip install git+https://github.com/deeppavlov/deeppavlov_dreamtools.git --force-reinstall
+```
+
+or install in editable mode from cloned repo locally (useful for development purposes)
 ```
 pip install -e .
 ```
 
-# Command hierarchy
+
+# Package API
+There are 4 main objects which represent Dream configurations
+
+## Usage
+
+### Quickstart
+```python
+from deeppavlov_dreamtools import AssistantDist, Pipeline, DreamComponent, DreamService
+
+
+dist = AssistantDist.from_name("ai_faq_assistant", dream_root="/home/username/projects/dream")
+
+new_dist = dist.clone(
+    name="cloned_dist",
+    display_name="Cloned AI FAQ Assistant",
+    author="me@email.org",
+    description="Yet another cloned assistant",
+)
+
+# common methods
+
+# add component to distribution
+component = DreamComponent.from_file("components/pGxj32ic41pvquRXUdqc7A.yml", dream_root="/home/username/projects/dream")
+new_dist.add_component()
+
+# save and generate new configs which include the annotator "spelling_preprocessing" added earlier
+new_dist.save(overwrite=True, generate_configs=True)
+# or generate configs separately
+new_dist.generate_pipeline_conf()
+new_dist.generate_compose()
+
+# remove previously added component
+new_dist.remove_component("annotators", "spelling_preprocessing")
+new_dist.save(overwrite=True, generate_configs=True)
+```
+### AssistantDist
+Represents distribution object.
+You can either load it from classmethods `from_name`, `from_dist`
+or initialize it directly passing underlying objects [see initializing from scratch](#Initializing-objects-from-scratch)
+
+```python
+from deeppavlov_dreamtools import AssistantDist
+
+dist = AssistantDist.from_name("ai_faq_assistant", dream_root="/home/username/projects/dream")
+```
+
+### Pipeline
+Represents pipeline object.
+You can either load it from classmethod `from_name`
+or initialize it directly passing underlying objects [see initializing from scratch](#Initializing-objects-from-scratch)
+
+```python
+from deeppavlov_dreamtools import Pipeline
+
+pipeline = Pipeline.from_name("ai_faq_assistant", dream_root="/home/username/projects/dream")
+```
+
+### Component
+Represents component object. Component is a part of Pipeline which describes how to interact with a service.
+You can load it from classmethod `from_file`
+```python
+from deeppavlov_dreamtools import DreamComponent
+
+component = DreamComponent.from_file("components/1Q9QXih1U2zhCpVm9zxdsA.yml", dream_root="/home/username/projects/dream")
+```
+
+
+### Service
+Represents service object. Service is a part of Component which describes how to deploy a service.
+Multiple components can use a single service.
+You can load it from classmethods `from_config_dir`, `from_source_dir`
+```python
+from deeppavlov_dreamtools import DreamService
+
+component = DreamService.from_config_dir(path="annotators/SentSeg/service_configs/sentseg", dream_root="/home/username/projects/dream")
+```
+
+
+### Initializing objects from scratch
+```python
+from deeppavlov_dreamtools import AssistantDist, Pipeline, DreamComponent, DreamService
+from deeppavlov_dreamtools.distconfigs.generics import PipelineConfMetadata
+
+
+dist = AssistantDist(
+    dist_path="/home/username/projects/dream/assistant_dists/ai_faq_assistant",
+    name="ai_faq_assistant",
+    dream_root="/home/username/projects/dream",
+    pipeline=Pipeline(
+        config=None,
+        metadata=PipelineConfMetadata(
+            display_name="AI FAQ Assistant",
+            author="me@email.org",
+            description="Answers FAQ Questions",
+        ),
+        annotators={
+            "sentseg": DreamComponent.from_file("components/gM4fEjvVqLlSRRRkQfds2g.yml", "/home/username/projects/dream"),
+            "prompt_goals_collector": DreamComponent.from_file("components/fOud1KbT6qhY.yml", "/home/username/projects/dream"),
+            "prompt_selector": DreamComponent.from_file("components/fOud1KbT6qhY.yml", "/home/username/projects/dream"),
+        },
+        skills={
+            "dff_ai_faq_prompted_skill": DreamComponent.from_file("components/sQjaqWKJjVWjVEIbNuA.yml", "/home/username/projects/dream"),
+            "dummy_skill": DreamComponent.from_file("components/uYkoK0vRp4bbIg9akI1yw.yml", "/home/username/projects/dream"),
+        },
+        response_selectors={
+            "response_selector": DreamComponent.from_file("components/YJzc7NwGrLmKp6gfZJh7X1.yml", "/home/username/projects/dream")
+        },
+        last_chance_service=DreamComponent.from_file("components/70NLr5qqOow5.yml", "/home/username/projects/dream"),
+        timeout_service=DreamComponent.from_file("components/x8rLTpIWct4P.yml", "/home/username/projects/dream"),
+        response_annotators={
+            "sentseg": DreamComponent.from_file("components/1Q9QXih1U2zhCpVm9zxdsA.yml", "/home/username/projects/dream"),
+        },
+        response_annotator_selectors=DreamComponent.from_file("components/LXrJDIf43gwNmPMNXG5Eg.yml", "/home/username/projects/dream"),
+        candidate_annotators={
+            "combined_classification": DreamComponent.from_file("components/PbLNvh4hrvs47rPaf2bfYQ.yml", "/home/username/projects/dream"),
+            "sentence_ranker": DreamComponent.from_file("components/XGwmAHtAOu0NDqqG3QCJw.yml", "/home/username/projects/dream"),
+        },
+        skill_selectors={
+            "description_based_skill_selector": DreamComponent.from_file("components/dfsw4bji8bgjq2.yml", "/home/username/projects/dream"),
+        },
+        services={
+            "transformers_lm_oasst12b": DreamComponent.from_file("component/sdkajfhsidhf8wfjh2ornfkle.yml", "/home/username/projects/dream")
+        },
+    ),
+)
+
+# save and generate configs
+dist.save(overwrite=True, generate_configs=True)
+```
+
+# Command Line Interface
+dreamtools support a number of commands to ease Dream development.
+You can always refer to
+`dreamtools {command} --help`
+or
+`dreamtools {command} {subcommand} --help`
+to see available arguments.
+
 - [dreamtools](#dreamtools)
-  - [new](#dreamtools-new)
+  - new
     - [dist](#dreamtools-new-dist)
-    - [dff](#dreamtools-new-dff)
-    - [skill](#dreamtools-new-skill)
-    - [local](#dreamtools-new-local)
-  - [test](#dreamtools-test)
-    - [api](#dreamtools-test-api)
-  - [verify](#dreamtools-verify)
-    - [dist](#dreamtools-verify-dist)
-    - [dff](#dreamtools-verify-dff)
-    - [downloads](#dreamtools-verify-downloads)
-    
+  - clone
+    - [dist](#dreamtools-clone-dist)
+  - add
+    - [component](#dreamtools-add-component)
+
 # dreamtools
+All CLI commands start with the main command `dreamtools`.
+You can either call it from inside the cloned Dream directory or provide it as an argument:
+
 ```
-$ dreamtools --help
-Usage: dreamtools [OPTIONS] COMMAND [ARGS]...
-
-  dreamtools is a command line utility which enhances your DeepPavlov Dream
-  development experience
-
-Options:
-  -D, --dream DIRECTORY  Dream root directory. Defaults to ./
-  --help                 Show this message and exit.
-
-Commands:
-  new     Create new template for distribution or skill
-  test    Test something
-  verify  Verify distribution or skill
-```
-
-## dreamtools new
-```
-$ dreamtools new --help
-Usage: dreamtools new [OPTIONS] COMMAND [ARGS]...
-
-  Create new template for distribution or skill
-
-Options:
-  --help  Show this message and exit.
-
-Commands:
-  dff    Create new dff-based skill template in ./skills
-  dist   Create new distribution in ./assistant_dists with templates for...
-  local  Create new local.yml
+dreamtools -D home/username/projects/dream {command} {subcommand} ...
 ```
 
 ### dreamtools new dist
-Create new dream dist
+Create new Dream distribution
+
 ```
-$ dreamtools new dist --help
-Usage: dreamtools new dist [OPTIONS] NAME
-
-  Creates new distribution in ./assistant_dists
-
-Options:
-  -d, --dist TEXT                 Dream distribution name
-  -s, --services TEXT             Dream distribution name
-  --overwrite / --no-overwrite    Overwrite distribution directory if it
-                                  exists
-  --all                           Create all configs (defaults to False).
-                                  Overrides --pipeline and all other
-                                  --compose-* flags
-  --pipeline / --no-pipeline      Create pipeline_conf.json config (defaults
-                                  to True)
-  --compose-override / --no-compose-override
-                                  Create docker-compose.override.yml config
-                                  (defaults to False)
-  --compose-dev / --no-compose-dev
-                                  Create dev.yml config (defaults to False)
-  --compose-proxy / --no-compose-proxy
-                                  Create proxy.yml config (defaults to False)
-  --compose-local / --no-compose-local
-                                  Create local.yml config (defaults to False)
-  --help                          Show this message and exit.
+dreamtools new dist my_assistant \
+  --display-name "My Assistant" \
+  --author myemail@email.org \
+  --description "My custom Distribution" \
+  --annotators components/1Q9QXih1U2zhCpVm9zxdsA.yml \
+  --annotators components/dflkgjdlkh342r9ndf.yml \
+  --annotators components/tgzaSQggV7wgMprOmF1Ww.yml \
+  --annotators components/M1sE6hOm20EGBWBdr0vIOw.yml \
+  --annotators components/O4FVnkAwjay1mL1FbuRGWw.yml \
+  --skills components/4yA8wZWOEnafRfz6Po9nvA.yml \
+  --skills components/qx0j5QHAzog0b39nRnuA.yml \
+  --skills components/ckUclxqUplyzwmnYyixEw.yml \
+  --skills components/uYkoK0vRp4bbIg9akI1yw.yml \
+  --response-annotators components/dflkgjdlkh342r9ndf.yml \
+  --response-annotators components/05PqJXVd7gV7DqslN5z3A.yml \
+  --last-chance-service components/70NLr5qqOow5.yml \
+  --timeout-service components/x8rLTpIWct4P.yml \
+  --response-annotator-selectors components/LXrJDIf43gwNmPMNXG5Eg.yml \
+  --skill-selectors components/xSwFvtAUdvtQosvzpb7oMg.yml \
+  --response-selectors components/KX4drAocVa5APcivWHeBNQ.yml \
+  --overwrite
 ```
 
-### dreamtools new dff
-Create new dff skill
+
+### dreamtools clone dist
+Clone existing (--template argument) distribution
+
 ```
-$ dreamtools new dff --help
-Usage: dreamtools new dff [OPTIONS] NAME
-
-  Creates new dff skill in ./skills
-
-Options:
-  -d, --dist TEXT                 Dream distribution name  [required]
-  -p, --port TEXT                 DFF skill port  [required]
-  --all                           Add definition to all docker-compose configs
-                                  (defaults to False). Overrides all other
-                                  --compose-* flags
-  --compose-override / --no-compose-override
-                                  Add definition to docker-
-                                  compose.override.yml (defaults to False)
-  --compose-dev / --no-compose-dev
-                                  Add definition to dev.yml config (defaults
-                                  to False)
-  --compose-proxy / --no-compose-proxy
-                                  Add definition to proxy.yml config (defaults
-                                  to False)
-  --compose-local / --no-compose-local
-                                  Add definition to local.yml config (defaults
-                                  to False)
-  --help                          Show this message and exit.
+dreamtools clone dist dream_adventurer_openai_prompted \
+--template dream_persona_openai_prompted \
+--display-name "Dream Adventurer" \
+--author deepypavlova@email.org \
+--description "This is a simple dialog system that can chat with you on any topic. It has a pre-defined personality and uses OpenAI ChatGPT model to generate responses." \
+--overwrite
 ```
 
-### dreamtools new local
-Create new local.yml. Replacement for `dream/utils/create_local_yml.py`
+
+### dreamtools add component
+Add component from component card to distribution
+
 ```
-$ dreamtools new local --help
-Usage: dreamtools new local [OPTIONS] NAME
-
-  Create new local.yml
-
-Options:
-  --help  Show this message and exit.
-```
-
-## dreamtools test
-```
-$ dreamtools test --help
-Usage: dreamtools test [OPTIONS] COMMAND [ARGS]...
-
-  Test something
-
-Options:
-  --help  Show this message and exit.
-
-Commands:
-  api  Test api
-```
-
-### dreamtools test api
-Test api. Replacement for `dream/utils/http_api_test.py` and `dream/utils/xlsx_responder.py` (probably)
-```dreamtools test api --help
-Usage: dreamtools test api [OPTIONS] NAME
-
-  Test api
-
-Options:
-  --xlsx
-  --help  Show this message and exit.
-```
-
-## dreamtools verify
-```
-$ dreamtools verify --help
-Usage: dreamtools verify [OPTIONS] COMMAND [ARGS]...
-
-  Verify distribution or skill
-
-Options:
-  --help  Show this message and exit.
-
-Commands:
-  dff        Verify dff skill
-  dist       Verify distribution
-  downloads  Verify downloads
-```
-
-### dreamtools verify dist
-Verify dist. Replacement for `dream/utils/verify_compose.py` and more.
-```$ dreamtools verify dist --help
-Usage: dreamtools verify dist [OPTIONS] NAME
-
-  Verify distribution
-
-Options:
-  --help  Show this message and exit.
-```
-
-### dreamtools verify dff
-Verify dff skill
-```$ dreamtools verify dff --help
-Usage: dreamtools verify dff [OPTIONS] NAME
-
-  Verify dff skill
-
-Options:
-  --help  Show this message and exit.
-```
-
-### dreamtools verify downloads
-Verify downloads. Replacement for `dream/utils/analyze_downloads.py` and more.
-```$ dreamtools verify downloads --help
-Usage: dreamtools verify downloads [OPTIONS] NAME
-
-  Verify downloads
-
-Options:
-  --help  Show this message and exit.
+dreamtools add component components/jkdhfgkhgodfiugpojwrnkjnlg.yml --dist dream_persona_openai_prompted
 ```
