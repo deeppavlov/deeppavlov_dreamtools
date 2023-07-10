@@ -1009,7 +1009,8 @@ class AssistantDist:
             self.dream_root,
             f"services/agent_services/service_configs/{agent_service_name}",
             agent_service_name,
-            f"assistant_dists/{name}/pipeline_conf.json"
+            f"assistant_dists/{name}/pipeline_conf.json",
+            environment=self.pipeline.agent.service.environment
         )
 
         agent_last_chance_component_name = utils.generate_unique_name()
