@@ -38,7 +38,7 @@ class Stack(BaseModel):
     EndpointId: int
     SwarmId: str
     EntryPoint: str
-    Env: Optional[Any]  # TODO: make type more specific
+    Env: Optional[Any] = None  # TODO: make type more specific
     ResourceControl: ResourceControl
     Status: int
     ProjectPath: str
@@ -46,9 +46,9 @@ class Stack(BaseModel):
     CreatedBy: str
     UpdateDate: int
     UpdatedBy: str
-    AdditionalFiles: Optional[Any]  # TODO: make type more specific
-    AutoUpdate: Optional[Any]  # TODO: make type more specific
-    GitConfig: Optional[Any]  # TODO: make type more specific
+    AdditionalFiles: Optional[Any] = None  # TODO: make type more specific
+    AutoUpdate: Optional[Any] = None  # TODO: make type more specific
+    GitConfig: Optional[Any] = None  # TODO: make type more specific
     FromAppTemplate: bool
     Namespace: str
     IsComposeFormat: bool

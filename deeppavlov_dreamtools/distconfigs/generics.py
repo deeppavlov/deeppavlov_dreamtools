@@ -15,7 +15,7 @@ from pathlib import Path
 import re
 from typing import Dict, Union, Optional, Any, List, Type, Literal
 
-from pydantic import BaseModel, Extra, validator, Field, EmailStr
+from pydantic import field_validator, ConfigDict, BaseModel, Field, EmailStr
 
 from deeppavlov_dreamtools.utils import parse_connector_url
 
@@ -63,13 +63,12 @@ class BaseModelNoExtra(BaseModel):
     """
     Implements BaseModel which throws an Exception when children are instantiated with extra kwargs
     """
-
-    class Config:
-        extra = Extra.forbid
-        json_encoders = {
-            # custom output conversion for datetime
-            datetime: convert_datetime_to_str
-        }
+    # TODO[pydantic]: The following keys were removed: `json_encoders`.
+    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-config for more information.
+    model_config = ConfigDict(extra="forbid", json_encoders={
+        # custom output conversion for datetime
+        datetime: convert_datetime_to_str
+    })
 
 
 COMPONENT_TYPES = Literal[
@@ -91,12 +90,12 @@ MODEL_TYPES = Literal[
 
 class PipelineConfConnector(BaseModelNoExtra):
     protocol: str
-    timeout: Optional[float]
-    url: Optional[str]
-    class_name: Optional[str]
-    response_text: Optional[str]
-    annotations: Optional[Dict[str, Any]]
-    annotator_names: Optional[list]
+    timeout: Optional[float] = None
+    url: Optional[str] = None
+    class_name: Optional[str] = None
+    response_text: Optional[str] = None
+    annotations: Optional[Dict[str, Any]] = None
+    annotator_names: Optional[list] = None
 
 
 class PipelineConfComponentSource(BaseModelNoExtra):
@@ -105,17 +104,17 @@ class PipelineConfComponentSource(BaseModelNoExtra):
 
 
 class PipelineConfServiceComponent(BaseModel):
-    group: Optional[str]
+    group: Optional[str] = None
     connector: Union[str, PipelineConfConnector]
-    dialog_formatter: Optional[Union[str, dict]]
-    response_formatter: Optional[str]
-    previous_services: Optional[List[str]]
-    required_previous_services: Optional[List[str]]
-    state_manager_method: Optional[str]
-    tags: Optional[List[str]]
-    host: Optional[str]
-    port: Optional[int]
-    endpoint: Optional[str]
+    dialog_formatter: Optional[Union[str, dict]] = None
+    response_formatter: Optional[str] = None
+    previous_services: Optional[List[str]] = None
+    required_previous_services: Optional[List[str]] = None
+    state_manager_method: Optional[str] = None
+    tags: Optional[List[str]] = None
+    host: Optional[str] = None
+    port: Optional[int] = None
+    endpoint: Optional[str] = None
 
 
 class PipelineConfService(PipelineConfServiceComponent):
@@ -124,13 +123,13 @@ class PipelineConfService(PipelineConfServiceComponent):
 
 
 class PipelineConfServiceList(BaseModelNoExtra):
-    last_chance_service: Optional[PipelineConfService]
-    timeout_service: Optional[PipelineConfService]
+    last_chance_service: Optional[PipelineConfService] = None
+    timeout_service: Optional[PipelineConfService] = None
     annotators: Dict[str, PipelineConfService]
-    response_annotators: Optional[Dict[str, PipelineConfService]]
-    response_annotator_selectors: Optional[PipelineConfService]
-    candidate_annotators: Optional[Dict[str, PipelineConfService]]
-    skill_selectors: Optional[Dict[str, PipelineConfService]]
+    response_annotators: Optional[Dict[str, PipelineConfService]] = None
+    response_annotator_selectors: Optional[PipelineConfService] = None
+    candidate_annotators: Optional[Dict[str, PipelineConfService]] = None
+    skill_selectors: Optional[Dict[str, PipelineConfService]] = None
     skills: Dict[str, PipelineConfService]
     response_selectors: Dict[str, PipelineConfService]
 
@@ -159,10 +158,10 @@ class PipelineConfMetadata(BaseModelNoExtra):
     date_created: datetime = Field(default_factory=datetime.utcnow)
 
     # subject to deprecation:
-    version: Optional[str]
-    ram_usage: Optional[str]
-    gpu_usage: Optional[str]
-    disk_usage: Optional[str]
+    version: Optional[str] = None
+    ram_usage: Optional[str] = None
+    gpu_usage: Optional[str] = None
+    disk_usage: Optional[str] = None
 
 
 class PipelineConf(BaseModelNoExtra):
@@ -170,24 +169,25 @@ class PipelineConf(BaseModelNoExtra):
     Implements pipeline.json config structure
     """
 
-    connectors: Optional[Dict[str, PipelineConfConnector]]
+    connectors: Optional[Dict[str, PipelineConfConnector]] = None
     services: PipelineConfServiceList
-    metadata: Optional[PipelineConfMetadata]
+    metadata: Optional[PipelineConfMetadata] = None
 
 
 class ContainerBuildDefinition(BaseModelNoExtra):
-    args: Optional[Dict[str, Any]]
-    context: Optional[Path]
-    dockerfile: Optional[Path]
-
-    class Config:
-        json_encoders = {Path: str}
+    args: Optional[Dict[str, Any]] = None
+    context: Optional[Path] = None
+    dockerfile: Optional[Path] = None
+    # TODO[pydantic]: The following keys were removed: `json_encoders`.
+    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-config for more information.
+    model_config = ConfigDict(json_encoders={Path: str})
 
 
 class DeploymentDefinitionResourcesArg(BaseModelNoExtra):
     memory: str
 
-    @validator("memory")
+    @field_validator("memory")
+    @classmethod
     def check_memory_format(cls, v):
         check_memory_format(v)
         return v
@@ -199,30 +199,30 @@ class DeploymentDefinitionResources(BaseModelNoExtra):
 
 
 class DeploymentDefinition(BaseModelNoExtra):
-    mode: Optional[str]
-    replicas: Optional[int]
-    resources: Optional[DeploymentDefinitionResources]
+    mode: Optional[str] = None
+    replicas: Optional[int] = None
+    resources: Optional[DeploymentDefinitionResources] = None
 
 
 class ComposeContainer(BaseModelNoExtra):
-    image: Optional[str]
-    volumes: Optional[List[str]]
-    env_file: Optional[Union[list, str]]
-    build: Optional[ContainerBuildDefinition]
-    command: Optional[Union[list, str]]
-    environment: Optional[Union[Dict[str, Any], list]]
-    deploy: Optional[DeploymentDefinition]
-    tty: Optional[bool]
-    ports: Optional[List[str]]
+    image: Optional[str] = None
+    volumes: Optional[List[str]] = None
+    env_file: Optional[Union[list, str]] = None
+    build: Optional[ContainerBuildDefinition] = None
+    command: Optional[Union[list, str]] = None
+    environment: Optional[Union[Dict[str, Any], list]] = None
+    deploy: Optional[DeploymentDefinition] = None
+    tty: Optional[bool] = None
+    ports: Optional[List[str]] = None
 
 
 class ComposeDevContainer(BaseModelNoExtra):
-    volumes: Optional[List[str]]
+    volumes: Optional[List[str]] = None
     ports: List[str]
 
 
 class ComposeLocalContainer(ComposeContainer, ComposeDevContainer):
-    ports: Optional[List[str]]
+    ports: Optional[List[str]] = None
 
 
 class BaseComposeConfigModel(BaseModelNoExtra):
@@ -271,8 +271,8 @@ class ComposeLocal(BaseComposeConfigModel):
 class Service(BaseModelNoExtra):
     name: str
     endpoints: list
-    compose: Optional[ComposeContainer]
-    proxy: Optional[ComposeContainer]
+    compose: Optional[ComposeContainer] = None
+    proxy: Optional[ComposeContainer] = None
 
 
 class ComponentEndpoint(BaseModelNoExtra):
@@ -286,35 +286,36 @@ class ComponentTemplate(BaseModelNoExtra):
     author: EmailStr
     description: str
     endpoints: List[ComponentEndpoint]
-    config_keys: Optional[dict]
+    config_keys: Optional[dict] = None
 
 
 class Component(BaseModelNoExtra):
     # template: Optional[ComponentTemplate]
     name: str
     display_name: str
-    component_type: Optional[COMPONENT_TYPES]
-    model_type: Optional[MODEL_TYPES]
+    component_type: Optional[COMPONENT_TYPES] = None
+    model_type: Optional[MODEL_TYPES] = None
     is_customizable: bool
     author: EmailStr
     description: str
-    ram_usage: Optional[str]
-    gpu_usage: Optional[str]
+    ram_usage: Optional[str] = None
+    gpu_usage: Optional[str] = None
 
-    group: Optional[str]
+    group: Optional[str] = None
     connector: Union[str, PipelineConfConnector]
-    dialog_formatter: Optional[Union[str, dict]]
-    response_formatter: Optional[str]
-    previous_services: Optional[List[str]]
-    required_previous_services: Optional[List[str]]
-    state_manager_method: Optional[str]
-    tags: Optional[List[str]]
-    endpoint: Optional[str]
+    dialog_formatter: Optional[Union[str, dict]] = None
+    response_formatter: Optional[str] = None
+    previous_services: Optional[List[str]] = None
+    required_previous_services: Optional[List[str]] = None
+    state_manager_method: Optional[str] = None
+    tags: Optional[List[str]] = None
+    endpoint: Optional[str] = None
 
     service: Path
     date_created: datetime = Field(default_factory=datetime.utcnow)
 
-    @validator("ram_usage", "gpu_usage")
+    @field_validator("ram_usage", "gpu_usage")
+    @classmethod
     def check_memory_format(cls, v):
         check_memory_format(v)
         return v
