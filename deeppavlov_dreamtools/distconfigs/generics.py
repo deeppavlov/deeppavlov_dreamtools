@@ -59,16 +59,19 @@ def convert_datetime_to_str(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%S")
 
 
+def _default_datetime():
+    return datetime.utcnow().replace(microsecond=0)
+
+
+class DateCreatedFieldMixin(BaseModel):
+    date_created: datetime = Field(default_factory=_default_datetime)
+
+
 class BaseModelNoExtra(BaseModel):
     """
     Implements BaseModel which throws an Exception when children are instantiated with extra kwargs
     """
-    # TODO[pydantic]: The following keys were removed: `json_encoders`.
-    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-config for more information.
-    model_config = ConfigDict(extra="forbid", json_encoders={
-        # custom output conversion for datetime
-        datetime: convert_datetime_to_str
-    })
+    model_config = ConfigDict(extra="forbid")
 
 
 COMPONENT_TYPES = Literal[
@@ -151,11 +154,10 @@ class PipelineConfServiceList(BaseModelNoExtra):
         return groups
 
 
-class PipelineConfMetadata(BaseModelNoExtra):
+class PipelineConfMetadata(BaseModelNoExtra, DateCreatedFieldMixin):
     display_name: str
     author: str
     description: str
-    date_created: datetime = Field(default_factory=datetime.utcnow)
 
     # subject to deprecation:
     version: Optional[str] = None
@@ -178,9 +180,6 @@ class ContainerBuildDefinition(BaseModelNoExtra):
     args: Optional[Dict[str, Any]] = None
     context: Optional[Path] = None
     dockerfile: Optional[Path] = None
-    # TODO[pydantic]: The following keys were removed: `json_encoders`.
-    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-config for more information.
-    model_config = ConfigDict(json_encoders={Path: str})
 
 
 class DeploymentDefinitionResourcesArg(BaseModelNoExtra):
@@ -289,7 +288,7 @@ class ComponentTemplate(BaseModelNoExtra):
     config_keys: Optional[dict] = None
 
 
-class Component(BaseModelNoExtra):
+class Component(BaseModelNoExtra, DateCreatedFieldMixin):
     # template: Optional[ComponentTemplate]
     name: str
     display_name: str
@@ -312,7 +311,6 @@ class Component(BaseModelNoExtra):
     endpoint: Optional[str] = None
 
     service: Path
-    date_created: datetime = Field(default_factory=datetime.utcnow)
 
     @field_validator("ram_usage", "gpu_usage")
     @classmethod

@@ -146,7 +146,7 @@ class Pipeline:
         dream_root = Path(path).parents[2]
         data = utils.load_json(path)
 
-        config = generics.PipelineConf.parse_obj(data)
+        config = generics.PipelineConf.model_validate(data)
         kwargs = {}
 
         for group_name in cls.COMPONENT_GROUPS:

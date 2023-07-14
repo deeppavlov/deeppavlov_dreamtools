@@ -59,7 +59,8 @@ def pydantic_to_dict(data: BaseModel, exclude_none: bool = False):
     # we will have to use this workaround
     # https://github.com/samuelcolvin/pydantic/issues/1409
 
-    return json.loads(data.json(exclude_none=exclude_none))
+    # return json.loads(data.json(exclude_none=exclude_none))
+    return data.model_dump(mode="json", exclude_none=exclude_none)
 
 
 def generate_unique_name(size: int = 12):

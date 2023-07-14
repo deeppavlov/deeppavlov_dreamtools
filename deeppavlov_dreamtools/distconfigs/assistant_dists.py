@@ -107,7 +107,7 @@ class BaseDreamConfig:
         """
 
         data = cls.load(Path(dist_path).resolve() / cls.DEFAULT_FILE_NAME)
-        config = cls.GENERIC_MODEL.parse_obj(data)
+        config = cls.GENERIC_MODEL.model_validate(data)
         return cls(config)
 
     def to_dist(self, dist_path: Union[str, Path], overwrite: bool = False):
@@ -202,7 +202,7 @@ class YmlDreamConfig(BaseDreamConfig):
             "version": self.config.version,
             "services": {k: v for k, v in self.config.services.items() if k in names},
         }
-        config = self.GENERIC_MODEL.parse_obj(model_dict)
+        config = self.GENERIC_MODEL.model_validate(model_dict)
         return names, self.__class__(config)
 
     def add_component(self, name: str, definition: AnyContainer, inplace: bool = False):
@@ -224,7 +224,7 @@ class YmlDreamConfig(BaseDreamConfig):
             "version": self.config.version,
             "services": services,
         }
-        config = self.GENERIC_MODEL.parse_obj(model_dict)
+        config = self.GENERIC_MODEL.model_validate(model_dict)
         if inplace:
             self.config = config
             value = self
@@ -253,7 +253,7 @@ class YmlDreamConfig(BaseDreamConfig):
             "version": self.config.version,
             "services": services,
         }
-        config = self.GENERIC_MODEL.parse_obj(model_dict)
+        config = self.GENERIC_MODEL.model_validate(model_dict)
         if inplace:
             self.config = config
             value = self
@@ -422,7 +422,7 @@ class DreamPipeline(JsonDreamConfig):
             "connectors": self.config.connectors,
             "services": services,
         }
-        config = self.GENERIC_MODEL.parse_obj(model_dict)
+        config = self.GENERIC_MODEL.model_validate(model_dict)
         if inplace:
             self.config = config
             value = self
@@ -454,7 +454,7 @@ class DreamPipeline(JsonDreamConfig):
             "connectors": self.config.connectors,
             "services": services,
         }
-        config = self.GENERIC_MODEL.parse_obj(model_dict)
+        config = self.GENERIC_MODEL.model_validate(model_dict)
         if inplace:
             self.config = config
             value = self

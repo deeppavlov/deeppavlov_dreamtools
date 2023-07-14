@@ -73,10 +73,10 @@ class SwarmClient:
             },
             files={"file": open(file, "rb")},
         )
-        return Stack.parse_obj(ans.json())
+        return Stack.model_validate(ans.json())
 
     def get_stacks(self) -> List[Stack]:
-        return [Stack.parse_obj(s) for s in self._get("/api/stacks").json()]
+        return [Stack.model_validate(s) for s in self._get("/api/stacks").json()]
 
     def delete_stack(self, stack_id):
         return self._delete(f"/api/stacks/{stack_id}", params={"external": True, "endpointId": self.endpoint_id})
