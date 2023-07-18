@@ -76,8 +76,8 @@ class Pipeline:
                     f"Components which use agent service (e.g. 'last_chance_service' or 'timeout_service') "
                     f"must use the same service.yml card (unique for each distribution).\n"
                     "Conflicting agent services:\n"
-                    f"{a.component.name} {a.component_file} ({a.service.service_file})\n"
-                    f"{b.component.name} {b.component_file} ({b.service.service_file})"
+                    f"{a.component.name} ({a.component_file}) uses {a.service.service_file} card\n"
+                    f"{b.component.name} ({b.component_file}) uses {b.service.service_file} card"
                 )
 
         return args[0]
