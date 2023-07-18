@@ -72,7 +72,13 @@ class Pipeline:
     def validate_agent_services(*args: DreamComponent):
         for a, b in itertools.combinations(args, 2):
             if a.service.service != b.service.service:
-                raise ValueError(f"{a.component_file} != {b.component_file}")
+                raise ValueError(
+                    f"Components which use agent service (e.g. 'last_chance_service' or 'timeout_service') "
+                    f"must use the same service.yml card (unique for each distribution).\n"
+                    "Conflicting agent services:\n"
+                    f"{a.component.name} ({a.component_file}) uses {a.service.service_file} card\n"
+                    f"{b.component.name} ({b.component_file}) uses {b.service.service_file} card"
+                )
 
         return args[0]
 
