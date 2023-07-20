@@ -24,6 +24,7 @@ class Pipeline:
         "skill_selectors",
         "skills",
         "response_selectors",
+        "actors",
     ]
     COMPONENT_GROUPS = [
         "last_chance_service",
@@ -35,6 +36,7 @@ class Pipeline:
         "skill_selectors",
         "skills",
         "response_selectors",
+        "actors",
     ]
 
     def __init__(
@@ -50,6 +52,7 @@ class Pipeline:
         response_annotator_selectors: Optional[DreamComponent] = None,
         candidate_annotators: Optional[Dict[str, DreamComponent]] = None,
         skill_selectors: Optional[Dict[str, DreamComponent]] = None,
+        actors: Optional[Dict[str, DreamComponent]] = None,
         services: Optional[Dict[str, DreamComponent]] = None,
     ):
         self._config = config
@@ -60,12 +63,13 @@ class Pipeline:
         self.last_chance_service = last_chance_service
         self.timeout_service = timeout_service
         self.annotators = annotators
-        self.response_annotators = response_annotators
+        self.response_annotators = response_annotators or {}
         self.response_annotator_selectors = response_annotator_selectors
-        self.candidate_annotators = candidate_annotators
-        self.skill_selectors = skill_selectors
+        self.candidate_annotators = candidate_annotators or {}
+        self.skill_selectors = skill_selectors or {}
         self.skills = skills
         self.response_selectors = response_selectors
+        self.actors = actors or {}
         self.services = services or {}
 
     @staticmethod

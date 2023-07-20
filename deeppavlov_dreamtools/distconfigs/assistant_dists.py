@@ -50,6 +50,15 @@ class BaseDreamConfig:
     def __init__(self, config: AnyConfig):
         self.config = config
 
+        import warnings
+        warning_text = f"{self.__class__.__name__} is subject to deprecation."
+        if self.__class__.__name__ == "DreamPipeline":
+            warning_text = (
+                f"{warning_text} Consider using deeppavlov_dreamtools.Pipeline "
+                "instead of deeppavlov_dreamtools.distconfigs.assistant_dists.DreamPipeline"
+            )
+        warnings.warn(warning_text, DeprecationWarning)
+
     @staticmethod
     def load(path: Union[Path, str]):
         raise NotImplementedError("Override this function")
@@ -1010,7 +1019,7 @@ class AssistantDist:
             f"services/agent_services/service_configs/{agent_service_name}",
             agent_service_name,
             f"assistant_dists/{name}/pipeline_conf.json",
-            environment=self.pipeline.agent.service.environment
+            environment=self.pipeline.agent.service.environment,
         )
 
         agent_last_chance_component_name = utils.generate_unique_name()
