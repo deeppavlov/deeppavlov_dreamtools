@@ -263,10 +263,11 @@ class Pipeline:
             "skill_selectors": {name: item.pipeline for name, item in self.skill_selectors.items()},
             "skills": {name: item.pipeline for name, item in self.skills.items()},
             "response_selectors": {name: item.pipeline for name, item in self.response_selectors.items()},
+            "actors": {name: item.pipeline for name, item in self.actors.items()},
         }
 
-    def get_component(self, group: str, name: str) -> DreamComponent:
-        return getattr(self, group)[name]
+    # def get_component(self, group: str, name: str) -> DreamComponent:
+    #     return getattr(self, group)[name]
 
     def add_component(self, component: DreamComponent):
         component_group = getattr(self, component.component.group)
