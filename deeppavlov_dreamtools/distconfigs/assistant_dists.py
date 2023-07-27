@@ -51,6 +51,7 @@ class BaseDreamConfig:
         self.config = config
 
         import warnings
+
         warning_text = f"{self.__class__.__name__} is subject to deprecation."
         if self.__class__.__name__ == "DreamPipeline":
             warning_text = (
@@ -734,6 +735,22 @@ class AssistantDist:
         self._check_if_path_located_in_correct_dream_directory(new_path)
 
         self._dist_path = new_path
+
+    @property
+    def language(self):
+        """Get distribution language
+
+        Returns: agent language in lowercase
+
+        """
+        return self.pipeline.agent.service.get_environment_value("LANGUAGE").lower()
+
+    @language.setter
+    def language(self, value: str):
+        raise NotImplementedError(
+            "Changing distribution language is currently restricted, "
+            "create a new distribution using .clone() with the specified language value"
+        )
 
     def _check_if_distribution_path_is_available(self, new_path: Path):
         """
