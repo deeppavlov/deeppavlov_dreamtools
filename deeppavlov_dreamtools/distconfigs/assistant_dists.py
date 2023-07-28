@@ -1045,6 +1045,10 @@ class AssistantDist:
             lang=lang,
         )
 
+        agent_last_chance_response = {
+            "en": "Sorry, something went wrong inside. Please tell me, what did you say.",
+            "ru": "Извини, что-то пошло не так в моем мозгу. Пожалуйста, повтори предыдущую реплику.",
+        }
         agent_last_chance_component_name = utils.generate_unique_name()
         agent_last_chance_component = components.create_agent_component(
             self.dream_root,
@@ -1055,10 +1059,14 @@ class AssistantDist:
             author,
             "Copy of agent",
             "last_chance_service",
-            "Извини, что-то пошло не так в моем мозгу. Пожалуйста, повтори предыдущую реплику.",
+            agent_last_chance_response[lang],
             ["last_chance"],
         )
 
+        agent_timeout_response = {
+            "en": "Sorry, I need to think more on that. Let's talk about something else.",
+            "ru": "Извини, что-то пошло не так в моем мозгу. Пожалуйста, повтори предыдущую реплику.",
+        }
         agent_timeout_component_name = utils.generate_unique_name()
         agent_timeout_component = components.create_agent_component(
             self.dream_root,
@@ -1069,7 +1077,7 @@ class AssistantDist:
             author,
             "Copy of agent",
             "timeout_service",
-            "Извини, что-то пошло не так в моем мозгу. Пожалуйста, повтори предыдущую реплику.",
+            agent_timeout_response[lang],
             ["timeout"],
         )
 
