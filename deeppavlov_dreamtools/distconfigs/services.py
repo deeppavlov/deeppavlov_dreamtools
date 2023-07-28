@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Union, List
+from typing import Union, List, Literal
 
 from pydantic import BaseModel
 
@@ -36,6 +36,7 @@ def create_agent_service(
     service_name: str,
     assistant_dist_pipeline_file: Union[Path, str],
     environment: dict = None,
+    lang: Literal["en", "ru"] = "en"
 ):
     source_dir, config_dir, service_file, environment_file = _resolve_default_service_config_paths(
         config_dir=config_dir
@@ -50,8 +51,8 @@ def create_agent_service(
             "HIGH_PRIORITY_INTENTS": 1,
             "RESTRICTION_FOR_SENSITIVE_CASE": 1,
             "ALWAYS_TURN_ON_ALL_SKILLS": 0,
-            "LANGUAGE": "EN",
-            "FALLBACK_FILE": "fallbacks_dream_en.json",
+            "LANGUAGE": lang.upper(),
+            "FALLBACK_FILE": f"fallbacks_dream_{lang}.json",
         }
 
     service = DreamService(

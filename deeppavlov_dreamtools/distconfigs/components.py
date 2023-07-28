@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Union, Type, Optional, List
+from typing import Union, Type, Optional, List, Literal
 
 from pydantic import parse_obj_as
 
@@ -159,10 +159,12 @@ def create_prompt_selector_component(
     prompt_selector_service: services.DreamService,
     config_path: Union[Path, str],
     name: str,
+    lang: Literal["en", "ru"] = "en",
 ):
     config_path = Path(config_path)
     source_dir = config_path.parent
 
+    connector_url_host = "prompt-selector-ru" if lang == "ru" else "prompt-selector"
     component = generics.Component(
         name=name,
         display_name="Prompt Selector",
@@ -178,7 +180,7 @@ def create_prompt_selector_component(
         connector=generics.PipelineConfConnector(
             protocol="http",
             timeout="2.0",
-            url="http://prompt-selector:8135/respond",
+            url=f"http://{connector_url_host}:8135/respond",
         ),
         dialog_formatter="state_formatters.dp_formatters:context_formatter_dialog",
         response_formatter="state_formatters.dp_formatters:simple_formatter_service",
