@@ -992,11 +992,6 @@ class AssistantDist:
         Returns:
             instance of DreamDist
         """
-        # all_names, new_pipeline_conf = self.pipeline_conf.filter_services(service_names)
-        # all_names += const.MANDATORY_SERVICES
-
-        # _, new_compose_override = self.compose_override.filter_services(all_names)
-
         new_generative_prompted_skills = {}
         prompted_service_names = []
 
