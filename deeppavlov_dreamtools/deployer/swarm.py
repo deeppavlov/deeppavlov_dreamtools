@@ -39,8 +39,8 @@ class DeployerState:
 
 
 class CloudServiceName:
-    AMAZON = "AMAZON"
-    LOCAL = "LOCAL"
+    AMAZON = "amazon"
+    LOCAL = "local"
 
 
 class DeployerError:
