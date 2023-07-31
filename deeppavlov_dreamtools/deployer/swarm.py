@@ -38,6 +38,11 @@ class DeployerState:
     DEPLOYED = "DEPLOYED"
 
 
+class CloudServiceName:
+    AMAZON = "AMAZON"
+    LOCAL = "LOCAL"
+
+
 class DeployerError:
     def __init__(self, state: str, exc: Exception, message: str = None):
         self.state = state
@@ -66,7 +71,8 @@ class SwarmDeployer:
         registry_addr: str = None,
         user_services: List[str] = None,
         deployment_dict: dict = None,
-        default_prefix: str = DEFAULT_PREFIX
+        default_prefix: str = DEFAULT_PREFIX,
+        cloud_service_name: str = CloudServiceName.AMAZON
     ):
         """
         Args:
@@ -80,6 +86,7 @@ class SwarmDeployer:
         self.user_services = user_services
         self.deployment_dict = deployment_dict
         self.default_prefix = default_prefix
+        self.cloud_service_name = cloud_service_name
 
     def deploy(self, dist: AssistantDist):
         """
@@ -354,17 +361,9 @@ class SwarmDeployer:
             if "/" in image_name_:
                 ecr_url, image_name_ = image_name_.split("/")
 
-            if self._check_if_repository_exists(ecr_client=ecr_client, repository_name=image_name_):
-                response = ecr_client.describe_repositories(
-                    repositoryNames=[
-                        image_name_,
-                    ]
-                )
-                repository_description = response["repositories"][0]
-                logger.info(f'initialized {repository_description["repositoryUri"]} repository')
-            else:
-                repository_description = ecr_client.create_repository(repositoryName=image_name_)["repository"]
-                logger.info(f'{repository_description["repositoryUri"]} found')
+            if self.cloud_service_name == CloudServiceName.AMAZON:
+                self._get_or_create_aws_repository(ecr_client, image_name_)
+
             # image = docker_client.images.get(image_name)
             # image.tag(repository_uri, "test")
             # image.tags doesn't guarantee that tags in python objects  match with docker tags in system, so then
@@ -384,6 +383,19 @@ class SwarmDeployer:
             logger.info(f"Images pushed")
         except docker.errors.APIError as e:
             logger.error(f"While pushing image raised error: {e}")
+
+    def _get_or_create_aws_repository(self, ecr_client, image_name_: str) -> None:
+        if self._check_if_repository_exists(ecr_client=ecr_client, repository_name=image_name_):
+            response = ecr_client.describe_repositories(
+                repositoryNames=[
+                    image_name_,
+                ]
+            )
+            repository_description = response["repositories"][0]
+            logger.info(f'initialized {repository_description["repositoryUri"]} repository')
+        else:
+            repository_description = ecr_client.create_repository(repositoryName=image_name_)["repository"]
+            logger.info(f'{repository_description["repositoryUri"]} found')
 
     def _check_if_repository_exists(self, ecr_client, repository_name):
         try:
