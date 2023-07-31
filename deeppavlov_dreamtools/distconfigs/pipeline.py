@@ -24,6 +24,7 @@ class Pipeline:
         "skill_selectors",
         "skills",
         "response_selectors",
+        "actors",
     ]
     COMPONENT_GROUPS = [
         "last_chance_service",
@@ -35,6 +36,7 @@ class Pipeline:
         "skill_selectors",
         "skills",
         "response_selectors",
+        "actors",
     ]
 
     def __init__(
@@ -50,6 +52,7 @@ class Pipeline:
         response_annotator_selectors: Optional[DreamComponent] = None,
         candidate_annotators: Optional[Dict[str, DreamComponent]] = None,
         skill_selectors: Optional[Dict[str, DreamComponent]] = None,
+        actors: Optional[Dict[str, DreamComponent]] = None,
         services: Optional[Dict[str, DreamComponent]] = None,
     ):
         self._config = config
@@ -60,19 +63,26 @@ class Pipeline:
         self.last_chance_service = last_chance_service
         self.timeout_service = timeout_service
         self.annotators = annotators
-        self.response_annotators = response_annotators
+        self.response_annotators = response_annotators or {}
         self.response_annotator_selectors = response_annotator_selectors
-        self.candidate_annotators = candidate_annotators
-        self.skill_selectors = skill_selectors
+        self.candidate_annotators = candidate_annotators or {}
+        self.skill_selectors = skill_selectors or {}
         self.skills = skills
         self.response_selectors = response_selectors
+        self.actors = actors or {}
         self.services = services or {}
 
     @staticmethod
     def validate_agent_services(*args: DreamComponent):
         for a, b in itertools.combinations(args, 2):
             if a.service.service != b.service.service:
-                raise ValueError(f"{a.component_file} != {b.component_file}")
+                raise ValueError(
+                    f"Components which use agent service (e.g. 'last_chance_service' or 'timeout_service') "
+                    f"must use the same service.yml card (unique for each distribution).\n"
+                    "Conflicting agent services:\n"
+                    f"{a.component.name} ({a.component_file}) uses {a.service.service_file} card\n"
+                    f"{b.component.name} ({b.component_file}) uses {b.service.service_file} card"
+                )
 
         return args[0]
 
@@ -253,10 +263,11 @@ class Pipeline:
             "skill_selectors": {name: item.pipeline for name, item in self.skill_selectors.items()},
             "skills": {name: item.pipeline for name, item in self.skills.items()},
             "response_selectors": {name: item.pipeline for name, item in self.response_selectors.items()},
+            "actors": {name: item.pipeline for name, item in self.actors.items()},
         }
 
-    def get_component(self, group: str, name: str) -> DreamComponent:
-        return getattr(self, group)[name]
+    # def get_component(self, group: str, name: str) -> DreamComponent:
+    #     return getattr(self, group)[name]
 
     def add_component(self, component: DreamComponent):
         component_group = getattr(self, component.component.group)

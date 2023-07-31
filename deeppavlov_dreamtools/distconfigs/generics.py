@@ -133,6 +133,7 @@ class PipelineConfServiceList(BaseModelNoExtra):
     skill_selectors: Optional[Dict[str, PipelineConfService]]
     skills: Dict[str, PipelineConfService]
     response_selectors: Dict[str, PipelineConfService]
+    actors: Optional[Dict[str, PipelineConfService]]
 
     @property
     def editable_groups(self):

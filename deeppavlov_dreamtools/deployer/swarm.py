@@ -166,7 +166,7 @@ class SwarmDeployer:
         url that not in self.user_services -> http://prefix_service
         """
         env_dict = dotenv.dotenv_values(dist.dream_root / ".env")
-        env_dict["DB_NAME"] = self.user_identifier
+        env_dict["DB_NAME"] = self.user_identifier.split('_')[-1]
 
         for env_var, env_value in env_dict.items():
             if env_var.endswith("URL"):

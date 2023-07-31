@@ -50,6 +50,16 @@ class BaseDreamConfig:
     def __init__(self, config: AnyConfig):
         self.config = config
 
+        import warnings
+
+        warning_text = f"{self.__class__.__name__} is subject to deprecation."
+        if self.__class__.__name__ == "DreamPipeline":
+            warning_text = (
+                f"{warning_text} Consider using deeppavlov_dreamtools.Pipeline "
+                "instead of deeppavlov_dreamtools.distconfigs.assistant_dists.DreamPipeline"
+            )
+        warnings.warn(warning_text, DeprecationWarning)
+
     @staticmethod
     def load(path: Union[Path, str]):
         raise NotImplementedError("Override this function")
@@ -726,6 +736,22 @@ class AssistantDist:
 
         self._dist_path = new_path
 
+    @property
+    def language(self):
+        """Get distribution language
+
+        Returns: agent language in lowercase
+
+        """
+        return self.pipeline.agent.service.get_environment_value("LANGUAGE").lower()
+
+    @language.setter
+    def language(self, value: str):
+        raise NotImplementedError(
+            "Changing distribution language is currently restricted, "
+            "create a new distribution using .clone() with the specified language value"
+        )
+
     def _check_if_distribution_path_is_available(self, new_path: Path):
         """
         Checks if distribution dist_path doesn't match with any existing distribution
@@ -936,6 +962,7 @@ class AssistantDist:
         author: str,
         description: str,
         existing_prompted_skills: List[Dict],
+        lang: Literal["en", "ru"] = "en",
     ):
         """
         Creates Dream distribution inherited from another distribution.
@@ -961,18 +988,16 @@ class AssistantDist:
                     "description": str | None,
                 }
             ]
-            # service_names: list of services to be included in new distribution
+            lang: distribution language, affects component configurations
         Returns:
             instance of DreamDist
         """
-        # all_names, new_pipeline_conf = self.pipeline_conf.filter_services(service_names)
-        # all_names += const.MANDATORY_SERVICES
-
-        # _, new_compose_override = self.compose_override.filter_services(all_names)
-
         new_generative_prompted_skills = {}
         prompted_service_names = []
 
+        # 1. we iterate over existing prompted components and generate service & component cards for them.
+        # the new cards are mostly clones with new names, but you need this to be
+        # able to correctly edit those components later on as a part of new dist
         for skill in existing_prompted_skills:
             prompted_service_name = utils.generate_unique_name()
             prompted_skill_name = f"dff_{prompted_service_name}_prompted_skill"
@@ -1004,15 +1029,21 @@ class AssistantDist:
             )
             new_generative_prompted_skills[skill["name"]] = prompted_component
 
+        # 2. we create a new agent service card and fallback components: timeout and last chance
         agent_service_name = utils.generate_unique_name()
         agent_service = services.create_agent_service(
             self.dream_root,
             f"services/agent_services/service_configs/{agent_service_name}",
             agent_service_name,
             f"assistant_dists/{name}/pipeline_conf.json",
-            environment=self.pipeline.agent.service.environment
+            environment=self.pipeline.agent.service.environment,
+            lang=lang,
         )
 
+        agent_last_chance_response = {
+            "en": "Sorry, something went wrong inside. Please tell me, what did you say.",
+            "ru": "Извини, что-то пошло не так в моем мозгу. Пожалуйста, повтори предыдущую реплику.",
+        }
         agent_last_chance_component_name = utils.generate_unique_name()
         agent_last_chance_component = components.create_agent_component(
             self.dream_root,
@@ -1023,10 +1054,14 @@ class AssistantDist:
             author,
             "Copy of agent",
             "last_chance_service",
-            "Sorry, something went wrong inside. Please tell me, what did you say.",
+            agent_last_chance_response[lang],
             ["last_chance"],
         )
 
+        agent_timeout_response = {
+            "en": "Sorry, I need to think more on that. Let's talk about something else.",
+            "ru": "Извини, что-то пошло не так в моем мозгу. Пожалуйста, повтори предыдущую реплику.",
+        }
         agent_timeout_component_name = utils.generate_unique_name()
         agent_timeout_component = components.create_agent_component(
             self.dream_root,
@@ -1037,10 +1072,11 @@ class AssistantDist:
             author,
             "Copy of agent",
             "timeout_service",
-            "Sorry, I need to think more on that. Let's talk about something else.",
+            agent_timeout_response[lang],
             ["timeout"],
         )
 
+        # 3. create new prompt selector cards
         prompt_selector_service_name = utils.generate_unique_name()
         prompt_selector_service = services.create_prompt_selector_service(
             self.dream_root,
@@ -1055,8 +1091,10 @@ class AssistantDist:
             prompt_selector_service,
             f"components/{prompt_selector_component_name}.yml",
             prompt_selector_component_name,
+            lang=lang,
         )
 
+        # 4. copy pipeline and overwrite components with previously generated ones
         new_pipeline = deepcopy(self.pipeline)
 
         new_pipeline.metadata = PipelineConfMetadata(
@@ -1074,37 +1112,11 @@ class AssistantDist:
         new_pipeline.timeout_service = agent_timeout_component
         new_pipeline.annotators["prompt_selector"] = prompt_selector_component
 
-        # new_pipeline_conf = deepcopy(self.pipeline_conf)
-        # new_pipeline_conf.display_name = display_name
-        # new_pipeline_conf.description = description
-        #
-        # new_compose_override = deepcopy(self.compose_override)
-        # new_agent_command = re.sub(
-        #     f"assistant_dists/{self.name}/pipeline_conf.json",
-        #     f"assistant_dists/{name}/pipeline_conf.json",
-        #     new_compose_override.config.services["agent"].command,
-        # )
-        # new_compose_override.config.services["agent"].command = new_agent_command
-        #
-        # # new_compose_override.config.services["agent"].environment["WAIT_HOSTS"] = ""
-        # new_compose_dev = new_compose_proxy = new_compose_local = None
-        # if self.compose_dev:
-        #     new_compose_dev = deepcopy(self.compose_dev)
-        # if self.compose_proxy:
-        #     new_compose_proxy = deepcopy(self.compose_proxy)
-        # if self.compose_local:
-        #     new_compose_local = deepcopy(self.compose_local)
-
         return AssistantDist(
             self.resolve_dist_path(name, self.dream_root),
             name,
             self.dream_root,
             new_pipeline,
-            # new_pipeline_conf,
-            # new_compose_override,
-            # new_compose_dev,
-            # new_compose_proxy,
-            # new_compose_local,
         )
 
     def iter_loaded_configs(self):
@@ -1178,19 +1190,19 @@ class AssistantDist:
         #     **compose_kwargs,
         # )
 
-    def get_component(self, name: str, group: Literal["annotators", "skills"]):
-        for service_group, service_name, service in self.pipeline_conf.iter_services():
-            if service_group == group and service_name == name:
-                return self._extract_component_from_service(service_group, service_name, service)
-
-        raise KeyError(f"Cannot find {name} in {group}")
-
-    def iter_components(self, group: Literal["annotators", "skills"]):
-        for service_group, service_name, service in self.pipeline_conf.iter_services():
-            if service_group != group:
-                continue
-
-            yield self._extract_component_from_service(service_group, service_name, service)
+    # def get_component(self, name: str, group: Literal["annotators", "skills"]):
+    #     for service_group, service_name, service in self.pipeline_conf.iter_services():
+    #         if service_group == group and service_name == name:
+    #             return self._extract_component_from_service(service_group, service_name, service)
+    #
+    #     raise KeyError(f"Cannot find {name} in {group}")
+    #
+    # def iter_components(self, group: Literal["annotators", "skills"]):
+    #     for service_group, service_name, service in self.pipeline_conf.iter_services():
+    #         if service_group != group:
+    #             continue
+    #
+    #         yield self._extract_component_from_service(service_group, service_name, service)
 
     def add_component(self, component: DreamComponent):
         self.pipeline.add_component(component)
@@ -1270,177 +1282,177 @@ class AssistantDist:
 
         return paths
 
-    def add_dff_skill(self, name: str, port: int):
-        """
-        Adds DFF skill to distribution.
+    # def add_dff_skill(self, name: str, port: int):
+    #     """
+    #     Adds DFF skill to distribution.
+    #
+    #     Args:
+    #         name: DFF skill name
+    #         port: port where new DFF skill should be deployed
+    #
+    #     Returns:
+    #         path to new DFF skill
+    #     """
+    #     name_with_underscores = name.replace("-", "_")
+    #     name_with_dashes = name.replace("_", "-")
+    #
+    #     skill_dir = Path(self.dream_root) / const.SKILLS_DIR_NAME / name
+    #     if skill_dir.exists():
+    #         raise FileExistsError(f"{skill_dir} already exists!")
+    #
+    #     pkg_source_dir = Path(__file__).parents[1]
+    #     dff_template_dir = pkg_source_dir / "static" / "dff_template_skill"
+    #     copytree(dff_template_dir, skill_dir)
+    #
+    #     if self.pipeline_conf:
+    #         pl_service = PipelineConfService(
+    #             connector=PipelineConfConnector(
+    #                 protocol="http",
+    #                 timeout=2,
+    #                 url=f"http://{name_with_dashes}:{port}/respond",
+    #             ),
+    #             dialog_formatter=f"state_formatters.dp_formatters:{name}_formatter",
+    #             response_formatter="state_formatters.dp_formatters:skill_with_attributes_formatter_service",
+    #             previous_services=["skill_selectors"],
+    #             state_manager_method="add_hypothesis",
+    #         )
+    #         self.pipeline_conf.add_component(name_with_underscores, "skills", pl_service, inplace=True)
+    #
+    #     if self.compose_override:
+    #         override_service = ComposeContainer(
+    #             env_file=[".env"],
+    #             build=ContainerBuildDefinition(
+    #                 args={"SERVICE_PORT": port, "SERVICE_NAME": name},
+    #                 context=Path("."),
+    #                 dockerfile=skill_dir / "Dockerfile",
+    #             ),
+    #             command=f"gunicorn --workers=1 server:app -b 0.0.0.0:{port} --reload --timeout 500",
+    #             deploy=DeploymentDefinition(
+    #                 resources=DeploymentDefinitionResources(
+    #                     limits=DeploymentDefinitionResourcesArg(memory="1G"),
+    #                     reservations=DeploymentDefinitionResourcesArg(memory="1G"),
+    #                 )
+    #             ),
+    #         )
+    #         self.compose_override.add_component(name_with_dashes, override_service, inplace=True)
+    #
+    #     if self.compose_dev:
+    #         dev_service = ComposeDevContainer(
+    #             volumes=[f"./skills/{name}:/src", "./common:/src/common"],
+    #             ports=[f"{port}:{port}"],
+    #         )
+    #         self.compose_dev.add_component(name_with_dashes, dev_service, inplace=True)
+    #
+    #     if self.compose_proxy:
+    #         proxy_service = ComposeContainer(
+    #             command=["nginx", "-g", "daemon off;"],
+    #             build=ContainerBuildDefinition(context=Path("dp/proxy"), dockerfile=Path("Dockerfile")),
+    #             environment=[f"PROXY_PASS=dream.deeppavlov.ai:{port}", f"PORT={port}"],
+    #         )
+    #         self.compose_proxy.add_component(name_with_dashes, proxy_service, inplace=True)
+    #
+    #     self.save(True)
+    #
+    #     return skill_dir
 
-        Args:
-            name: DFF skill name
-            port: port where new DFF skill should be deployed
+    # def enable_service(
+    #     self,
+    #     config_type: DreamConfigLiteral,
+    #     definition: Union[AnyContainer, PipelineConfService],
+    #     service_name: str,
+    #     service_type: str,
+    # ) -> None:
+    #     """
+    #     Stores config with the new service to temp configs storage
+    #
+    #     Args:
+    #         config_type: Literal["pipeline_conf", "compose_override", "compose_dev", "compose_proxy"]
+    #         service_type: e.g. `post_annotators`
+    #         definition: config to be added to temp storage with the new service
+    #         service_name: name of the service to be added to config, e.g. `ner`
+    #     """
+    #     dream_temp_config = self._fetch_dream_temp_config(config_type)
+    #     dream_temp_config.add_component(
+    #         name=service_name, component_group=service_type, definition=definition, inplace=True
+    #     )
+    #
+    #     self.temp_configs[config_type] = dream_temp_config
 
-        Returns:
-            path to new DFF skill
-        """
-        name_with_underscores = name.replace("-", "_")
-        name_with_dashes = name.replace("_", "-")
+    # def disable_service(self, config_type: DreamConfigLiteral, service_type: str, service_name: str) -> None:
+    #     """
+    #     Removes service from the config
+    #
+    #     Args:
+    #         config_type: Literal["pipeline_conf", "compose_override", "compose_dev", "compose_proxy"]
+    #         service_type: name of the component_group
+    #         service_name: name of the service to be added to config
+    #     """
+    #     dream_temp_config = self._fetch_dream_temp_config(config_type)  # DreamDist.pipeline_conf, for example
+    #
+    #     dream_temp_config.remove_component(component_group=service_type, name=service_name, inplace=True)
+    #     self.temp_configs[config_type] = dream_temp_config
 
-        skill_dir = Path(self.dream_root) / const.SKILLS_DIR_NAME / name
-        if skill_dir.exists():
-            raise FileExistsError(f"{skill_dir} already exists!")
+    # def _fetch_dream_temp_config(self, config_type: DreamConfigLiteral):
+    #     """
+    #     Fetches DreamDist attribute with name `config_type` and copies it
+    #
+    #     Args:
+    #         config_type: Literal["pipeline_conf", "compose_override", "compose_dev", "compose_proxy"]
+    #     """
+    #     if self.temp_configs.get(config_type) is None:
+    #         dream_config: AnyConfigClass = getattr(self, config_type)
+    #         self.temp_configs[config_type] = dream_config
+    #
+    #         if dream_config is None:
+    #             raise AttributeError("The config is neither in the temp storage nor in the DreamDist attributes")
+    #     else:
+    #         dream_config = self.temp_configs[config_type]
+    #
+    #     dream_temp_config = deepcopy(dream_config)
+    #
+    #     return dream_temp_config
 
-        pkg_source_dir = Path(__file__).parents[1]
-        dff_template_dir = pkg_source_dir / "static" / "dff_template_skill"
-        copytree(dff_template_dir, skill_dir)
+    # def apply_temp_config(self, config_type: DreamConfigLiteral) -> None:
+    #     """
+    #     Replaces current config with the temp one.
+    #
+    #     Args:
+    #         config_type: Literal["pipeline_conf", "compose_override", "compose_dev", "compose_proxy"]
+    #     """
+    #     setattr(self, config_type, self.temp_configs[config_type])
 
-        if self.pipeline_conf:
-            pl_service = PipelineConfService(
-                connector=PipelineConfConnector(
-                    protocol="http",
-                    timeout=2,
-                    url=f"http://{name_with_dashes}:{port}/respond",
-                ),
-                dialog_formatter=f"state_formatters.dp_formatters:{name}_formatter",
-                response_formatter="state_formatters.dp_formatters:skill_with_attributes_formatter_service",
-                previous_services=["skill_selectors"],
-                state_manager_method="add_hypothesis",
-            )
-            self.pipeline_conf.add_component(name_with_underscores, "skills", pl_service, inplace=True)
-
-        if self.compose_override:
-            override_service = ComposeContainer(
-                env_file=[".env"],
-                build=ContainerBuildDefinition(
-                    args={"SERVICE_PORT": port, "SERVICE_NAME": name},
-                    context=Path("."),
-                    dockerfile=skill_dir / "Dockerfile",
-                ),
-                command=f"gunicorn --workers=1 server:app -b 0.0.0.0:{port} --reload --timeout 500",
-                deploy=DeploymentDefinition(
-                    resources=DeploymentDefinitionResources(
-                        limits=DeploymentDefinitionResourcesArg(memory="1G"),
-                        reservations=DeploymentDefinitionResourcesArg(memory="1G"),
-                    )
-                ),
-            )
-            self.compose_override.add_component(name_with_dashes, override_service, inplace=True)
-
-        if self.compose_dev:
-            dev_service = ComposeDevContainer(
-                volumes=[f"./skills/{name}:/src", "./common:/src/common"],
-                ports=[f"{port}:{port}"],
-            )
-            self.compose_dev.add_component(name_with_dashes, dev_service, inplace=True)
-
-        if self.compose_proxy:
-            proxy_service = ComposeContainer(
-                command=["nginx", "-g", "daemon off;"],
-                build=ContainerBuildDefinition(context=Path("dp/proxy"), dockerfile=Path("Dockerfile")),
-                environment=[f"PROXY_PASS=dream.deeppavlov.ai:{port}", f"PORT={port}"],
-            )
-            self.compose_proxy.add_component(name_with_dashes, proxy_service, inplace=True)
-
-        self.save(True)
-
-        return skill_dir
-
-    def enable_service(
-        self,
-        config_type: DreamConfigLiteral,
-        definition: Union[AnyContainer, PipelineConfService],
-        service_name: str,
-        service_type: str,
-    ) -> None:
-        """
-        Stores config with the new service to temp configs storage
-
-        Args:
-            config_type: Literal["pipeline_conf", "compose_override", "compose_dev", "compose_proxy"]
-            service_type: e.g. `post_annotators`
-            definition: config to be added to temp storage with the new service
-            service_name: name of the service to be added to config, e.g. `ner`
-        """
-        dream_temp_config = self._fetch_dream_temp_config(config_type)
-        dream_temp_config.add_component(
-            name=service_name, component_group=service_type, definition=definition, inplace=True
-        )
-
-        self.temp_configs[config_type] = dream_temp_config
-
-    def disable_service(self, config_type: DreamConfigLiteral, service_type: str, service_name: str) -> None:
-        """
-        Removes service from the config
-
-        Args:
-            config_type: Literal["pipeline_conf", "compose_override", "compose_dev", "compose_proxy"]
-            service_type: name of the component_group
-            service_name: name of the service to be added to config
-        """
-        dream_temp_config = self._fetch_dream_temp_config(config_type)  # DreamDist.pipeline_conf, for example
-
-        dream_temp_config.remove_component(component_group=service_type, name=service_name, inplace=True)
-        self.temp_configs[config_type] = dream_temp_config
-
-    def _fetch_dream_temp_config(self, config_type: DreamConfigLiteral):
-        """
-        Fetches DreamDist attribute with name `config_type` and copies it
-
-        Args:
-            config_type: Literal["pipeline_conf", "compose_override", "compose_dev", "compose_proxy"]
-        """
-        if self.temp_configs.get(config_type) is None:
-            dream_config: AnyConfigClass = getattr(self, config_type)
-            self.temp_configs[config_type] = dream_config
-
-            if dream_config is None:
-                raise AttributeError("The config is neither in the temp storage nor in the DreamDist attributes")
-        else:
-            dream_config = self.temp_configs[config_type]
-
-        dream_temp_config = deepcopy(dream_config)
-
-        return dream_temp_config
-
-    def apply_temp_config(self, config_type: DreamConfigLiteral) -> None:
-        """
-        Replaces current config with the temp one.
-
-        Args:
-            config_type: Literal["pipeline_conf", "compose_override", "compose_dev", "compose_proxy"]
-        """
-        setattr(self, config_type, self.temp_configs[config_type])
-
-    def check_ports(self):
-        """
-        Checks all available dream distributions configs for matching ports in services
-
-        Example of service with mismatching ports(proxy.yml):
-        ```
-        dialogpt-persona-based:
-            command: [ "nginx", "-g", "daemon off;" ]
-            build:
-              context: dp/proxy/
-              dockerfile: Dockerfile
-            environment:
-              - PROXY_PASS=dream.deeppavlov.ai:8131
-              - PORT=8125
-        ```
-        """
-        mismatching_ports_info: List[str] = []
-
-        for config in self.iter_loaded_configs():
-            if isinstance(config, DreamPipeline):
-                for service_group, service_name, service in config.iter_services():
-                    config.discover_port(service)
-            else:
-                for service_name, service in config.iter_services():
-                    if service_name in const.NON_SERVICES:
-                        continue
-                    try:
-                        config.discover_port(service)
-                    except ValueError as e:
-                        mismatching_ports_info.append(f"{service_name}: {str(e)}")
-        if mismatching_ports_info:
-            raise ValueError("\n".join(mismatching_ports_info))
+    # def check_ports(self):
+    #     """
+    #     Checks all available dream distributions configs for matching ports in services
+    #
+    #     Example of service with mismatching ports(proxy.yml):
+    #     ```
+    #     dialogpt-persona-based:
+    #         command: [ "nginx", "-g", "daemon off;" ]
+    #         build:
+    #           context: dp/proxy/
+    #           dockerfile: Dockerfile
+    #         environment:
+    #           - PROXY_PASS=dream.deeppavlov.ai:8131
+    #           - PORT=8125
+    #     ```
+    #     """
+    #     mismatching_ports_info: List[str] = []
+    #
+    #     for config in self.iter_loaded_configs():
+    #         if isinstance(config, DreamPipeline):
+    #             for service_group, service_name, service in config.iter_services():
+    #                 config.discover_port(service)
+    #         else:
+    #             for service_name, service in config.iter_services():
+    #                 if service_name in const.NON_SERVICES:
+    #                     continue
+    #                 try:
+    #                     config.discover_port(service)
+    #                 except ValueError as e:
+    #                     mismatching_ports_info.append(f"{service_name}: {str(e)}")
+    #     if mismatching_ports_info:
+    #         raise ValueError("\n".join(mismatching_ports_info))
 
     def del_ports_and_volumes(self):
         for _, compose in self.iter_container_configs():
@@ -1480,48 +1492,48 @@ def list_dists(dream_root: Union[Path, str]) -> List[AssistantDist]:
     return dream_dists
 
 
-def list_components(dream_root: Union[Path, str], group: Literal["annotators", "skills"]) -> List[Component]:
-    """Lists all components available in the group
+# def list_components(dream_root: Union[Path, str], group: Literal["annotators", "skills"]) -> List[Component]:
+#     """Lists all components available in the group
+#
+#     Args:
+#         dream_root: path to Dream module
+#         group: component group
+#
+#     Returns:
+#         components: dictionary with names as keys and config_name: definition as values
+#     """
+#     components = []
+#
+#     for dist in list_dists(dream_root):
+#         for component in dist.iter_components(group):
+#             components.append(component)
+#
+#     return components
 
-    Args:
-        dream_root: path to Dream module
-        group: component group
 
-    Returns:
-        components: dictionary with names as keys and config_name: definition as values
-    """
-    components = []
-
-    for dist in list_dists(dream_root):
-        for component in dist.iter_components(group):
-            components.append(component)
-
-    return components
-
-
-def check_ports_in_all_distributions(dream_root: Union[Path, str]):
-    """
-    Checks all available dream assistant distributions for matching ports in services
-
-    Example of service with mismatching ports(proxy.yml):
-    ```
-    dialogpt-persona-based:
-        command: [ "nginx", "-g", "daemon off;" ]
-        build:
-          context: dp/proxy/
-          dockerfile: Dockerfile
-        environment:
-          - PROXY_PASS=dream.deeppavlov.ai:8131
-          - PORT=8125
-    ```
-    """
-    mismatching_ports_info: List[str] = []
-
-    for dream_dist in list_dists(dream_root):
-        try:
-            dream_dist.check_ports()
-        except ValueError as e:
-            mismatching_ports_info.append(f"{dream_dist.dist_path}:\n{str(e)}")
-
-    if mismatching_ports_info:
-        raise ValueError(f"{' '.join(mismatching_ports_info)}\n")
+# def check_ports_in_all_distributions(dream_root: Union[Path, str]):
+#     """
+#     Checks all available dream assistant distributions for matching ports in services
+#
+#     Example of service with mismatching ports(proxy.yml):
+#     ```
+#     dialogpt-persona-based:
+#         command: [ "nginx", "-g", "daemon off;" ]
+#         build:
+#           context: dp/proxy/
+#           dockerfile: Dockerfile
+#         environment:
+#           - PROXY_PASS=dream.deeppavlov.ai:8131
+#           - PORT=8125
+#     ```
+#     """
+#     mismatching_ports_info: List[str] = []
+#
+#     for dream_dist in list_dists(dream_root):
+#         try:
+#             dream_dist.check_ports()
+#         except ValueError as e:
+#             mismatching_ports_info.append(f"{dream_dist.dist_path}:\n{str(e)}")
+#
+#     if mismatching_ports_info:
+#         raise ValueError(f"{' '.join(mismatching_ports_info)}\n")
