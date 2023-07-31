@@ -362,7 +362,7 @@ class SwarmDeployer:
                 ecr_url, image_name_ = image_name_.split("/")
 
             if self.cloud_service_name == CloudServiceName.AMAZON:
-                self._get_or_create_aws_repository(ecr_client, image_name_)
+                self._log_or_create_aws_repository(ecr_client, image_name_)
 
             # image = docker_client.images.get(image_name)
             # image.tag(repository_uri, "test")
@@ -384,7 +384,7 @@ class SwarmDeployer:
         except docker.errors.APIError as e:
             logger.error(f"While pushing image raised error: {e}")
 
-    def _get_or_create_aws_repository(self, ecr_client, image_name_: str) -> None:
+    def _log_or_create_aws_repository(self, ecr_client, image_name_: str) -> None:
         if self._check_if_repository_exists(ecr_client=ecr_client, repository_name=image_name_):
             response = ecr_client.describe_repositories(
                 repositoryNames=[
