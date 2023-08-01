@@ -357,7 +357,8 @@ class SwarmDeployer:
                 raise KeyError(f'there is no "image" key in {service_name}')
             # TODO: replace with regex
             if ":" in image_name:
-                image_name_, tag = image_name.split(":")
+                *image_name_, tag = image_name.split(":")
+                image_name_ = ":".join(image_name_)
             if "/" in image_name_:
                 ecr_url, image_name_ = image_name_.split("/")
 
