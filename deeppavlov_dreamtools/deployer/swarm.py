@@ -347,7 +347,8 @@ class SwarmDeployer:
         repository_name == stack_name == self.user_identifier
         docker login must be configured
         """
-        ecr_client = boto3.client("ecr")
+        is_amazon_registry = self.cloud_service_name == CloudServiceName.AMAZON
+
         with open(self._get_deployment_path(dist)) as fin:
             deployment = yaml.safe_load(fin.read())
         for service_name, service in deployment['services'].items():
@@ -360,9 +361,10 @@ class SwarmDeployer:
                 *image_name_, tag = image_name.split(":")
                 image_name_ = ":".join(image_name_)
             if "/" in image_name_:
-                ecr_url, image_name_ = image_name_.split("/")
+                _, image_name_ = image_name_.split("/")
 
-            if self.cloud_service_name == CloudServiceName.AMAZON:
+            if is_amazon_registry:
+                ecr_client = boto3.client("ecr")
                 self._log_or_create_aws_repository(ecr_client, image_name_)
 
             # image = docker_client.images.get(image_name)
