@@ -4,6 +4,6 @@ PyYAML==5.3b1
 pytest==7.1.2
 fabric==3.0.0
 python-dotenv
-boto3
+boto3==1.28.40
 docker
 typing_extensions<4.6.0
