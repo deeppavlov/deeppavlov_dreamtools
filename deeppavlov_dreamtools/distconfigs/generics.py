@@ -284,7 +284,7 @@ class ComponentEndpoint(BaseModelNoExtra):
 class ComponentTemplate(BaseModelNoExtra):
     name: str
     display_name: str
-    author: Union[EmailStr, None]
+    author: Optional[EmailStr] = None
     description: str
     endpoints: List[ComponentEndpoint]
     config_keys: Optional[dict]
@@ -297,7 +297,7 @@ class Component(BaseModelNoExtra):
     component_type: Optional[COMPONENT_TYPES]
     model_type: Optional[MODEL_TYPES]
     is_customizable: bool
-    author: Union[EmailStr, None]
+    author: Optional[EmailStr] = None
     description: str
     ram_usage: Optional[str]
     gpu_usage: Optional[str]

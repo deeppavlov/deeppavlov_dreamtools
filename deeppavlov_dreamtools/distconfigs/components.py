@@ -62,10 +62,10 @@ def create_agent_component(
     config_path: Union[Path, str],
     name: str,
     display_name: str,
-    author: str,
     description: str,
     group: str,
     response_text: str,
+    author: Optional[str] = None,
     tags: Optional[List[str]] = None,
 ):
     config_path = Path(config_path)
@@ -114,8 +114,8 @@ def create_generative_prompted_skill_component(
     connector_url: str,
     name: str,
     display_name: str,
-    author: Union[str, None],
     description: str,
+    author: Optional[str] = None
 ):
     config_path = Path(config_path)
     source_dir = config_path.parent
