@@ -297,7 +297,7 @@ class Component(BaseModelNoExtra):
     component_type: Optional[COMPONENT_TYPES]
     model_type: Optional[MODEL_TYPES]
     is_customizable: bool
-    author: EmailStr
+    author: Optional[EmailStr]
     description: str
     ram_usage: Optional[str]
     gpu_usage: Optional[str]
