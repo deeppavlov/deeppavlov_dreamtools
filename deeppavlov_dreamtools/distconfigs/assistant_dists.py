@@ -959,7 +959,7 @@ class AssistantDist:
         self,
         name: str,
         display_name: str,
-        author: str,
+        author: Union[str, None],
         description: str,
         existing_prompted_skills: List[Dict],
         lang: Literal["en", "ru"] = "en",

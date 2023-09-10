@@ -155,7 +155,7 @@ class PipelineConfServiceList(BaseModelNoExtra):
 
 class PipelineConfMetadata(BaseModelNoExtra):
     display_name: str
-    author: str
+    author: Union[str, None]
     description: str
     date_created: datetime = Field(default_factory=datetime.utcnow)
 
@@ -284,7 +284,7 @@ class ComponentEndpoint(BaseModelNoExtra):
 class ComponentTemplate(BaseModelNoExtra):
     name: str
     display_name: str
-    author: EmailStr
+    author: Union[EmailStr, None]
     description: str
     endpoints: List[ComponentEndpoint]
     config_keys: Optional[dict]
