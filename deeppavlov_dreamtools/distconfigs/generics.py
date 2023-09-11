@@ -19,6 +19,8 @@ from pydantic import BaseModel, Extra, validator, Field, EmailStr
 
 from deeppavlov_dreamtools.utils import parse_connector_url
 
+author_type = Optional[EmailStr]
+
 
 def check_memory_format(value: Optional[str]) -> None:
     """Checks if the string has the correct memory format
@@ -155,7 +157,7 @@ class PipelineConfServiceList(BaseModelNoExtra):
 
 class PipelineConfMetadata(BaseModelNoExtra):
     display_name: str
-    author: Optional[str] = None
+    author: author_type = None
     description: str
     date_created: datetime = Field(default_factory=datetime.utcnow)
 
@@ -284,7 +286,7 @@ class ComponentEndpoint(BaseModelNoExtra):
 class ComponentTemplate(BaseModelNoExtra):
     name: str
     display_name: str
-    author: Optional[EmailStr] = None
+    author: author_type = None
     description: str
     endpoints: List[ComponentEndpoint]
     config_keys: Optional[dict]
@@ -297,7 +299,7 @@ class Component(BaseModelNoExtra):
     component_type: Optional[COMPONENT_TYPES]
     model_type: Optional[MODEL_TYPES]
     is_customizable: bool
-    author: Optional[EmailStr] = None
+    author: author_type = None
     description: str
     ram_usage: Optional[str]
     gpu_usage: Optional[str]

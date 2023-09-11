@@ -13,6 +13,8 @@ from deeppavlov_dreamtools.constants import (
 from deeppavlov_dreamtools.distconfigs import generics, services
 from deeppavlov_dreamtools.utils import parse_connector_url
 
+author_type = Optional[str]
+
 
 class MissingPipelineException(Exception):
     """"""
@@ -65,7 +67,7 @@ def create_agent_component(
     description: str,
     group: str,
     response_text: str,
-    author: Optional[str] = None,
+    author: author_type = None,
     tags: Optional[List[str]] = None,
 ):
     config_path = Path(config_path)
@@ -115,7 +117,7 @@ def create_generative_prompted_skill_component(
     name: str,
     display_name: str,
     description: str,
-    author: Optional[str] = None
+    author: author_type = None
 ):
     config_path = Path(config_path)
     source_dir = config_path.parent

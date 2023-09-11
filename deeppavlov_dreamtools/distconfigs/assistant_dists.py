@@ -36,6 +36,8 @@ from deeppavlov_dreamtools.distconfigs.generics import (
 from deeppavlov_dreamtools.distconfigs.pipeline import Pipeline
 from deeppavlov_dreamtools.utils import parse_connector_url
 
+author_type = Optional[str]
+
 
 class BaseDreamConfig:
     """
@@ -959,7 +961,7 @@ class AssistantDist:
         self,
         name: str,
         display_name: str,
-        author: Optional[str],
+        author: author_type,
         description: str,
         existing_prompted_skills: List[Dict],
         lang: Literal["en", "ru"] = "en",
