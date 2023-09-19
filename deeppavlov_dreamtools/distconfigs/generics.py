@@ -300,7 +300,7 @@ class Component(BaseModelNoExtra):
     model_type: Optional[MODEL_TYPES]
     is_customizable: bool
     author: author_type = None
-    description: str
+    description: Optional[str]
     ram_usage: Optional[str]
     gpu_usage: Optional[str]
 
