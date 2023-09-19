@@ -19,7 +19,7 @@ from pydantic import BaseModel, Extra, validator, Field, EmailStr
 
 from deeppavlov_dreamtools.utils import parse_connector_url
 
-author_type = Optional[EmailStr]
+author_type = Optional[str]
 
 
 def check_memory_format(value: Optional[str]) -> None:
