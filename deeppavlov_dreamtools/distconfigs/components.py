@@ -116,7 +116,7 @@ def create_generative_prompted_skill_component(
     connector_url: str,
     name: str,
     display_name: str,
-    description: Optional[str],
+    description: str,
     author: author_type = None
 ):
     config_path = Path(config_path)
