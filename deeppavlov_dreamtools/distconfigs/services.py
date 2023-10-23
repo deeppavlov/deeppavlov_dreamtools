@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Union, List, Literal
+from typing import Union, List, Literal, Optional
 
 from pydantic import BaseModel
 
@@ -8,8 +8,8 @@ from deeppavlov_dreamtools.distconfigs import generics
 
 
 class ServicePrompt(BaseModel):
-    prompt: str
-    goals: str
+    prompt: Optional[str]
+    goals: Optional[str]
 
 
 def _resolve_default_service_config_paths(
@@ -267,12 +267,12 @@ class DreamService:
         return ServicePrompt(**prompt)
 
     def dump_prompt_file(self, prompt: str, goals: str):
-        prompt_file = self.get_environment_value("PROMPT_FILE")
-        utils.dump_json(
-            ServicePrompt(prompt=prompt, goals=goals).dict(),
-            self.dream_root / prompt_file,
-            overwrite=True,
-        )
+        if prompt_file := self.get_environment_value("PROMPT_FILE"):
+            utils.dump_json(
+                ServicePrompt(prompt=prompt, goals=goals).dict(),
+                self.dream_root / prompt_file,
+                overwrite=True,
+            )
 
     def load_lm_config_file(self):
         lm_config_file = self.get_environment_value("GENERATIVE_SERVICE_CONFIG")
