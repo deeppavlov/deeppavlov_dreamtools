@@ -332,7 +332,7 @@ class SwarmDeployer:
         deployment_file_path = self._get_deployment_path(dist)
         temporary_deployment_file_path = str(deployment_file_path)[:-1]
         cmd = " ".join(f"-f {config}" for config in (docker_compose_pathfile, override_path, deployment_file_path))
-        logger.info("COMPOSE CMD \n %s", CMD)
+        logger.info("COMPOSE CMD \n %s", cmd)
         subprocess.run(
             f"docker compose {cmd} config  > {temporary_deployment_file_path} && mv {temporary_deployment_file_path} "
             f"{deployment_file_path}",
