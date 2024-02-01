@@ -183,7 +183,7 @@ class SwarmDeployer:
                 for var, value in env_dict.items():
                     f.write(f"{var}={value}\n")
         except IOError as e:
-            logger.info(f"Error writing to {dist.dist_path}/".env" : {e}")
+            logger.info(f"Error writing to {dist.dist_path}/.env" : {e}")
 
     def _change_pipeline_conf_services_url_for_deployment(
         self, dream_pipeline: DreamPipeline, user_prefix: str
