@@ -335,6 +335,9 @@ class SwarmDeployer:
         logger.info("COMPOSE CMD \n %s", cmd)
         logger.info("COMPOSE temporary_deployment_file_path \n %s", temporary_deployment_file_path)
         logger.info("COMPOSE deployment_file_path \n %s", deployment_file_path)
+        with open(self._get_deployment_path(dist)) as fin:
+            deployment = yaml.safe_load(fin.read())
+        logger.info("COMPOSE FILE \n %s", deployment)
         res = subprocess.run(
             f"docker compose {cmd} config  > {temporary_deployment_file_path} && mv {temporary_deployment_file_path} "
             f"{deployment_file_path}",
