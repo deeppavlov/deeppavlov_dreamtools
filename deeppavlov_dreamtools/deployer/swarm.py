@@ -332,23 +332,27 @@ class SwarmDeployer:
         deployment_file_path = self._get_deployment_path(dist)
         temporary_deployment_file_path = str(deployment_file_path)[:-1]
         cmd = " ".join(f"-f {config}" for config in (docker_compose_pathfile, override_path, deployment_file_path))
-
+        logger.info("COMPOSE CMD \n %s", CMD)
         subprocess.run(
             f"docker compose {cmd} config  > {temporary_deployment_file_path} && mv {temporary_deployment_file_path} "
             f"{deployment_file_path}",
             shell=True,
         )
+        logger.info("RUN 1")
         subprocess.run(
             f'sed -i "/published:/s/\\"//g" {deployment_file_path} && echo "version: \'3.7\'" >> '
             f'{deployment_file_path} && sed -i "/^name:/d" {deployment_file_path}',
             shell=True,
         )
+        logger.info("RUN 2")
         if self.user_services:  # remove mongo
             with open(deployment_file_path) as fin:
                 data = yaml.safe_load(fin)
                 data['services'].pop('mongo', None)
+            logger.info("REMOVE MOBGO")
             with open(deployment_file_path, 'w') as fout:
                 yaml.dump(data, fout)
+            logger.info("DUMP")
 
     def remove_services(self, stack_name: str):
         self.swarm_client.delete_stack(stack_name)
