@@ -187,6 +187,9 @@ class SwarmDeployer:
         except IOError as e:
             logger.info(f"Error writing to {dist.dist_path}/.env : {e}")
         logger.info("END WRITE")
+        with open(dist.dist_path / ".env", "r") as f:
+            env_file_content = f.read()
+            logger.info(f"Contents of .env:\n{env_file_content}")
 
     def _change_pipeline_conf_services_url_for_deployment(
         self, dream_pipeline: DreamPipeline, user_prefix: str
