@@ -166,6 +166,7 @@ class SwarmDeployer:
         url that not in self.user_services -> http://prefix_service
         """
         env_dict = dotenv.dotenv_values(dist.dream_root / ".env")
+        logger.info("DREAM .ENV FILE \n", env_dict)
         env_dict["DB_NAME"] = self.user_identifier.split('_')[-1]
 
         for env_var, env_value in env_dict.items():
@@ -177,10 +178,12 @@ class SwarmDeployer:
                         env_dict[env_var] = self.get_url_prefixed(env_value, self.default_prefix)
                 else:
                     env_dict[env_var] = self.get_url_prefixed(env_value, self.default_prefix)
-
-        with open(dist.dist_path / ".env", "w") as f:
-            for var, value in env_dict.items():
-                f.write(f"{var}={value}\n")
+        try:
+            with open(dist.dist_path / ".env", "w") as f:
+                for var, value in env_dict.items():
+                    f.write(f"{var}={value}\n")
+        except IOError as e:
+            logger.info(f"Error writing to {dist.dist_path / ".env"}: {e}")
 
     def _change_pipeline_conf_services_url_for_deployment(
         self, dream_pipeline: DreamPipeline, user_prefix: str
