@@ -335,11 +335,19 @@ class SwarmDeployer:
         logger.info("COMPOSE CMD \n %s", cmd)
         logger.info("COMPOSE temporary_deployment_file_path \n %s", temporary_deployment_file_path)
         logger.info("COMPOSE deployment_file_path \n %s", deployment_file_path)
-        subprocess.run(
+        res = subprocess.run(
             f"docker compose {cmd} config  > {temporary_deployment_file_path} && mv {temporary_deployment_file_path} "
             f"{deployment_file_path}",
             shell=True,
         )
+        if res.returncode == 0:
+            logger.info("Success")
+        else:
+            logger.error(f"Error: {result.returncode}")
+            logger.info("Standart out:")
+            logger.info(result.stdout.decode())
+            logger.info("Standart error:")
+            logger.info(result.stderr.decode())
         logger.info("RUN 1")
         subprocess.run(
             f'sed -i "/published:/s/\\"//g" {deployment_file_path} && echo "version: \'3.7\'" >> '
