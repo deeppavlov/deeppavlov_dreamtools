@@ -343,11 +343,11 @@ class SwarmDeployer:
         if res.returncode == 0:
             logger.info("Success")
         else:
-            logger.error(f"Error: {result.returncode}")
+            logger.error(f"Error: {res.returncode}")
             logger.info("Standart out:")
-            logger.info(result.stdout.decode())
+            logger.info(res.stdout.decode())
             logger.info("Standart error:")
-            logger.info(result.stderr.decode())
+            logger.info(res.stderr.decode())
         logger.info("RUN 1")
         subprocess.run(
             f'sed -i "/published:/s/\\"//g" {deployment_file_path} && echo "version: \'3.7\'" >> '
