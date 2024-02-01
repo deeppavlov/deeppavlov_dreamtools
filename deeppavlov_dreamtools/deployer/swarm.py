@@ -263,9 +263,13 @@ class SwarmDeployer:
                 image: {dist.name}_asr
         ```
         """
+        logger.info("START CREATE DEPLOYMENT YML FILE")
         deployment_dict = self._create_deployment_dict(dist)
+        logger.info("DEPLOYMENT DICT")
         self._save_deployment_dict_in_dist_path(deployment_dict, dist)
+        logger.info("SAVE")
         self._configure_deployment_file(dist)
+        logger.info("CONFIGURE")
 
     def _create_services_dict(self, dist: AssistantDist) -> dict:
         """
