@@ -179,12 +179,14 @@ class SwarmDeployer:
                         env_dict[env_var] = self.get_url_prefixed(env_value, self.default_prefix)
                 else:
                     env_dict[env_var] = self.get_url_prefixed(env_value, self.default_prefix)
+        logger.info("START WRITE")
         try:
             with open(dist.dist_path / ".env", "w") as f:
                 for var, value in env_dict.items():
                     f.write(f"{var}={value}\n")
         except IOError as e:
             logger.info(f"Error writing to {dist.dist_path}/.env : {e}")
+        logger.info("END WRITE")
 
     def _change_pipeline_conf_services_url_for_deployment(
         self, dream_pipeline: DreamPipeline, user_prefix: str
