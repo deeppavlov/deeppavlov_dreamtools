@@ -176,7 +176,7 @@ def create_generative_prompted_skill_service(
             "GENERATIVE_SERVICE_CONFIG": f"{service_uid}.json",
             "GENERATIVE_TIMEOUT": 120,
             "N_UTTERANCES_CONTEXT": 7,
-            "ENVVARS_TO_SEND": "OPENAI_API_KEY,OPENAI_ORGANIZATION",
+            "ENVVARS_TO_SEND": "OPENAI_API_KEY,OPENAI_ORGANIZATION,GIGACHAT_CREDENTIAL,GIGACHAT_SCOPE",
         },
     )
 
